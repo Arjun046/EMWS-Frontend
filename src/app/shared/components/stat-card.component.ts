@@ -1,16 +1,17 @@
 import { Component, Input } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatCardModule } from '@angular/material/card';
+import { StatCard } from '../models/ui.models';
 
 @Component({
   selector: 'app-stat-card',
   standalone: true,
   imports: [CommonModule, MatCardModule],
   template: `
-    <mat-card class="stat-card" [ngClass]="'tone-' + card.tone">
+    <mat-card class="stat-card" [ngClass]="card.tone ? 'tone-' + card.tone : 'tone-default'">
       <span class="label">{{ card.label }}</span>
       <strong class="value">{{ card.value }}</strong>
-      <span class="delta">{{ card.delta }}</span>
+      <span class="delta" *ngIf="card.delta">{{ card.delta }}</span>
     </mat-card>
   `,
   styles: [`
@@ -26,5 +27,5 @@ import { MatCardModule } from '@angular/material/card';
   `]
 })
 export class StatCardComponent {
-  @Input() card!: { label: string; value: string; delta: string; tone: string };
+  @Input() card!: StatCard;
 }

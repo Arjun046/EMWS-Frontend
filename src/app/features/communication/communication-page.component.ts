@@ -154,8 +154,6 @@ type ChatMode = 'private' | 'group';
   standalone: true,
   imports: [
     CommonModule,
-    NgClass,
-    DatePipe,
     ReactiveFormsModule,
     FormsModule,
     MatButtonModule,
@@ -169,15 +167,9 @@ type ChatMode = 'private' | 'group';
     MatSnackBarModule,
     MatCheckboxModule,
     MatMenuModule,
-    PageHeaderComponent,
     AudioPlayerComponent
   ],
   template: `
-    <app-page-header
-      title="Communication Hub"
-      subtitle="Enterprise-grade unified messaging with live workforce status, focused threads, and operational room management."
-    />
-
     <div class="whatsapp-shell" [class.dark-mode]="isDarkMode()" [style.background-image]="chatTheme()">
       <aside class="sidebar">
         <header class="sidebar-header">
@@ -204,7 +196,8 @@ type ChatMode = 'private' | 'group';
                   <span>Settings</span>
                </button>
             </mat-menu>
-            </div>        </header>
+          </div>
+        </header>
 
         <div class="search-bar">
           <mat-form-field appearance="outline" class="search-field">
@@ -283,7 +276,7 @@ type ChatMode = 'private' | 'group';
                <p class="text-slate-500 text-sm">No groups found. Create one above!</p>
             </div>
           }
-        </nav>
+        </div>
       </aside>
 
       <main class="chat-window">
