@@ -1,0 +1,51 @@
+@import '@angular/material/prebuilt-themes/azure-blue.css';
+
+:root {
+  --primary-brand: #2563eb;
+  --secondary-brand: #64748b;
+  --accent-brand: #14b8a6;
+  --bg-brand: #f8fafc;
+  --text-brand: #0f172a;
+  
+  --app-primary-600: var(--primary-brand);
+  --app-primary-700: var(--primary-brand);
+  --app-surface: var(--bg-brand);
+  --app-text: var(--text-brand);
+  --app-text-secondary: var(--secondary-brand);
+}
+
+.global-dark-mode {
+  --app-text: #f1f5f9;
+  --app-surface: rgba(15, 23, 42, 0.85);
+  background: var(--bg-brand) !important;
+  color: var(--text-brand) !important;
+  
+  .mat-mdc-card {
+    --mdc-elevated-card-container-color: #1e293b !important;
+    color: #f1f5f9 !important;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  min-height: 100%;
+  color: var(--app-text);
+  font-family: 'Manrope', 'Segoe UI', sans-serif;
+  background: linear-gradient(180deg, #f8fbff 0%, #f2f6fb 100%);
+}
+
+body {
+  min-height: 100vh;
+}
+
+button, input, textarea, select {
+  font: inherit;
+}
+
+.mat-mdc-card {
+  --mdc-elevated-card-container-color: rgba(255, 255, 255, 0.82);
+}
