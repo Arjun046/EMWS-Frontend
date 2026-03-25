@@ -1,7 +1,7 @@
 export const environment = {
   production: false,
   appName: 'EWMS Workforce Console',
-  apiBaseUrl: 'https://emws-backend-arjunsuthar2001.loca.lt',
-  widgetSocketUrl: 'wss://emws-backend-arjunsuthar2001.loca.lt/ws-hub',
-  chatSocketUrl: 'wss://emws-backend-arjunsuthar2001.loca.lt/ws-chat'
+  apiBaseUrl: 'http://localhost:8080',
+  widgetSocketUrl: 'ws://localhost:8080/ws-hub',
+  chatSocketUrl: 'ws://localhost:8080/ws-chat'
 };
