@@ -1294,7 +1294,7 @@ export class CommunicationPageComponent implements OnInit {
     this.chat.addOptimisticMessage(optimisticMsg);
 
     // 2. Encryption logic
-    if (this.mode() === 'private' && this.selectedContact()) {
+    if (this.mode() === 'private' && this.selectedContact() && this.selectedContact()!.id !== 0) {
       const peerId = this.selectedContact()!.id;
       console.log(`[E2EE] Attempting to encrypt for Peer ID: ${peerId}`);
 
@@ -1439,7 +1439,7 @@ export class CommunicationPageComponent implements OnInit {
 
     let finalFileUrl = audioBase64;
     
-    if (this.mode() === 'private' && this.selectedContact()) {
+    if (this.mode() === 'private' && this.selectedContact() && this.selectedContact()!.id !== 0) {
        try {
           const resp = await this.chatApi.getPublicKey(this.selectedContact()!.id).toPromise();
           if (resp && resp.publicKey) {

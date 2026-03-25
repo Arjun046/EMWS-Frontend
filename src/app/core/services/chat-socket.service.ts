@@ -93,55 +93,9 @@ export class ChatSocketService {
         destination: '/app/chat.send',
         body: JSON.stringify(message)
       });
-
-      // EWMS AI SIMULATION: If sent to AI Assistant (ID: 0)
-      if (message.recipientId === 0) {
-         this.simulateAIResponse(message);
-      }
     } else {
       console.error('[ChatSocket] Send failed: not connected');
     }
-  }
-
-  private simulateAIResponse(userMsg: ChatMessage): void {
-     // 1. Show Typing Status
-     setTimeout(() => {
-        const typing: ChatMessage = {
-           senderId: 0,
-           recipientId: this.currentUserId,
-           groupId: null,
-           companyId: this.currentCompanyId!,
-           messageType: 'TYPING',
-           content: '...',
-           isRead: false
-        };
-        this.handleMessage({ body: JSON.stringify(typing) } as IMessage);
-     }, 1000);
-
-     // 2. Send Actual Response
-     setTimeout(() => {
-        const response: ChatMessage = {
-           id: Math.floor(Math.random() * 1000000),
-           senderId: 0,
-           recipientId: this.currentUserId,
-           groupId: null,
-           companyId: this.currentCompanyId!,
-           messageType: 'TEXT',
-           content: this.getAIResponse(userMsg.content),
-           isRead: false,
-           timestamp: new Date().toISOString()
-        };
-        this.handleMessage({ body: JSON.stringify(response) } as IMessage);
-     }, 3500);
-  }
-
-  private getAIResponse(prompt: string): string {
-     const p = prompt.toLowerCase();
-     if (p.includes('hello') || p.includes('hi')) return 'Hello! I am your EWMS AI Assistant. How can I help you with your workforce tasks today?';
-     if (p.includes('schedule') || p.includes('shift')) return 'I can help you view or change shifts. Currently, there are 12 employees scheduled for the morning shift.';
-     if (p.includes('payroll')) return 'Payroll processing for this cycle is 85% complete. No major blockers detected.';
-     if (p.includes('who are you')) return 'I am an AI built into the Enterprise Mesh to help you manage operations efficiently.';
-     return "That's an interesting question about the workforce. I'm currently processing system data to give you a more accurate answer. Anything else I can assist with?";
   }
 
   private handleMessage(message: IMessage): void {
