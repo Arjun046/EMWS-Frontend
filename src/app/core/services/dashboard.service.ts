@@ -18,10 +18,10 @@ export class DashboardService {
     { title: 'Payroll review ready', detail: '12 exceptions grouped for finance approval', time: '14:05', tone: 'accent' }
   ]);
   private readonly statsState = signal<StatCard[]>([
-    { label: 'Active Staff', value: '0', delta: 'Loading', tone: 'good' },
-    { label: 'Attendance Adherence', value: '0%', delta: 'Loading', tone: 'accent' },
-    { label: 'Pending Leave Approvals', value: '0', delta: 'Loading', tone: 'warn' },
-    { label: 'Open Tasks', value: '0', delta: 'Loading', tone: 'good' }
+    { label: 'Present Today', value: '0', delta: 'Active now', tone: 'good', icon: 'how_to_reg' },
+    { label: 'Absent Today', value: '0', delta: 'Missed shifts', tone: 'warn', icon: 'event_busy' },
+    { label: 'Late Arrivals', value: '0', delta: 'After start time', tone: 'accent', icon: 'schedule' },
+    { label: 'On Leave', value: '0', delta: 'Approved requests', tone: 'default', icon: 'beach_access' }
   ]);
   private readonly attendanceScoreState = signal(0);
   private readonly leavePressureState = signal(0);
@@ -35,29 +35,42 @@ export class DashboardService {
 
   constructor(private readonly api: ApiService) {
     const { start, end } = this.currentRange();
+    const todayStart = new Date().toISOString().split('T')[0] + 'T00:00:00Z';
+    const tomorrowStart = new Date(Date.now() + 86400000).toISOString().split('T')[0] + 'T00:00:00Z';
 
     combineLatest([
       this.api.get<any[]>('/api/employees', [], this.empUrl),
-      this.api.get<number>('/api/attendance/summary/clocked-in', 0, this.attUrl),
-      this.api.get<number>(`/api/attendance/summary/break-violations?start=${start}&end=${end}`, 0, this.attUrl),
-      this.api.get<any[]>('/api/leaves/status/PENDING', [], this.leaveUrl),
+      this.api.get<any[]>(`/api/attendance/range?start=${todayStart}&end=${tomorrowStart}`, [], this.attUrl),
+      this.api.get<any[]>('/api/leaves/status/APPROVED', [], this.leaveUrl),
       this.api.get<any[]>('/api/tasks', [], this.taskUrl),
       this.api.get<any[]>('/api/shifts', [], this.schedUrl),
       this.api.get<any>('/api/analytics/dashboard/admin', null, this.analyticsUrl)
-    ]).subscribe(([employees, clockedIn, breakViolations, pendingLeaves, tasks, shifts, admin]) => {
-      const activeEmployees = employees.filter((employee) => employee.status === 'ACTIVE').length;
-      const openTasks = tasks.filter((task) => !String(task.status ?? '').toUpperCase().includes('DONE')).length;
-      const openShifts = shifts.filter((shift) => !shift.employeeId).length;
+    ]).subscribe(([employees, attendance, approvedLeaves, tasks, shifts, admin]) => {
+      const activeEmployees = employees.filter((e) => e.status === 'ACTIVE').length;
+      
+      const presentCount = attendance.filter(a => a.clockOut === null).length;
+      const lateCount = attendance.filter(a => a.isLate).length;
+      
+      // On Leave today
+      const today = new Date().toISOString().split('T')[0];
+      const onLeaveToday = approvedLeaves.filter(l => {
+        const start = l.startDate.split('T')[0];
+        const end = l.endDate.split('T')[0];
+        return today >= start && today <= end;
+      }).length;
 
-      const adherence = employees.length ? Math.round((clockedIn / employees.length) * 100) : (admin?.currentlyClockedIn ?? 0);
-      const leavePressure = Math.min(100, pendingLeaves.length * 10 + breakViolations * 3);
-      const scheduleCoverage = Math.max(35, 100 - openShifts * 6);
+      // Absent: Scheduled for today but no attendance record
+      // This is a simplification
+      const scheduledToday = shifts.filter(s => s.startTime?.startsWith(today)).length;
+      const absentCount = Math.max(0, scheduledToday - attendance.length);
+
+      const adherence = employees.length ? Math.round((presentCount / employees.length) * 100) : 0;
 
       this.statsState.set([
-        { label: 'Active Staff', value: String(activeEmployees || admin?.totalEmployees || employees.length), delta: `${employees.length} profiles loaded`, tone: 'good' },
-        { label: 'Attendance Adherence', value: `${adherence}%`, delta: `${clockedIn} clocked in`, tone: 'accent' },
-        { label: 'Pending Leave Approvals', value: String(pendingLeaves.length || admin?.pendingLeaveRequests || 0), delta: `${breakViolations} break alerts`, tone: 'warn' },
-        { label: 'Open Tasks', value: String(openTasks), delta: `${openShifts} open shifts`, tone: 'good' }
+        { label: 'Present Today', value: String(presentCount), delta: 'Currently clocked in', tone: 'good', icon: 'how_to_reg' },
+        { label: 'Absent Today', value: String(absentCount), delta: 'Scheduled but not in', tone: 'warn', icon: 'event_busy' },
+        { label: 'Late Arrivals', value: String(lateCount), delta: 'Flagged today', tone: 'accent', icon: 'schedule' },
+        { label: 'On Leave', value: String(onLeaveToday), delta: 'Approved for today', tone: 'default', icon: 'beach_access' }
       ]);
 
       this.attendanceScoreState.set(adherence);

@@ -1,6 +1,6 @@
 import { Routes } from '@angular/router';
-import { AttendancePageComponent } from './attendance-page.component';
+import { AttendanceContainerComponent } from './attendance-container.component';
 
 export const ATTENDANCE_ROUTES: Routes = [
-  { path: '', component: AttendancePageComponent }
+  { path: '', component: AttendanceContainerComponent }
 ];
