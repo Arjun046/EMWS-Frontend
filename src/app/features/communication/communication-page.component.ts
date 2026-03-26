@@ -1075,7 +1075,7 @@ export class CommunicationPageComponent implements OnInit {
     });
     dialogRef.afterClosed().subscribe(result => {
       if (result) {
-        const payload = { ...result, companyId: this.currentCompanyId() };
+        const payload = { ...result, companyId: this.currentCompanyId(), createdByUserId: this.currentUserId() };
         this.chatApi.createGroup(payload).subscribe({
           next: (newGroup) => {
             this.localGroups.update(gs => [...gs, newGroup]);
