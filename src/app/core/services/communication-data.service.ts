@@ -1,6 +1,11 @@
 import { Injectable } from '@angular/core';
 import { map, Observable } from 'rxjs';
-import { ConversationContact, ConversationGroup, ChatMessage } from '../../shared/models/ui.models';
+import {
+  ChatMessage,
+  ConversationContact,
+  ConversationGroup,
+  StatusStory
+} from '../../shared/models/ui.models';
 import { ApiService } from './api.service';
 
 const DEFAULT_CONTACTS: ConversationContact[] = [
@@ -75,7 +80,8 @@ export class CommunicationDataService {
           name: item.name,
           description: item.description,
           members: item.members ?? 1,
-          accent: item.accent ?? 'linear-gradient(135deg, #2563eb, #14b8a6)'
+          accent: item.accent ?? 'linear-gradient(135deg, #2563eb, #14b8a6)',
+          imageUrl: item.imageUrl ?? null
         }));
       })
     );
@@ -118,5 +124,55 @@ export class CommunicationDataService {
 
   pinMessage(messageId: number, status: boolean): Observable<void> {
     return this.api.post<void>(`/api/communication/chat/messages/${messageId}/pin?status=${status}`, {}, undefined, this.commsUrl);
+  }
+
+  addReaction(messageId: number, userId: number, companyId: number, emoji: string): Observable<ChatMessage> {
+    return this.api.post<ChatMessage>(
+      `/api/communication/chat/messages/${messageId}/reactions`,
+      { userId, companyId, emoji },
+      undefined,
+      this.commsUrl
+    );
+  }
+
+  removeReaction(messageId: number, userId: number): Observable<ChatMessage> {
+    return this.api.delete<ChatMessage>(
+      `/api/communication/chat/messages/${messageId}/reactions?userId=${userId}`,
+      undefined,
+      this.commsUrl
+    );
+  }
+
+  loadStatuses(companyId: number, requesterId?: number): Observable<StatusStory[]> {
+    let url = `/api/communication/status?companyId=${companyId}`;
+    if (requesterId != null) {
+      url += `&requesterId=${requesterId}`;
+    }
+    return this.api.get<StatusStory[]>(url, [], this.commsUrl);
+  }
+
+  createStatus(payload: {
+    userId: number;
+    companyId: number;
+    content?: string;
+    mediaUrl?: string;
+    backgroundStyle?: string;
+    statusType?: string;
+    expiresInHours?: number;
+  }): Observable<StatusStory> {
+    return this.api.post<StatusStory>('/api/communication/status', payload, undefined, this.commsUrl);
+  }
+
+  markStatusViewed(statusId: number, viewerId: number): Observable<void> {
+    return this.api.post<void>(
+      `/api/communication/status/${statusId}/view?viewerId=${viewerId}`,
+      {},
+      undefined,
+      this.commsUrl
+    );
+  }
+
+  deleteStatus(statusId: number, userId: number): Observable<void> {
+    return this.api.delete<void>(`/api/communication/status/${statusId}?userId=${userId}`, undefined, this.commsUrl);
   }
 }

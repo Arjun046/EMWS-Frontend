@@ -92,6 +92,28 @@ export interface ChatMessage {
   isEdited?: boolean;
   isDeleted?: boolean;
   isPinned?: boolean;
+  reactions?: ChatReactionSummary[];
+}
+
+export interface ChatReactionSummary {
+  emoji: string;
+  count: number;
+  reactedByCurrentUser: boolean;
+}
+
+export interface StatusStory {
+  id: number;
+  userId: number;
+  companyId: number;
+  content?: string | null;
+  mediaUrl?: string | null;
+  backgroundStyle?: string | null;
+  statusType: string;
+  createdAt: string;
+  expiresAt: string;
+  viewCount: number;
+  viewedByRequester: boolean;
+  active: boolean;
 }
 
 export interface NotificationItem {

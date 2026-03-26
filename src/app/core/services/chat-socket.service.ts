@@ -82,6 +82,15 @@ export class ChatSocketService {
     this.messagesState.set(messages);
   }
 
+  upsertMessage(message: ChatMessage): void {
+    this.messagesState.update((messages) => {
+      if (message.id && messages.some((entry) => entry.id === message.id)) {
+        return messages.map((entry) => entry.id === message.id ? message : entry);
+      }
+      return [...messages, message];
+    });
+  }
+
   addOptimisticMessage(msg: ChatMessage): void {
     this.messagesState.update(msgs => [...msgs, msg]);
   }

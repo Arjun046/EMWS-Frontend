@@ -17,7 +17,7 @@ import { AuthService } from '../../core/services/auth.service';
 import { ChatSocketService } from '../../core/services/chat-socket.service';
 import { CommunicationDataService, DEFAULT_GROUPS } from '../../core/services/communication-data.service';
 import { PageHeaderComponent } from '../../shared/components/page-header.component';
-import { ConversationContact, ConversationGroup, ChatMessage } from '../../shared/models/ui.models';
+import { ConversationContact, ConversationGroup, ChatMessage, StatusStory } from '../../shared/models/ui.models';
 import { CryptoService } from '../../core/services/crypto.service';
 import { VoiceRecorderService } from '../../core/services/voice-recorder.service';
 import { AudioPlayerComponent } from './audio-player.component';
@@ -149,6 +149,103 @@ export class NewGroupDialog {
 
 type ChatMode = 'private' | 'group';
 
+type StatusStorySummary = {
+  userId: number;
+  name: string;
+  avatar: string;
+  imageUrl?: string | null;
+  viewed: boolean;
+  latestStory: StatusStory;
+  stories: StatusStory[];
+  isOwn: boolean;
+};
+
+@Component({
+  selector: 'app-status-composer-dialog',
+  standalone: true,
+  imports: [CommonModule, ReactiveFormsModule, MatDialogModule, MatFormFieldModule, MatInputModule, MatButtonModule],
+  template: `
+    <h2 mat-dialog-title>Create Status</h2>
+    <mat-dialog-content>
+      <form [formGroup]="form" class="dialog-form">
+        <mat-form-field appearance="outline" class="w-full">
+          <mat-label>Status text</mat-label>
+          <textarea matInput rows="4" formControlName="content" placeholder="Share an update"></textarea>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="w-full">
+          <mat-label>Background color</mat-label>
+          <input matInput formControlName="backgroundStyle" placeholder="#128C7E">
+        </mat-form-field>
+      </form>
+    </mat-dialog-content>
+    <mat-dialog-actions align="end">
+      <button mat-button (click)="dialogRef.close()">Cancel</button>
+      <button mat-flat-button color="primary" [disabled]="form.invalid" (click)="submit()">Post</button>
+    </mat-dialog-actions>
+  `,
+  styles: [`
+    .dialog-form { display: flex; flex-direction: column; gap: 1rem; min-width: 20rem; padding-top: 0.5rem; }
+    .w-full { width: 100%; }
+  `]
+})
+export class StatusComposerDialog {
+  private readonly fb = inject(FormBuilder);
+  protected readonly dialogRef = inject(MatDialogRef<StatusComposerDialog>);
+
+  protected readonly form = this.fb.group({
+    content: ['', [Validators.required, Validators.maxLength(280)]],
+    backgroundStyle: ['#128C7E', [Validators.required]]
+  });
+
+  protected submit(): void {
+    this.dialogRef.close(this.form.getRawValue());
+  }
+}
+
+@Component({
+  selector: 'app-status-viewer-dialog',
+  standalone: true,
+  imports: [CommonModule, MatDialogModule, MatButtonModule, MatIconModule],
+  template: `
+    <h2 mat-dialog-title>{{ data.name }}</h2>
+    <mat-dialog-content>
+      <div
+        class="status-viewer"
+        [style.background]="data.story.backgroundStyle || '#128C7E'">
+        <p>{{ data.story.content || 'Status update' }}</p>
+        <span>{{ data.story.createdAt | date:'short' }}</span>
+      </div>
+    </mat-dialog-content>
+    <mat-dialog-actions align="end">
+      <button mat-button *ngIf="data.canDelete" (click)="dialogRef.close('delete')">
+        <mat-icon>delete</mat-icon>
+        Delete
+      </button>
+      <button mat-flat-button color="primary" (click)="dialogRef.close()">Close</button>
+    </mat-dialog-actions>
+  `,
+  styles: [`
+    .status-viewer {
+      min-width: 20rem;
+      min-height: 20rem;
+      border-radius: 1rem;
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      color: #fff;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.1);
+    }
+    .status-viewer p { margin: 0; font-size: 1.2rem; line-height: 1.5; white-space: pre-wrap; }
+    .status-viewer span { font-size: 0.85rem; opacity: 0.9; }
+  `]
+})
+export class StatusViewerDialog {
+  protected readonly data = inject(MAT_DIALOG_DATA) as { name: string; story: StatusStory; canDelete: boolean };
+  protected readonly dialogRef = inject(MatDialogRef<StatusViewerDialog>);
+}
+
 @Component({
   selector: 'app-communication-page',
   standalone: true,
@@ -183,7 +280,7 @@ type ChatMode = 'private' | 'group';
             <button mat-icon-button (click)="toggleDarkMode()" [title]="isDarkMode() ? 'Light Mode' : 'Dark Mode'">
                <mat-icon>{{ isDarkMode() ? 'light_mode' : 'dark_mode' }}</mat-icon>
             </button>
-            <button mat-icon-button title="Status"><mat-icon>donut_large</mat-icon></button>
+            <button mat-icon-button title="Status" (click)="openStatusComposer()"><mat-icon>donut_large</mat-icon></button>
             <button mat-icon-button title="New Chat" (click)="openNewChatDialog()"><mat-icon>add_box</mat-icon></button>
             <button mat-icon-button [matMenuTriggerFor]="mainMenu"><mat-icon>more_vert</mat-icon></button>
             <mat-menu #mainMenu="matMenu">
@@ -205,6 +302,31 @@ type ChatMode = 'private' | 'group';
             <input matInput placeholder="Search or start new chat" [formControl]="searchControl">
           </mat-form-field>
         </div>
+
+        <section class="status-strip">
+          <button class="status-card status-card--own" type="button" (click)="openStatusComposer()">
+            <div class="status-avatar" [class.status-avatar--empty]="!ownStatusSummary()">
+              <span>{{ auth.user()?.avatar || 'ME' }}</span>
+              <span class="status-add-badge">+</span>
+            </div>
+            <div class="status-copy">
+              <strong>My status</strong>
+              <span>{{ ownStatusSummary() ? 'Tap to post another update' : 'Add a status update' }}</span>
+            </div>
+          </button>
+
+          <div class="status-story-list" *ngIf="statusSummaries().length > 0">
+            @for (status of statusSummaries(); track status.userId) {
+              <button class="status-story" type="button" (click)="openStatusViewer(status)">
+                <div class="status-avatar" [class.status-avatar--viewed]="status.viewed">
+                  <img *ngIf="status.imageUrl" [src]="status.imageUrl" class="avatar-img">
+                  <span *ngIf="!status.imageUrl">{{ status.avatar }}</span>
+                </div>
+                <span>{{ status.name }}</span>
+              </button>
+            }
+          </div>
+        </section>
 
         <div class="mode-tabs">
           <button (click)="mode.set('private')" [class.active]="mode() === 'private'">Workforce</button>
@@ -367,9 +489,19 @@ type ChatMode = 'private' | 'group';
                             <mat-icon>expand_more</mat-icon>
                          </button>
                          <mat-menu #msgMenu="matMenu">
+                            <button mat-menu-item [matMenuTriggerFor]="reactionMenu"><mat-icon>add_reaction</mat-icon><span>React</span></button>
                             <button mat-menu-item (click)="setReply(msg)"><mat-icon>reply</mat-icon><span>Reply</span></button>
                             <button mat-menu-item (click)="forwardMessage(msg)"><mat-icon>forward</mat-icon><span>Forward</span></button>
+                            <button mat-menu-item *ngIf="msg.senderId === currentUserId() && !msg.isDeleted" (click)="startEditMessage(msg)"><mat-icon>edit</mat-icon><span>Edit</span></button>
+                            <button mat-menu-item (click)="togglePinMessage(msg)"><mat-icon>push_pin</mat-icon><span>{{ msg.isPinned ? 'Unpin' : 'Pin' }}</span></button>
                             <button mat-menu-item color="warn" *ngIf="msg.senderId === currentUserId()" (click)="deleteMessage(msg)"><mat-icon>delete</mat-icon><span>Delete</span></button>
+                         </mat-menu>
+                         <mat-menu #reactionMenu="matMenu">
+                            @for (emoji of reactionOptions; track emoji) {
+                              <button mat-menu-item (click)="reactToMessage(msg, emoji)">
+                                <span>{{ emoji }}</span>
+                              </button>
+                            }
                          </mat-menu>
                       </div>
 
@@ -430,6 +562,25 @@ type ChatMode = 'private' | 'group';
                           <div class="content">{{ msg.content }}</div>
                         }
                       }
+
+                      <div class="reaction-summary" *ngIf="msg.reactions?.length">
+                        @for (reaction of msg.reactions || []; track reaction.emoji) {
+                          <button
+                            class="reaction-chip"
+                            type="button"
+                            [class.reaction-chip--own]="reaction.reactedByCurrentUser"
+                            (click)="toggleReaction(msg, reaction.emoji, reaction.reactedByCurrentUser)">
+                            <span>{{ reaction.emoji }}</span>
+                            <strong>{{ reaction.count }}</strong>
+                          </button>
+                        }
+                      </div>
+
+                      <div class="reaction-picker-inline" *ngIf="hoveredMsg() === msg.id && !msg.isDeleted">
+                        @for (emoji of reactionOptions; track emoji) {
+                          <button type="button" (click)="reactToMessage(msg, emoji)">{{ emoji }}</button>
+                        }
+                      </div>
 
                       <div class="meta">
                         <span class="edited-tag" *ngIf="msg.isEdited">(edited)</span>
@@ -594,6 +745,21 @@ type ChatMode = 'private' | 'group';
     .search-field { width: 100%; }
     ::ng-deep .search-field .mat-mdc-text-field-wrapper { background: #f0f2f5 !important; border-radius: 0.6rem !important; height: 2.5rem; }
     ::ng-deep .search-field .mat-mdc-form-field-flex { min-height: 2.5rem !important; padding-top: 0 !important; }
+    .status-strip { padding: 0 1rem 0.75rem; display: flex; flex-direction: column; gap: 0.75rem; border-bottom: 1px solid #f1f5f9; }
+    .status-card { display: flex; align-items: center; gap: 0.75rem; border: none; background: #f8fafc; border-radius: 1rem; padding: 0.75rem; cursor: pointer; text-align: left; }
+    .status-card--own { border: 1px solid #dcfce7; }
+    .status-copy { display: flex; flex-direction: column; min-width: 0; }
+    .status-copy strong { color: #0f172a; font-size: 0.9rem; }
+    .status-copy span { color: #64748b; font-size: 0.75rem; }
+    .status-story-list { display: flex; gap: 0.75rem; overflow-x: auto; padding-bottom: 0.25rem; scrollbar-width: none; }
+    .status-story-list::-webkit-scrollbar { display: none; }
+    .status-story { display: flex; flex-direction: column; align-items: center; gap: 0.35rem; border: none; background: transparent; min-width: 4.25rem; cursor: pointer; color: #475569; font-size: 0.72rem; }
+    .status-story span { max-width: 4.5rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .status-avatar { width: 3rem; height: 3rem; border-radius: 50%; padding: 2px; background: linear-gradient(135deg, #25d366, #128c7e); display: grid; place-items: center; position: relative; flex-shrink: 0; }
+    .status-avatar > span, .status-avatar > img { width: 100%; height: 100%; border-radius: 50%; background: #e2e8f0; display: grid; place-items: center; color: #0f172a; font-weight: 700; object-fit: cover; }
+    .status-avatar--viewed { background: linear-gradient(135deg, #cbd5e1, #94a3b8); }
+    .status-avatar--empty { background: linear-gradient(135deg, #bae6fd, #93c5fd); }
+    .status-add-badge { position: absolute; right: -2px; bottom: -2px; width: 1.1rem !important; height: 1.1rem !important; background: #25d366 !important; color: #fff !important; border: 2px solid #fff; font-size: 0.85rem; }
     .mode-tabs { display: flex; padding: 0.5rem 1rem; gap: 0.5rem; border-bottom: 1px solid #f1f5f9; }
     .mode-tabs button { flex: 1; border: none; background: transparent; padding: 0.6rem; font-size: 0.85rem; font-weight: 600; cursor: pointer; color: #64748b; transition: all 0.2s; position: relative; }
     .mode-tabs button.active { color: #2563eb; }
@@ -679,6 +845,12 @@ type ChatMode = 'private' | 'group';
     .emoji-tray span:hover { transform: scale(1.2); }
 
     .content { font-size: 0.92rem; color: #111b21; line-height: 1.4; white-space: pre-wrap; word-break: break-word; }
+    .reaction-summary { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.45rem; }
+    .reaction-chip { display: inline-flex; align-items: center; gap: 0.25rem; border: 1px solid #dbeafe; background: rgba(255,255,255,0.9); border-radius: 999px; padding: 0.15rem 0.45rem; cursor: pointer; font-size: 0.75rem; color: #0f172a; }
+    .reaction-chip strong { font-size: 0.72rem; color: #64748b; }
+    .reaction-chip--own { border-color: #86efac; background: #f0fdf4; }
+    .reaction-picker-inline { position: absolute; top: -1.6rem; right: 0.5rem; display: flex; gap: 0.25rem; background: #fff; padding: 0.2rem; border-radius: 999px; box-shadow: 0 6px 20px rgba(15, 23, 42, 0.16); z-index: 6; }
+    .reaction-picker-inline button { border: none; background: transparent; cursor: pointer; padding: 0.1rem 0.2rem; font-size: 0.95rem; }
     .meta { display: flex; align-items: center; justify-content: flex-end; gap: 0.3rem; margin-top: 0.1rem; }
     .meta .time { font-size: 0.65rem; color: #667781; }
     .status-icon { font-size: 1rem; width: 1rem; height: 1rem; color: #8696a0; }
@@ -761,10 +933,12 @@ export class CommunicationPageComponent implements OnInit {
   private readonly decryptedMessages = signal<ChatMessage[]>([]);
 
   private readonly chatSummariesState = signal<any[]>([]);
+  private readonly statusStoriesState = signal<StatusStory[]>([]);
   protected readonly decryptedSummaries = signal<any[]>([]);
   protected readonly chatSummaries = this.chatSummariesState.asReadonly();
   private readonly allEmployees = toSignal(this.chatApi.loadAllEmployees(this.currentCompanyId()), { initialValue: [] });
   private readonly localGroups = signal<ConversationGroup[]>([]);
+  protected readonly reactionOptions = ['\u{1F44D}', '\u{2764}\u{FE0F}', '\u{1F602}', '\u{1F62E}', '\u{1F389}', '\u{1F525}'];
 
   protected readonly sidebarFilter = signal<'all' | 'unread' | 'favorites' | 'groups'>('all');
   protected readonly editingMessage = signal<ChatMessage | null>(null);
@@ -837,6 +1011,42 @@ export class CommunicationPageComponent implements OnInit {
     
     return [...remote, ...this.localGroups()];
   });
+  protected readonly ownStatusSummary = computed(() =>
+    this.statusStoriesState()
+      .filter((story) => story.userId === this.currentUserId() && story.active)
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0] ?? null
+  );
+  protected readonly statusSummaries = computed<StatusStorySummary[]>(() => {
+    const currentId = this.currentUserId();
+    const employees = new Map(this.allEmployees().map((employee) => [employee.id, employee]));
+    const grouped = new Map<number, StatusStory[]>();
+
+    this.statusStoriesState()
+      .filter((story) => story.active && story.userId !== currentId)
+      .forEach((story) => {
+        const bucket = grouped.get(story.userId) ?? [];
+        bucket.push(story);
+        grouped.set(story.userId, bucket);
+      });
+
+    return Array.from(grouped.entries())
+      .map(([userId, stories]) => {
+        const sortedStories = [...stories].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        const latestStory = sortedStories[0];
+        const employee = employees.get(userId);
+        return {
+          userId,
+          name: employee?.name ?? `User ${userId}`,
+          avatar: employee?.avatar ?? 'ST',
+          imageUrl: employee?.imageUrl ?? null,
+          viewed: sortedStories.every((story) => story.viewedByRequester),
+          latestStory,
+          stories: sortedStories,
+          isOwn: false
+        };
+      })
+      .sort((a, b) => Number(a.viewed) - Number(b.viewed) || new Date(b.latestStory.createdAt).getTime() - new Date(a.latestStory.createdAt).getTime());
+  });
   protected readonly mode = signal<ChatMode>('private');
 
   protected openNewGroupDialog(): void {
@@ -866,6 +1076,59 @@ export class CommunicationPageComponent implements OnInit {
     dialogRef.afterClosed().subscribe(result => {
       if (result) {
         this.selectContact(result);
+      }
+    });
+  }
+
+  protected openStatusComposer(): void {
+    const dialogRef = this.dialog.open(StatusComposerDialog, { width: '420px' });
+    dialogRef.afterClosed().subscribe((result) => {
+      if (!result?.content?.trim()) {
+        return;
+      }
+
+      this.chatApi.createStatus({
+        userId: this.currentUserId(),
+        companyId: this.currentCompanyId(),
+        content: result.content.trim(),
+        backgroundStyle: result.backgroundStyle || '#128C7E',
+        statusType: 'TEXT',
+        expiresInHours: 24
+      }).subscribe({
+        next: () => {
+          this.snack.open('Status posted', 'OK', { duration: 2000 });
+          this.refreshStatuses();
+        },
+        error: () => this.snack.open('Failed to post status', 'OK', { duration: 2500 })
+      });
+    });
+  }
+
+  protected openStatusViewer(summary: StatusStorySummary): void {
+    const dialogRef = this.dialog.open(StatusViewerDialog, {
+      width: '420px',
+      data: {
+        name: summary.name,
+        story: summary.latestStory,
+        canDelete: summary.userId === this.currentUserId()
+      }
+    });
+
+    if (summary.userId !== this.currentUserId() && !summary.latestStory.viewedByRequester) {
+      this.chatApi.markStatusViewed(summary.latestStory.id, this.currentUserId()).subscribe({
+        next: () => this.refreshStatuses()
+      });
+    }
+
+    dialogRef.afterClosed().subscribe((action) => {
+      if (action === 'delete') {
+        this.chatApi.deleteStatus(summary.latestStory.id, this.currentUserId()).subscribe({
+          next: () => {
+            this.snack.open('Status deleted', 'OK', { duration: 2000 });
+            this.refreshStatuses();
+          },
+          error: () => this.snack.open('Failed to delete status', 'OK', { duration: 2500 })
+        });
       }
     });
   }
@@ -900,6 +1163,7 @@ export class CommunicationPageComponent implements OnInit {
 
   async ngOnInit(): Promise<void> {
     await this.initializeE2EE();
+    this.refreshStatuses();
   }
 
   protected async resetSecurityKeys(): Promise<void> {
@@ -1259,6 +1523,32 @@ export class CommunicationPageComponent implements OnInit {
      });
   }
 
+  protected reactToMessage(msg: ChatMessage, emoji: string): void {
+    if (!msg.id) {
+      return;
+    }
+
+    this.chatApi.addReaction(msg.id, this.currentUserId(), this.currentCompanyId(), emoji).subscribe({
+      next: (updatedMessage) => this.chat.upsertMessage(updatedMessage),
+      error: () => this.snack.open('Failed to react to message', 'OK', { duration: 2000 })
+    });
+  }
+
+  protected toggleReaction(msg: ChatMessage, emoji: string, reactedByCurrentUser: boolean): void {
+    if (!msg.id) {
+      return;
+    }
+
+    const request = reactedByCurrentUser
+      ? this.chatApi.removeReaction(msg.id, this.currentUserId())
+      : this.chatApi.addReaction(msg.id, this.currentUserId(), this.currentCompanyId(), emoji);
+
+    request.subscribe({
+      next: (updatedMessage) => this.chat.upsertMessage(updatedMessage),
+      error: () => this.snack.open('Failed to update reaction', 'OK', { duration: 2000 })
+    });
+  }
+
   protected async send(): Promise<void> {
     if (this.form.invalid) return;
 
@@ -1473,6 +1763,13 @@ export class CommunicationPageComponent implements OnInit {
     this.chatApi.loadChatSummaries(this.currentUserId(), this.currentCompanyId()).subscribe((data) => {
          this.chatSummariesState.set(data);
       });
+  }
+
+  protected refreshStatuses(): void {
+    this.chatApi.loadStatuses(this.currentCompanyId(), this.currentUserId()).subscribe({
+      next: (stories) => this.statusStoriesState.set(stories),
+      error: () => this.statusStoriesState.set([])
+    });
   }
 
   private updateSidebarWithLiveMessage(msg: ChatMessage): void {
