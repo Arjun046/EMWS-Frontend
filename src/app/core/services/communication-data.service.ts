@@ -126,6 +126,17 @@ export class CommunicationDataService {
     return this.api.post<void>(`/api/communication/chat/messages/${messageId}/pin?status=${status}`, {}, undefined, this.commsUrl);
   }
 
+  updateConversationPreference(payload: {
+    userId: number;
+    companyId: number;
+    conversationType: 'PRIVATE' | 'GROUP';
+    conversationId: number;
+    archived: boolean;
+    muted: boolean;
+  }): Observable<any> {
+    return this.api.put<any>('/api/communication/preferences', payload, undefined, this.commsUrl);
+  }
+
   addReaction(messageId: number, userId: number, companyId: number, emoji: string): Observable<ChatMessage> {
     return this.api.post<ChatMessage>(
       `/api/communication/chat/messages/${messageId}/reactions`,

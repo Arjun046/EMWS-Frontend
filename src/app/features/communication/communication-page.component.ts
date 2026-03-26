@@ -336,6 +336,7 @@ export class StatusViewerDialog {
         <div class="filter-bar">
            <button [class.active]="sidebarFilter() === 'all'" (click)="sidebarFilter.set('all')">All</button>
            <button [class.active]="sidebarFilter() === 'unread'" (click)="sidebarFilter.set('unread')">Unread</button>
+           <button [class.active]="sidebarFilter() === 'archived'" (click)="sidebarFilter.set('archived')">Archived</button>
            <button [class.active]="sidebarFilter() === 'favorites'" (click)="sidebarFilter.set('favorites')">Favorites</button>
            <button [class.active]="sidebarFilter() === 'groups'" (click)="sidebarFilter.set('groups')">Groups</button>
         </div>
@@ -365,6 +366,7 @@ export class StatusViewerDialog {
                   <div class="chat-preview">
                     <span class="role">{{ contact.lastMessage || contact.role }}</span>
                     <div class="meta-side">
+                       <mat-icon class="muted-icon" *ngIf="contact.isMuted">volume_off</mat-icon>
                        <span class="unread-badge" *ngIf="contact.unreadCount">{{ contact.unreadCount }}</span>
                        <span class="status-dot" [class.online]="contact.status === 'ACTIVE'"></span>
                     </div>
@@ -387,6 +389,7 @@ export class StatusViewerDialog {
                   <div class="chat-preview">
                     <span class="description">{{ group.lastMessage || group.description }}</span>
                     <div class="meta-side">
+                       <mat-icon class="muted-icon" *ngIf="group.isMuted">volume_off</mat-icon>
                        <span class="unread-badge" *ngIf="group.unreadCount">{{ group.unreadCount }}</span>
                        <span class="member-count">{{ group.members }} members</span>
                     </div>
@@ -434,6 +437,8 @@ export class StatusViewerDialog {
               <button mat-icon-button [matMenuTriggerFor]="chatMoreMenu"><mat-icon>more_vert</mat-icon></button>
               <mat-menu #chatMoreMenu="matMenu">
                  <button mat-menu-item (click)="showDetails.set(true)"><mat-icon>info</mat-icon><span>Contact Info</span></button>
+                 <button mat-menu-item (click)="toggleMuteConversation()"><mat-icon>{{ isCurrentConversationMuted() ? 'volume_up' : 'volume_off' }}</mat-icon><span>{{ isCurrentConversationMuted() ? 'Unmute notifications' : 'Mute notifications' }}</span></button>
+                 <button mat-menu-item (click)="toggleArchiveConversation()"><mat-icon>{{ isCurrentConversationArchived() ? 'unarchive' : 'archive' }}</mat-icon><span>{{ isCurrentConversationArchived() ? 'Move to inbox' : 'Archive chat' }}</span></button>
                  <button mat-menu-item (click)="clearChat()"><mat-icon>delete_sweep</mat-icon><span>Clear Chat</span></button>
                  <button mat-menu-item (click)="toggleBlockUser()" color="warn">
                     <mat-icon>block</mat-icon>
@@ -776,6 +781,7 @@ export class StatusViewerDialog {
     .chat-preview { display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; color: #64748b; }
     .role, .description { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 80%; }
     .meta-side { display: flex; align-items: center; gap: 0.5rem; }
+    .muted-icon { width: 0.95rem; height: 0.95rem; font-size: 0.95rem; color: #94a3b8; }
     .unread-badge { background: #25d366; color: #fff; font-size: 0.7rem; font-weight: 700; min-width: 1.2rem; height: 1.2rem; border-radius: 1rem; display: grid; place-items: center; padding: 0 0.3rem; }
     .status-dot { width: 0.6rem; height: 0.6rem; border-radius: 50%; background: #cbd5e1; }
     .status-dot.online { background: #22c55e; box-shadow: 0 0 8px rgba(34,197,94,0.4); }
@@ -940,7 +946,7 @@ export class CommunicationPageComponent implements OnInit {
   private readonly localGroups = signal<ConversationGroup[]>([]);
   protected readonly reactionOptions = ['\u{1F44D}', '\u{2764}\u{FE0F}', '\u{1F602}', '\u{1F62E}', '\u{1F389}', '\u{1F525}'];
 
-  protected readonly sidebarFilter = signal<'all' | 'unread' | 'favorites' | 'groups'>('all');
+  protected readonly sidebarFilter = signal<'all' | 'unread' | 'archived' | 'favorites' | 'groups'>('all');
   protected readonly editingMessage = signal<ChatMessage | null>(null);
   private readonly favoriteIds = signal<Set<number>>(new Set());
 
@@ -960,7 +966,9 @@ export class CommunicationPageComponent implements OnInit {
        avatar: 'AI',
        imageUrl: 'https://images.unsplash.com/photo-1675271591211-126ad94ec69c?auto=format&fit=crop&q=80&w=100',
        lastMessage: 'Ask me anything about EWMS...',
-       unreadCount: 0
+       unreadCount: 0,
+       isMuted: false,
+       isArchived: false
     } as any;
 
     const withAI = [aiAssistant, ...list];
@@ -976,11 +984,15 @@ export class CommunicationPageComponent implements OnInit {
         lastMessage: s.lastMessage,
         lastMessageTime: s.lastMessageTimestamp,
         unreadCount: s.unreadCount,
-        isFavorite: this.favoriteIds().has(s.id)
+        isFavorite: this.favoriteIds().has(s.id),
+        isMuted: s.muted ?? false,
+        isArchived: s.archived ?? false
       } as any))
       .filter(c => {
          if (filter === 'unread') return c.unreadCount > 0;
+         if (filter === 'archived') return c.isArchived;
          if (filter === 'favorites') return c.isFavorite;
+         if (c.isArchived) return false;
          return true;
       });
   });
@@ -1006,10 +1018,17 @@ export class CommunicationPageComponent implements OnInit {
         imageUrl: s.imageUrl,
         lastMessage: s.lastMessage,
         lastMessageTime: s.lastMessageTimestamp,
-        unreadCount: s.unreadCount
+        unreadCount: s.unreadCount,
+        isMuted: s.muted ?? false,
+        isArchived: s.archived ?? false
       } as ConversationGroup));
-    
-    return [...remote, ...this.localGroups()];
+
+    return [...remote, ...this.localGroups()].filter((group) => {
+      if (this.sidebarFilter() === 'archived') {
+        return !!group.isArchived;
+      }
+      return !group.isArchived;
+    });
   });
   protected readonly ownStatusSummary = computed(() =>
     this.statusStoriesState()
@@ -1160,6 +1179,18 @@ export class CommunicationPageComponent implements OnInit {
     (this.mode() === 'private' && !!this.selectedContact()) || 
     (this.mode() === 'group' && !!this.selectedGroup())
   );
+  protected readonly isCurrentConversationMuted = computed(() => {
+    if (this.mode() === 'private') {
+      return this.selectedContact()?.isMuted ?? false;
+    }
+    return this.selectedGroup()?.isMuted ?? false;
+  });
+  protected readonly isCurrentConversationArchived = computed(() => {
+    if (this.mode() === 'private') {
+      return this.selectedContact()?.isArchived ?? false;
+    }
+    return this.selectedGroup()?.isArchived ?? false;
+  });
 
   async ngOnInit(): Promise<void> {
     await this.initializeE2EE();
@@ -1521,6 +1552,127 @@ export class CommunicationPageComponent implements OnInit {
         else newSet.add(userId);
         return newSet;
      });
+  }
+
+  protected toggleMuteConversation(): void {
+    const preference = this.currentConversationPreferencePayload();
+    if (!preference) {
+      return;
+    }
+
+    this.chatApi.updateConversationPreference({
+      ...preference,
+      archived: preference.archived,
+      muted: !preference.muted
+    }).subscribe({
+      next: () => {
+        this.applyConversationPreference(preference.conversationType, preference.conversationId, {
+          isMuted: !preference.muted
+        });
+        this.snack.open(!preference.muted ? 'Conversation muted' : 'Conversation unmuted', 'OK', { duration: 2000 });
+      },
+      error: () => this.snack.open('Failed to update mute setting', 'OK', { duration: 2000 })
+    });
+  }
+
+  protected toggleArchiveConversation(): void {
+    const preference = this.currentConversationPreferencePayload();
+    if (!preference) {
+      return;
+    }
+
+    this.chatApi.updateConversationPreference({
+      ...preference,
+      archived: !preference.archived,
+      muted: preference.muted
+    }).subscribe({
+      next: () => {
+        this.applyConversationPreference(preference.conversationType, preference.conversationId, {
+          isArchived: !preference.archived
+        });
+        this.snack.open(!preference.archived ? 'Conversation archived' : 'Conversation moved to inbox', 'OK', { duration: 2000 });
+      },
+      error: () => this.snack.open('Failed to update archive setting', 'OK', { duration: 2000 })
+    });
+  }
+
+  private currentConversationPreferencePayload(): {
+    userId: number;
+    companyId: number;
+    conversationType: 'PRIVATE' | 'GROUP';
+    conversationId: number;
+    archived: boolean;
+    muted: boolean;
+  } | null {
+    if (this.mode() === 'private') {
+      const contact = this.selectedContact();
+      if (!contact || contact.id === 0) {
+        return null;
+      }
+      return {
+        userId: this.currentUserId(),
+        companyId: this.currentCompanyId(),
+        conversationType: 'PRIVATE',
+        conversationId: contact.id,
+        archived: contact.isArchived ?? false,
+        muted: contact.isMuted ?? false
+      };
+    }
+
+    const group = this.selectedGroup();
+    if (!group) {
+      return null;
+    }
+    return {
+      userId: this.currentUserId(),
+      companyId: this.currentCompanyId(),
+      conversationType: 'GROUP',
+      conversationId: group.id,
+      archived: group.isArchived ?? false,
+      muted: group.isMuted ?? false
+    };
+  }
+
+  private applyConversationPreference(
+    conversationType: 'PRIVATE' | 'GROUP',
+    conversationId: number,
+    changes: { isMuted?: boolean; isArchived?: boolean }
+  ): void {
+    this.chatSummariesState.update((summaries) => summaries.map((summary) => {
+      if (summary.type !== conversationType || summary.id !== conversationId) {
+        return summary;
+      }
+      return {
+        ...summary,
+        muted: changes.isMuted ?? summary.muted,
+        archived: changes.isArchived ?? summary.archived
+      };
+    }));
+
+    if (conversationType === 'PRIVATE') {
+      this.selectedContact.update((contact) => {
+        if (!contact || contact.id !== conversationId) {
+          return contact;
+        }
+        return {
+          ...contact,
+          isMuted: changes.isMuted ?? contact.isMuted,
+          isArchived: changes.isArchived ?? contact.isArchived
+        };
+      });
+      return;
+    }
+
+    this.selectedGroup.update((group) => {
+      if (!group || group.id !== conversationId) {
+        return group;
+      }
+      return {
+        ...group,
+        isMuted: changes.isMuted ?? group.isMuted,
+        isArchived: changes.isArchived ?? group.isArchived
+      };
+    });
   }
 
   protected reactToMessage(msg: ChatMessage, emoji: string): void {

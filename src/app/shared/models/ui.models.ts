@@ -147,6 +147,8 @@ export interface ConversationContact {
   lastMessage?: string;
   lastMessageTime?: string;
   unreadCount?: number;
+  isMuted?: boolean;
+  isArchived?: boolean;
 }
 
 export interface ConversationGroup {
@@ -161,4 +163,5 @@ export interface ConversationGroup {
   unreadCount?: number;
   isPinned?: boolean;
   isMuted?: boolean;
+  isArchived?: boolean;
 }
