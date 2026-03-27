@@ -66,6 +66,13 @@ export class DashboardService {
 
       const adherence = employees.length ? Math.round((presentCount / employees.length) * 100) : 0;
 
+      // Extract values from admin data or provide fallbacks
+      const leavePressure = admin?.leavePressure ?? (activeEmployees ? Math.round((onLeaveToday / activeEmployees) * 100) : 0);
+      const scheduleCoverage = admin?.scheduleCoverage ?? (scheduledToday ? Math.round((presentCount / scheduledToday) * 100) : 0);
+      const pendingLeaves = admin?.pendingLeaves || [];
+      const openShifts = admin?.openShifts || 0;
+      const breakViolations = admin?.breakViolations || 0;
+
       this.statsState.set([
         { label: 'Present Today', value: String(presentCount), delta: 'Currently clocked in', tone: 'good', icon: 'how_to_reg' },
         { label: 'Absent Today', value: String(absentCount), delta: 'Scheduled but not in', tone: 'warn', icon: 'event_busy' },

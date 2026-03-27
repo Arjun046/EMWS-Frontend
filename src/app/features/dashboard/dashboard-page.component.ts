@@ -1,5 +1,5 @@
 import { JsonPipe, CommonModule, DatePipe } from '@angular/common';
-import { Component, computed, inject, signal, OnInit } from '@angular/core';
+import { Component, computed, inject, signal, OnInit, OnDestroy } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
@@ -12,6 +12,7 @@ import { AuthService } from '../../core/services/auth.service';
 import { PageHeaderComponent } from '../../shared/components/page-header.component';
 import { StatCardComponent } from '../../shared/components/stat-card.component';
 import { WhoIsInComponent } from './components/who-is-in.component';
+import { ManagerOnboardingComponent } from './components/manager-onboarding.component';
 
 @Component({
   selector: 'app-dashboard-page',
@@ -26,6 +27,7 @@ import { WhoIsInComponent } from './components/who-is-in.component';
     PageHeaderComponent, 
     StatCardComponent, 
     WhoIsInComponent,
+    ManagerOnboardingComponent,
     RouterLink,
     DatePipe
   ],
@@ -47,10 +49,16 @@ import { WhoIsInComponent } from './components/who-is-in.component';
               <div class="flex items-center gap-2">
                 <span class="status-indicator" [class]="currentStatus()?.toLowerCase() || 'clocked_out'"></span>
                 <p class="text-slate-500 m-0 font-medium">Currently: <span class="font-bold text-slate-900">{{ getStatusLabel() }}</span></p>
+                <p class="text-slate-400 m-0 text-xs font-mono" *ngIf="currentStatus() === 'CLOCKED_IN'">
+                  Duration: {{ getLiveDuration() }}
+                </p>
               </div>
             </div>
           </div>
           <div class="flex gap-3 w-full md:w-auto">
+            <button mat-stroked-button class="hero-btn md:hidden" routerLink="/attendance/mobile-clock">
+              <mat-icon>fullscreen</mat-icon> MOBILE MODE
+            </button>
             @if (currentStatus() === 'CLOCKED_OUT') {
               <button mat-flat-button color="primary" class="hero-btn clock-in-btn" (click)="clockIn()">
                 <mat-icon>login</mat-icon> CLOCK IN NOW
@@ -122,6 +130,7 @@ import { WhoIsInComponent } from './components/who-is-in.component';
         </div>
 
         <div class="side-column flex flex-col gap-6">
+          <app-manager-onboarding *ngIf="isAdminOrManager()" />
           <app-who-is-in />
 
           <mat-card class="overflow-hidden">
@@ -136,10 +145,13 @@ import { WhoIsInComponent } from './components/who-is-in.component';
                 @for (alert of alerts(); track alert.title) {
                   <div class="alert-item flex gap-3">
                     <div class="w-1.5 h-auto bg-blue-500 rounded-full"></div>
-                    <div>
+                    <div class="flex-1">
                       <div class="text-[10px] uppercase font-bold text-slate-400 mb-0.5">{{ alert.time }}</div>
                       <strong class="text-sm block text-slate-900">{{ alert.title }}</strong>
-                      <p class="text-xs text-slate-500 m-0 leading-relaxed">{{ alert.detail }}</p>
+                      <p class="text-xs text-slate-500 m-0 leading-relaxed mb-2">{{ alert.detail }}</p>
+                      <button mat-button color="primary" class="text-[10px] uppercase font-bold p-0 h-auto min-h-0 min-w-0" (click)="resolveAlert(alert)">
+                        Resolve Alert <mat-icon class="text-[12px] w-[12px] h-[12px]">chevron_right</mat-icon>
+                      </button>
                     </div>
                   </div>
                 }
@@ -245,7 +257,7 @@ import { WhoIsInComponent } from './components/who-is-in.component';
     }
   `]
 })
-export class DashboardPageComponent implements OnInit {
+export class DashboardPageComponent implements OnInit, OnDestroy {
   protected readonly auth = inject(AuthService);
   protected readonly dashboardApi = inject(DashboardService);
   protected readonly socket = inject(WidgetSocketService);
@@ -258,8 +270,32 @@ export class DashboardPageComponent implements OnInit {
   protected readonly currentStatus = signal('CLOCKED_OUT');
   protected currentAttendance: Attendance | null = null;
 
+  protected readonly liveTime = signal(Date.now());
+  private timerHandle?: any;
+
   ngOnInit() {
     this.refreshStatus();
+    this.timerHandle = setInterval(() => this.liveTime.set(Date.now()), 1000);
+  }
+
+  ngOnDestroy() {
+    if (this.timerHandle) clearInterval(this.timerHandle);
+  }
+
+  protected getLiveDuration(): string {
+    if (!this.currentAttendance?.clockIn) return '00:00:00';
+    const start = new Date(this.currentAttendance.clockIn).getTime();
+    const diff = Math.max(0, this.liveTime() - start);
+    
+    const h = Math.floor(diff / 3600000);
+    const m = Math.floor((diff % 3600000) / 60000);
+    const s = Math.floor((diff % 60000) / 1000);
+    
+    return [h, m, s].map(v => v.toString().padStart(2, '0')).join(':');
+  }
+
+  protected resolveAlert(alert: any) {
+    this.snack.open(`Alert "${alert.title}" marked as resolved.`, 'OK', { duration: 3000 });
   }
 
   protected isAdminOrManager(): boolean {
@@ -320,95 +356,6 @@ export class DashboardPageComponent implements OnInit {
     if (this.currentAttendance) {
       this.attendanceApi.endBreak(this.currentAttendance.id).subscribe(() => {
         this.snack.open('Break ended. Welcome back!', 'OK', { duration: 3000 });
-        this.refreshStatus();
-      });
-    }
-  }
-}
-  `,
-  styles: [`
-    .avatar-large { width: 4rem; height: 4rem; border-radius: 1rem; background: #3b82f6; color: #fff; display: grid; place-items: center; font-size: 1.5rem; font-weight: 800; }
-    .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #cbd5e1; }
-    .status-dot.online { background: #22c55e; box-shadow: 0 0 8px rgba(34,197,94,0.5); }
-    .mb-6 { margin-bottom: 1.5rem; }
-    .flex { display: flex; }
-    .items-center { align-items: center; }
-    .justify-between { justify-content: space-between; }
-    .justify-start { justify-content: flex-start; }
-    .gap-4 { gap: 1rem; }
-    .gap-3 { gap: 0.75rem; }
-    .gap-6 { gap: 1.5rem; }
-    .grid { display: grid; }
-    .grid-cols-1 { grid-template-columns: repeat(1, minmax(0, 1fr)); }
-    @media (min-width: 768px) { .md\\:grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-    @media (min-width: 1024px) { 
-      .lg\\:grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-      .lg\\:grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-      .lg\\:col-span-2 { grid-column: span 2 / span 2; }
-    }
-  `]
-})
-export class DashboardPageComponent implements OnInit {
-  protected readonly auth = inject(AuthService);
-  protected readonly dashboardApi = inject(DashboardService);
-  protected readonly socket = inject(WidgetSocketService);
-  protected readonly attendanceApi = inject(AttendanceService);
-  private readonly snack = inject(MatSnackBar);
-
-  protected readonly stats = this.dashboardApi.stats;
-  protected readonly alerts = this.dashboardApi.liveAlerts;
-  
-  protected readonly currentStatus = signal('CLOCKED_OUT');
-  protected currentAttendance: Attendance | null = null;
-
-  ngOnInit() {
-    this.refreshStatus();
-  }
-
-  private refreshStatus() {
-    const user = this.auth.user();
-    if (user) {
-      this.attendanceApi.getAttendanceStatus(user.id).subscribe((status: string) => {
-        this.currentStatus.set(status);
-        this.attendanceApi.getTodayAttendance(user.id).subscribe((records: Attendance[]) => {
-          this.currentAttendance = records.find((r: Attendance) => r.clockOut === null) || null;
-        });
-      });
-    }
-  }
-
-  clockIn() {
-    const user = this.auth.user();
-    if (user) {
-      this.attendanceApi.clockIn(user.id).subscribe(() => {
-        this.snack.open('Clocked in successfully', 'OK', { duration: 3000 });
-        this.refreshStatus();
-      });
-    }
-  }
-
-  clockOut() {
-    if (this.currentAttendance) {
-      this.attendanceApi.clockOut(this.currentAttendance.id).subscribe(() => {
-        this.snack.open('Clocked out successfully', 'OK', { duration: 3000 });
-        this.refreshStatus();
-      });
-    }
-  }
-
-  startBreak() {
-    if (this.currentAttendance) {
-      this.attendanceApi.startBreak(this.currentAttendance.id).subscribe(() => {
-        this.snack.open('Break started', 'OK', { duration: 3000 });
-        this.refreshStatus();
-      });
-    }
-  }
-
-  endBreak() {
-    if (this.currentAttendance) {
-      this.attendanceApi.endBreak(this.currentAttendance.id).subscribe(() => {
-        this.snack.open('Break ended', 'OK', { duration: 3000 });
         this.refreshStatus();
       });
     }

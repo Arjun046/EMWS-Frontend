@@ -137,11 +137,34 @@ import { toSignal } from '@angular/core/rxjs-interop';
               <tr mat-row *matRowDef="let row; columns: ['employee', 'time', 'status', 'actions'];" [class.row-conflict]="hasConflict(row)"></tr>
             </table>
           } @else {
-            <div class="week-grid p-4">
-              <div class="empty-state py-12">
-                <mat-icon class="text-slate-200 text-6xl mb-4">calendar_view_week</mat-icon>
-                <p class="font-bold text-slate-400">Weekly Visual Roster coming in next sprint.</p>
-                <p class="text-slate-400 text-sm">Please use the Shift Registry view to manage assignments.</p>
+            <div class="week-grid-container p-4" cdkDropListGroup>
+              <div class="week-row">
+                @for (day of weekDays(); track day.date) {
+                  <div class="day-column">
+                    <div class="day-header">
+                      <span class="day-name">{{ day.name }}</span>
+                      <span class="day-date">{{ day.date | date:'MMM d' }}</span>
+                    </div>
+                    <div class="shift-list" 
+                         cdkDropList 
+                         [cdkDropListData]="getShiftsForDay(day.date)"
+                         (cdkDropListDropped)="onShiftDropped($event, day.date)">
+                      @for (shift of getShiftsForDay(day.date); track shift.id) {
+                        <div class="shift-card" cdkDrag [cdkDragData]="shift" [class.is-conflict]="hasConflict(shift)">
+                          <div class="shift-time">{{ shift.startTime | date:'shortTime' }} - {{ shift.endTime | date:'shortTime' }}</div>
+                          <div class="shift-staff">Staff #{{ shift.employeeId || '?' }}</div>
+                          @if (hasConflict(shift)) {
+                            <mat-icon class="conflict-icon">warning</mat-icon>
+                          }
+                          <div class="shift-placeholder" *cdkDragPlaceholder></div>
+                        </div>
+                      }
+                      @if (getShiftsForDay(day.date).length === 0) {
+                        <div class="day-empty">No shifts</div>
+                      }
+                    </div>
+                  </div>
+                }
               </div>
             </div>
           }
@@ -193,6 +216,31 @@ import { toSignal } from '@angular/core/rxjs-interop';
       .header-actions { width: 100%; display: flex; gap: 0.5rem; }
       .header-actions button { flex: 1; font-size: 0.7rem; padding: 0 0.5rem; }
     }
+
+    /* Week Grid Styles */
+    .week-grid-container { min-height: 500px; overflow-x: auto; }
+    .week-row { display: flex; gap: 1rem; min-width: 1200px; height: 100%; }
+    .day-column { flex: 1; min-width: 160px; background: #f8fafc; border-radius: 1rem; display: flex; flex-direction: column; border: 1px solid #e2e8f0; }
+    .day-header { padding: 1rem; border-bottom: 1px solid #e2e8f0; display: flex; flex-direction: column; align-items: center; background: #fff; border-radius: 1rem 1rem 0 0; }
+    .day-name { font-weight: 800; font-size: 0.75rem; color: #64748b; text-transform: uppercase; }
+    .day-date { font-weight: 900; font-size: 1.1rem; color: #1e293b; }
+    
+    .shift-list { flex: 1; padding: 0.75rem; display: flex; flex-direction: column; gap: 0.75rem; min-height: 200px; }
+    .shift-card { background: #fff; padding: 1rem; border-radius: 0.75rem; border: 1px solid #e2e8f0; box-shadow: 0 2px 4px rgba(0,0,0,0.02); cursor: grab; position: relative; transition: transform 0.2s, box-shadow 0.2s; }
+    .shift-card:active { cursor: grabbing; }
+    .shift-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+    .shift-time { font-weight: 800; font-size: 0.8rem; color: #1e40af; }
+    .shift-staff { font-size: 0.75rem; color: #64748b; margin-top: 0.25rem; font-weight: 600; }
+    
+    .is-conflict { border-left: 4px solid #ef4444; background: #fef2f2; }
+    .conflict-icon { position: absolute; top: 0.5rem; right: 0.5rem; font-size: 1rem; width: 1rem; height: 1rem; color: #ef4444; }
+
+    .day-empty { padding: 2rem 0; text-align: center; color: #cbd5e1; font-size: 0.75rem; font-weight: 600; font-style: italic; }
+    
+    .cdk-drag-preview { box-sizing: border-box; border-radius: 0.75rem; box-shadow: 0 10px 20px rgba(0,0,0,0.1); }
+    .cdk-drag-placeholder { opacity: 0.3; }
+    .cdk-drag-animating { transition: transform 250ms cubic-bezier(0, 0, 0.2, 1); }
+    .shift-list.cdk-drop-list-dragging .shift-card:not(.cdk-drag-placeholder) { transition: transform 250ms cubic-bezier(0, 0, 0.2, 1); }
   `]
 })
 export class SchedulingPageComponent implements OnInit {
@@ -202,6 +250,53 @@ export class SchedulingPageComponent implements OnInit {
 
   protected readonly viewMode = signal<'list' | 'week'>('list');
   protected readonly shifts = toSignal(this.scheduleApi.getShifts(), { initialValue: [] });
+
+  protected readonly weekDays = computed(() => {
+    const days = [];
+    const startOfWeek = new Date();
+    startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay()); // Sunday
+    
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(startOfWeek);
+      d.setDate(d.getDate() + i);
+      days.push({
+        name: d.toLocaleDateString('en-US', { weekday: 'short' }),
+        date: d.toISOString().split('T')[0]
+      });
+    }
+    return days;
+  });
+
+  protected getShiftsForDay(date: string): Shift[] {
+    return this.shifts().filter(s => s.startTime.startsWith(date));
+  }
+
+  protected onShiftDropped(event: CdkDragDrop<Shift[]>, newDate: string): void {
+    const shift = event.item.data as Shift;
+    const oldDate = shift.startTime.split('T')[0];
+    
+    if (oldDate === newDate) return;
+
+    // Update shift date while keeping time
+    const startTimeObj = new Date(shift.startTime);
+    const endTimeObj = new Date(shift.endTime);
+    
+    const [year, month, day] = newDate.split('-').map(Number);
+    
+    startTimeObj.setFullYear(year, month - 1, day);
+    endTimeObj.setFullYear(year, month - 1, day);
+
+    const updatedShift = {
+      ...shift,
+      startTime: startTimeObj.toISOString(),
+      endTime: endTimeObj.toISOString()
+    };
+
+    this.scheduleApi.updateShift(shift.id, updatedShift).subscribe(() => {
+      this.snack.open(`Shift moved to ${newDate}`, 'OK', { duration: 3000 });
+      window.location.reload();
+    });
+  }
 
   protected readonly coveragePercentage = computed(() => {
     const total = this.shifts().length;

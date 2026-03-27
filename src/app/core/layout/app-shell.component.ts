@@ -17,6 +17,10 @@ import { NotificationCenterService } from '../services/notification-center.servi
 import { ThemeService } from '../services/theme.service';
 import { NavigationItem } from '../../shared/models/ui.models';
 
+interface NavigationItemExtended extends NavigationItem {
+  roles?: string[];
+}
+
 @Component({
   selector: 'app-shell',
   standalone: true,
@@ -229,39 +233,40 @@ export class AppShellComponent {
   protected search = '';
   protected readonly isCollapsed = signal(false);
 
-  private readonly navItems: NavigationItem[] = [
+  private readonly navItems: NavigationItemExtended[] = [
     { label: 'Dashboard', icon: 'grid_view', route: '/dashboard', section: 'Overview' },
     { label: 'Notifications', icon: 'notifications', route: '/notifications', section: 'Overview', badge: '5' },
-    { label: 'Employees', icon: 'person_search', route: '/employees', section: 'Workforce' },
+    
+    { label: 'Employees', icon: 'person_search', route: '/employees', section: 'Workforce', roles: ['ADMIN', 'MANAGER'] },
     { label: 'Attendance', icon: 'fact_check', route: '/attendance', section: 'Workforce' },
     { label: 'Leaves', icon: 'event_busy', route: '/leaves', section: 'Workforce' },
     { label: 'Scheduling', icon: 'calendar_today', route: '/scheduling', section: 'Workforce' },
-    { label: 'Organization', icon: 'lan', route: '/organization', section: 'Workforce' },
+    { label: 'Organization', icon: 'lan', route: '/organization', section: 'Workforce', roles: ['ADMIN'] },
+    
     { label: 'Payroll', icon: 'payments', route: '/payroll', section: 'Execution' },
-    { label: 'Performance', icon: 'insights', route: '/performance', section: 'Execution' },
-    { label: 'Compliance', icon: 'gavel', route: '/compliance', section: 'Execution' },
+    { label: 'Performance', icon: 'insights', route: '/performance', section: 'Execution', roles: ['ADMIN', 'MANAGER'] },
+    { label: 'Compliance', icon: 'gavel', route: '/compliance', section: 'Execution', roles: ['ADMIN'] },
     { label: 'Documents', icon: 'description', route: '/documents', section: 'Execution' },
-    { label: 'Analytics', icon: 'bar_chart', route: '/analytics', section: 'Insights' },
+    
+    { label: 'Analytics', icon: 'bar_chart', route: '/analytics', section: 'Insights', roles: ['ADMIN', 'MANAGER'] },
     { label: 'Communication', icon: 'chat', route: '/communication', section: 'Insights', badge: 'Live' },
     { label: 'Tasks', icon: 'assignment_turned_in', route: '/tasks', section: 'Insights' },
-    { label: 'Roles & Permissions', icon: 'security', route: '/roles', section: 'Administration' },
-    { label: 'Company Branding', icon: 'palette', route: '/organization/branding', section: 'Administration' }
+    
+    { label: 'Roles & Permissions', icon: 'security', route: '/roles', section: 'Administration', roles: ['ADMIN'] },
+    { label: 'Company Branding', icon: 'palette', route: '/organization/branding', section: 'Administration', roles: ['ADMIN'] }
   ];
 
   protected readonly sections = computed(() => {
-    let items = this.navItems;
-    if (this.auth.user()?.role !== 'ADMIN') {
-       items = items.filter(i => i.label !== 'Company Branding');
-    }
+    const userRole = this.auth.user()?.role || 'EMPLOYEE';
+    const items = this.navItems.filter(item => !item.roles || item.roles.includes(userRole));
     return [...new Set(items.map((item) => item.section))];
   });
 
   protected itemsForSection(section: string): NavigationItem[] {
-    let items = this.navItems.filter((item) => item.section === section);
-    if (this.auth.user()?.role !== 'ADMIN') {
-       items = items.filter(i => i.label !== 'Company Branding');
-    }
-    return items;
+    const userRole = this.auth.user()?.role || 'EMPLOYEE';
+    return this.navItems.filter((item) => 
+      item.section === section && (!item.roles || item.roles.includes(userRole))
+    );
   }
 
   protected isActive(route: string): boolean {

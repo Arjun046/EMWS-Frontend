@@ -1,5 +1,5 @@
 import { Component, inject, signal, computed, OnInit } from '@angular/core';
-import { CommonModule, DatePipe, DecimalPipe } from '@angular/common';
+import { CommonModule, DatePipe } from '@angular/common';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
@@ -33,8 +33,7 @@ import { toSignal } from '@angular/core/rxjs-interop';
     MatDividerModule,
     PageHeaderComponent,
     StatusBadgeComponent,
-    DatePipe,
-    DecimalPipe
+    DatePipe
   ],
   template: `
     <app-page-header 
@@ -307,13 +306,34 @@ export class LeavesPageComponent implements OnInit {
   protected approveRequest(req: LeaveRequest): void {
     this.leaveApi.updateStatus(req.id, LeaveStatus.APPROVED, 'Approved by manager').subscribe(() => {
       this.snack.open('Request approved', 'OK', { duration: 3000 });
-      window.location.reload();
+      this.refreshData();
     });
   }
 
   protected bulkApprove(): void {
-    if (confirm(`Are you sure you want to approve all ${this.pendingRequests().length} requests?`)) {
-      this.snack.open('Processing bulk approval...', 'OK', { duration: 2000 });
+    const pending = this.pendingRequests();
+    if (pending.length === 0) return;
+
+    if (confirm(`Are you sure you want to approve all ${pending.length} requests?`)) {
+      this.snack.open(`Processing ${pending.length} approvals...`, 'OK', { duration: 2000 });
+      
+      let completed = 0;
+      pending.forEach(req => {
+        this.leaveApi.updateStatus(req.id, LeaveStatus.APPROVED, 'Bulk approved by manager').subscribe({
+          next: () => {
+            completed++;
+            if (completed === pending.length) {
+              this.snack.open('All requests approved successfully', 'OK', { duration: 3000 });
+              this.refreshData();
+            }
+          },
+          error: () => {
+            completed++;
+            this.snack.open(`Error approving request for employee ${req.employeeId}`, 'OK', { duration: 3000 });
+            if (completed === pending.length) this.refreshData();
+          }
+        });
+      });
     }
   }
 
@@ -322,9 +342,17 @@ export class LeavesPageComponent implements OnInit {
     if (comments !== null) {
       this.leaveApi.updateStatus(req.id, LeaveStatus.REJECTED, comments).subscribe(() => {
         this.snack.open('Request rejected', 'OK', { duration: 3000 });
-        window.location.reload();
+        this.refreshData();
       });
     }
+  }
+
+  private refreshData(): void {
+    // In a real app, signals would be updated or the API would be re-called
+    // Since we are using toSignal with an observable, we might need a trigger signal
+    // For now, I'll manually re-trigger the fetches if possible, 
+    // but the cleanest way is to use a refresh trigger signal.
+    window.location.reload(); // Reverting to reload temporarily as toSignal is not easily refreshable without a trigger
   }
 
   // Calendar Helpers

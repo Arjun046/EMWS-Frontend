@@ -13,6 +13,15 @@ import { DatePipe } from '@angular/common';
   standalone: true,
   imports: [MatTableModule, MatButtonModule, MatIconModule, MatMenuModule, MatDividerModule, StatusBadgeComponent, DatePipe],
   template: `
+    <div class="table-actions mb-4 flex justify-between items-center">
+      <div class="count-pill">
+        <strong>{{ rows().length }}</strong> records found
+      </div>
+      <button mat-stroked-button color="primary" (click)="exportToCSV()" [disabled]="rows().length === 0">
+        <mat-icon>download</mat-icon> Export CSV
+      </button>
+    </div>
+
     <div class="table-container">
       <table mat-table [dataSource]="rows()" class="enterprise-grid">
         @for (column of columns(); track column.key) {
@@ -86,6 +95,23 @@ import { DatePipe } from '@angular/common';
     
     .empty-state { padding: 4rem 2rem; text-align: center; color: #94a3b8; }
     .empty-state mat-icon { font-size: 3rem; width: 3rem; height: 3rem; margin-bottom: 1rem; }
+
+    .mb-4 { margin-bottom: 1rem; }
+    .flex { display: flex; }
+    .justify-between { justify-content: space-between; }
+    .items-center { align-items: center; }
+    .count-pill { background: #f1f5f9; padding: 0.4rem 1rem; border-radius: 999px; font-size: 0.85rem; color: #64748b; }
+    .count-pill strong { color: #1e293b; }
+
+    @media (max-width: 768px) {
+      .enterprise-grid { min-width: 100%; }
+      .header-cell:not(.actions-cell) { display: none; }
+      .body-cell:not(.actions-cell) { display: block; border: none; padding: 0.25rem 1rem !important; }
+      .body-cell:first-child { padding-top: 1rem !important; font-weight: 900; font-size: 1rem; }
+      .body-cell:last-child { padding-bottom: 1rem !important; border-bottom: 1px solid #e2e8f0; }
+      .row-hover { display: block; border-bottom: 8px solid #f8fafc; position: relative; }
+      .actions-cell { position: absolute; top: 0.5rem; right: 0.5rem; border: none !important; }
+    }
   `]
 })
 export class DataTableComponent {
@@ -97,5 +123,30 @@ export class DataTableComponent {
   protected read(row: Record<string, unknown>, key: string): string {
     const value = row[key];
     return value === undefined || value === null ? '—' : String(value);
+  }
+
+  exportToCSV() {
+    const headers = this.columns().map(c => c.label).join(',');
+    const dataRows = this.rows().map(row => 
+      this.columns().map(c => {
+        let val = this.read(row, c.key);
+        // Basic escaping for CSV
+        if (val.includes(',') || val.includes('"') || val.includes('\n')) {
+          val = `"${val.replace(/"/g, '""')}"`;
+        }
+        return val;
+      }).join(',')
+    );
+
+    const csvContent = [headers, ...dataRows].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `export_${new Date().getTime()}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   }
 }
