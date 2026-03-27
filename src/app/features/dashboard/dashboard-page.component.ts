@@ -47,7 +47,7 @@ import { ManagerOnboardingComponent } from './components/manager-onboarding.comp
             <div>
               <h2 class="text-2xl font-black mb-1">Welcome, {{ auth.user()?.name }}</h2>
               <div class="flex items-center gap-2">
-                <span class="status-indicator" [class]="currentStatus()?.toLowerCase() || 'clocked_out'"></span>
+                <span class="status-indicator" [class]="currentStatus().toLowerCase() || 'clocked_out'"></span>
                 <p class="text-slate-500 m-0 font-medium">Currently: <span class="font-bold text-slate-900">{{ getStatusLabel() }}</span></p>
                 <p class="text-slate-400 m-0 text-xs font-mono" *ngIf="currentStatus() === 'CLOCKED_IN'">
                   Duration: {{ getLiveDuration() }}
@@ -77,7 +77,7 @@ import { ManagerOnboardingComponent } from './components/manager-onboarding.comp
             }
           </div>
         </div>
-        <div class="bg-decoration" [class]="currentStatus()?.toLowerCase() || 'clocked_out'"></div>
+        <div class="bg-decoration" [class]="currentStatus().toLowerCase() || 'clocked_out'"></div>
       </mat-card>
     </section>
 
