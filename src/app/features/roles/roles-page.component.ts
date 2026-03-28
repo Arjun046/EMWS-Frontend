@@ -26,6 +26,7 @@ import { toSignal } from '@angular/core/rxjs-interop';
     MatTableModule,
     MatDialogModule,
     MatTabsModule,
+    FormsModule,
     PageHeaderComponent
   ],
   template: `
@@ -38,9 +39,18 @@ import { toSignal } from '@angular/core/rxjs-interop';
 
     <mat-tab-group class="roles-tabs">
       <mat-tab label="Role Definitions">
-        <section class="roles-grid mt-4">
-          <mat-card class="roles-main">
-            <table mat-table [dataSource]="roles()" class="enterprise-grid">
+        <div class="table-controls p-4 flex justify-between items-center bg-white border-x border-t rounded-t-xl mt-4">
+          <div class="search-box">
+            <mat-icon>search</mat-icon>
+            <input type="text" [ngModel]="roleSearch()" (ngModelChange)="roleSearch.set($event)" placeholder="Search roles...">
+          </div>
+          <button mat-stroked-button color="primary" (click)="exportRoles()">
+            <mat-icon>download</mat-icon> Export CSV
+          </button>
+        </div>
+        <section class="roles-grid">
+          <mat-card class="roles-main !rounded-t-none">
+            <table mat-table [dataSource]="filteredRoles()" class="enterprise-grid">
               <ng-container matColumnDef="name">
                 <th mat-header-cell *matHeaderCellDef>Role Name</th>
                 <td mat-cell *matCellDef="let role">
@@ -98,9 +108,18 @@ import { toSignal } from '@angular/core/rxjs-interop';
       </mat-tab>
 
       <mat-tab label="User Role Assignments">
-        <section class="user-assignments mt-4">
-          <mat-card class="roles-main">
-            <table mat-table [dataSource]="users()" class="enterprise-grid">
+        <div class="table-controls p-4 flex justify-between items-center bg-white border-x border-t rounded-t-xl mt-4">
+          <div class="search-box">
+            <mat-icon>search</mat-icon>
+            <input type="text" [ngModel]="userSearch()" (ngModelChange)="userSearch.set($event)" placeholder="Search users or roles...">
+          </div>
+          <button mat-stroked-button color="primary" (click)="exportAssignments()">
+            <mat-icon>download</mat-icon> Export Assignments
+          </button>
+        </div>
+        <section class="user-assignments">
+          <mat-card class="roles-main !rounded-t-none">
+            <table mat-table [dataSource]="filteredUsers()" class="enterprise-grid">
               <ng-container matColumnDef="username">
                 <th mat-header-cell *matHeaderCellDef>User / Email</th>
                 <td mat-cell *matCellDef="let user">
@@ -164,6 +183,12 @@ import { toSignal } from '@angular/core/rxjs-interop';
       .roles-grid { grid-template-columns: 1fr; }
       .side-panel { order: -1; }
     }
+
+    .table-controls { border-bottom: 1px solid #f1f5f9; }
+    .search-box { display: flex; align-items: center; gap: 0.75rem; background: #f8fafc; padding: 0.5rem 1rem; border-radius: 0.75rem; border: 1px solid #e2e8f0; width: min(24rem, 100%); transition: all 0.2s; }
+    .search-box:focus-within { background: #fff; border-color: #3b82f6; box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.05); }
+    .search-box mat-icon { color: #94a3b8; font-size: 1.25rem; width: 1.25rem; height: 1.25rem; }
+    .search-box input { border: none; background: transparent; outline: none; flex: 1; font-size: 0.85rem; color: #1e293b; }
   `]
 })
 export class RolesPageComponent {
@@ -175,6 +200,61 @@ export class RolesPageComponent {
   protected readonly permissions = toSignal(this.roleService.getPermissions(), { initialValue: [] });
   protected readonly users = toSignal(this.userService.getAllUsers(), { initialValue: [] });
   protected readonly displayedColumns = ['name', 'description', 'permissions', 'actions'];
+
+  protected readonly roleSearch = signal('');
+  protected readonly userSearch = signal('');
+
+  protected readonly filteredRoles = computed(() => {
+    const query = this.roleSearch().toLowerCase();
+    if (!query) return this.roles();
+    return this.roles().filter(r => 
+      r.name.toLowerCase().includes(query) || 
+      r.description.toLowerCase().includes(query) ||
+      r.permissions.some(p => p.name.toLowerCase().includes(query))
+    );
+  });
+
+  protected readonly filteredUsers = computed(() => {
+    const query = this.userSearch().toLowerCase();
+    if (!query) return this.users();
+    return this.users().filter(u => 
+      u.firstName.toLowerCase().includes(query) || 
+      u.lastName.toLowerCase().includes(query) || 
+      u.email.toLowerCase().includes(query) ||
+      u.roles?.some(r => r.toLowerCase().includes(query))
+    );
+  });
+
+  protected exportRoles(): void {
+    const headers = ['Role Name', 'Description', 'Permissions'].join(',');
+    const data = this.filteredRoles().map(r => [
+      r.name,
+      `"${r.description}"`,
+      `"${r.permissions.map(p => p.name).join('; ')}"`
+    ].join(','));
+    this.downloadCSV('roles_export.csv', [headers, ...data].join('\n'));
+  }
+
+  protected exportAssignments(): void {
+    const headers = ['User', 'Email', 'Assigned Roles'].join(',');
+    const data = this.filteredUsers().map(u => [
+      `${u.firstName} ${u.lastName}`,
+      u.email,
+      `"${u.roles?.join('; ') || ''}"`
+    ].join(','));
+    this.downloadCSV('role_assignments_export.csv', [headers, ...data].join('\n'));
+  }
+
+  private downloadCSV(filename: string, content: string): void {
+    const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.body.appendChild(document.createElement('a'));
+    link.href = url;
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(url);
+    link.remove();
+  }
 
   protected openRoleDialog(role?: Role): void {
     const dialogRef = this.dialog.open(RoleEditDialog, {

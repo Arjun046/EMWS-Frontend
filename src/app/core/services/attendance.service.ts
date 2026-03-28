@@ -4,6 +4,7 @@ import { Observable } from 'rxjs';
 
 export interface Attendance {
   id: number;
+  idempotencyKey?: string | null;
   employeeId: number;
   companyId: number;
   clockIn: string;
@@ -41,12 +42,20 @@ export class AttendanceService {
     return this.api.get<number>(`/api/attendance/summary/overtime?start=${start}&end=${end}`, 0, this.baseUrl);
   }
 
-  clockIn(employeeId: number, lat?: number, lng?: number): Observable<Attendance> {
+  clockIn(employeeId: number, lat?: number, lng?: number, idempotencyKey?: string): Observable<Attendance> {
     const params = new URLSearchParams();
     params.append('employeeId', employeeId.toString());
     if (lat) params.append('latitude', lat.toString());
     if (lng) params.append('longitude', lng.toString());
+    if (idempotencyKey) params.append('idempotencyKey', idempotencyKey);
     return this.api.post<Attendance>(`/api/attendance/clock-in?${params.toString()}`, {}, undefined, this.baseUrl);
+  }
+
+  generateClockInIdempotencyKey(employeeId: number): string {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      return `clock-in-${employeeId}-${crypto.randomUUID()}`;
+    }
+    return `clock-in-${employeeId}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
   }
 
   clockOut(attendanceId: number): Observable<Attendance> {

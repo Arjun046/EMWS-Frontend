@@ -60,8 +60,8 @@ import { ManagerOnboardingComponent } from './components/manager-onboarding.comp
               <mat-icon>fullscreen</mat-icon> MOBILE MODE
             </button>
             @if (currentStatus() === 'CLOCKED_OUT') {
-              <button mat-flat-button color="primary" class="hero-btn clock-in-btn" (click)="clockIn()">
-                <mat-icon>login</mat-icon> CLOCK IN NOW
+              <button mat-flat-button color="primary" class="hero-btn clock-in-btn" [disabled]="isClockInPending()" (click)="clockIn()">
+                <mat-icon>login</mat-icon> {{ isClockInPending() ? 'CLOCKING IN...' : 'CLOCK IN NOW' }}
               </button>
             } @else if (currentStatus() === 'CLOCKED_IN') {
               <button mat-stroked-button class="hero-btn" (click)="startBreak()">
@@ -268,6 +268,7 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
   protected readonly alerts = this.dashboardApi.liveAlerts;
   
   protected readonly currentStatus = signal('CLOCKED_OUT');
+  protected readonly isClockInPending = signal(false);
   protected currentAttendance: Attendance | null = null;
 
   protected readonly liveTime = signal(Date.now());
@@ -326,10 +327,19 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
 
   clockIn() {
     const user = this.auth.user();
-    if (user) {
-      this.attendanceApi.clockIn(user.id).subscribe(() => {
-        this.snack.open('Successfully clocked in!', 'OK', { duration: 3000 });
-        this.refreshStatus();
+    if (user && !this.isClockInPending()) {
+      this.isClockInPending.set(true);
+      const idempotencyKey = this.attendanceApi.generateClockInIdempotencyKey(user.id);
+      this.attendanceApi.clockIn(user.id, undefined, undefined, idempotencyKey).subscribe({
+        next: () => {
+          this.isClockInPending.set(false);
+          this.snack.open('Successfully clocked in!', 'OK', { duration: 3000 });
+          this.refreshStatus();
+        },
+        error: () => {
+          this.isClockInPending.set(false);
+          this.snack.open('Clock in failed. Please try again.', 'OK', { duration: 3000 });
+        }
       });
     }
   }

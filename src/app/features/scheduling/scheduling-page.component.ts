@@ -1,4 +1,4 @@
-import { Component, inject, signal, computed, OnInit } from '@angular/core';
+import { Component, effect, inject, signal, computed, OnInit } from '@angular/core';
 import { CommonModule, DatePipe } from '@angular/common';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
@@ -14,9 +14,10 @@ import { MatChipsModule } from '@angular/material/chips';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { CdkDragDrop, DragDropModule, moveItemInArray, transferArrayItem } from '@angular/cdk/drag-drop';
 import { FormsModule, ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
-import { SchedulingService, Shift } from '../../core/services/scheduling.service';
+import { SchedulingService, Shift, ShiftConflictRecord, ShiftConflictResponse } from '../../core/services/scheduling.service';
 import { EmployeeDataService } from '../../core/services/employee-data.service';
 import { OrganizationService } from '../../core/services/organization.service';
+import { WidgetSocketService } from '../../core/services/widget-socket.service';
 import { PageHeaderComponent } from '../../shared/components/page-header.component';
 import { StatusBadgeComponent } from '../../shared/components/status-badge.component';
 import { toSignal } from '@angular/core/rxjs-interop';
@@ -247,9 +248,19 @@ export class SchedulingPageComponent implements OnInit {
   private readonly scheduleApi = inject(SchedulingService);
   private readonly dialog = inject(MatDialog);
   private readonly snack = inject(MatSnackBar);
+  private readonly socket = inject(WidgetSocketService);
 
   protected readonly viewMode = signal<'list' | 'week'>('list');
-  protected readonly shifts = toSignal(this.scheduleApi.getShifts(), { initialValue: [] });
+  protected readonly shifts = signal<Shift[]>([]);
+
+  constructor() {
+    effect(() => {
+      const latestEvent = this.socket.events()[0];
+      if (latestEvent?.topic === '/topic/widgets/scheduling') {
+        this.loadShifts();
+      }
+    });
+  }
 
   protected readonly weekDays = computed(() => {
     const days = [];
@@ -292,9 +303,12 @@ export class SchedulingPageComponent implements OnInit {
       endTime: endTimeObj.toISOString()
     };
 
-    this.scheduleApi.updateShift(shift.id, updatedShift).subscribe(() => {
-      this.snack.open(`Shift moved to ${newDate}`, 'OK', { duration: 3000 });
-      window.location.reload();
+    this.scheduleApi.updateShift(shift.id, updatedShift).subscribe({
+      next: () => {
+        this.snack.open(`Shift moved to ${newDate}`, 'OK', { duration: 3000 });
+        this.loadShifts();
+      },
+      error: (error) => this.handleShiftError(error, 'Unable to move shift right now.')
     });
   }
 
@@ -334,7 +348,10 @@ export class SchedulingPageComponent implements OnInit {
     return Array.from(conflictIds);
   });
 
-  ngOnInit() {}
+  ngOnInit() {
+    this.socket.connect();
+    this.loadShifts();
+  }
 
   protected hasConflict(shift: Shift): boolean {
     return this.conflicts().includes(shift.id);
@@ -348,20 +365,45 @@ export class SchedulingPageComponent implements OnInit {
 
     dialogRef.afterClosed().subscribe(res => {
       if (res) {
-        this.snack.open('Shift updated successfully', 'OK', { duration: 3000 });
-        window.location.reload();
+        this.snack.open('Shift saved successfully', 'OK', { duration: 3000 });
+        this.loadShifts();
       }
     });
+  }
+
+  private loadShifts(): void {
+    this.scheduleApi.getShifts().subscribe((shifts) => this.shifts.set(shifts));
+  }
+
+  private handleShiftError(error: unknown, fallbackMessage: string): void {
+    const conflict = this.scheduleApi.extractShiftConflict(error);
+    if (conflict) {
+      const details = conflict.data.conflicts.slice(0, 2).map((entry) => formatConflict(entry)).join(' | ');
+      this.snack.open(details ? `${conflict.message} ${details}` : conflict.message, 'OK', { duration: 7000 });
+      return;
+    }
+
+    this.snack.open(fallbackMessage, 'OK', { duration: 3000 });
   }
 }
 
 @Component({
   selector: 'app-shift-edit-dialog',
   standalone: true,
-  imports: [CommonModule, FormsModule, ReactiveFormsModule, MatFormFieldModule, MatInputModule, MatButtonModule, MatSelectModule, MatDialogModule],
+  imports: [CommonModule, FormsModule, ReactiveFormsModule, MatFormFieldModule, MatInputModule, MatButtonModule, MatSelectModule, MatDialogModule, MatSnackBarModule],
   template: `
     <h2 mat-dialog-title>{{ data.shift ? 'Edit Shift' : 'Create New Shift' }}</h2>
     <mat-dialog-content>
+      @if (conflictResponse(); as conflict) {
+        <div class="conflict-banner">
+          <strong>{{ conflict.message }}</strong>
+          <ul class="conflict-list">
+            @for (item of conflict.data.conflicts; track item.type + '-' + item.recordId) {
+              <li>{{ formatConflict(item) }}</li>
+            }
+          </ul>
+        </div>
+      }
       <form [formGroup]="form" class="flex flex-col gap-4 mt-2">
         <mat-form-field appearance="outline">
           <mat-label>Employee</mat-label>
@@ -412,18 +454,27 @@ export class SchedulingPageComponent implements OnInit {
       <button mat-flat-button color="primary" [disabled]="form.invalid" (click)="save()">Save Shift</button>
     </mat-dialog-actions>
   `,
-  styles: [`.flex { display: flex; } .flex-col { flex-direction: column; } .gap-4 { gap: 1rem; } .flex-1 { flex: 1; }`]
+  styles: [`
+    .flex { display: flex; }
+    .flex-col { flex-direction: column; }
+    .gap-4 { gap: 1rem; }
+    .flex-1 { flex: 1; }
+    .conflict-banner { margin-bottom: 1rem; padding: 0.75rem 1rem; border-radius: 0.75rem; background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; }
+    .conflict-list { margin: 0.5rem 0 0; padding-left: 1rem; }
+  `]
 })
 export class ShiftEditDialog {
   private readonly fb = inject(FormBuilder);
   protected readonly dialogRef = inject(MatDialogRef<ShiftEditDialog>);
   private readonly scheduleApi = inject(SchedulingService);
+  private readonly snack = inject(MatSnackBar);
   private readonly empApi = inject(EmployeeDataService);
   private readonly orgApi = inject(OrganizationService);
   protected readonly data = inject<{ shift?: Shift }>(MAT_DIALOG_DATA);
 
   protected readonly employees = toSignal(this.empApi.getEmployees(), { initialValue: [] });
   protected readonly locations = toSignal(this.orgApi.getLocations(), { initialValue: [] });
+  protected readonly conflictResponse = signal<ShiftConflictResponse | null>(null);
 
   protected readonly form = this.fb.group({
     employeeId: [this.data.shift?.employeeId || null, Validators.required],
@@ -440,6 +491,7 @@ export class ShiftEditDialog {
   }
 
   save() {
+    this.conflictResponse.set(null);
     const raw = this.form.getRawValue();
     // Convert local time to ISO Instant
     const shiftData = {
@@ -452,6 +504,31 @@ export class ShiftEditDialog {
       ? this.scheduleApi.updateShift(this.data.shift.id, shiftData as any)
       : this.scheduleApi.createShift(shiftData as any);
 
-    obs.subscribe(() => this.dialogRef.close(true));
+    obs.subscribe({
+      next: () => this.dialogRef.close(true),
+      error: (error) => {
+        const conflict = this.scheduleApi.extractShiftConflict(error);
+        if (conflict) {
+          this.conflictResponse.set(conflict);
+          return;
+        }
+        this.snack.open('Unable to save shift right now.', 'OK', { duration: 3000 });
+      }
+    });
   }
+
+  protected formatConflict(conflict: ShiftConflictRecord): string {
+    return formatConflict(conflict);
+  }
+}
+
+function formatConflict(conflict: ShiftConflictRecord): string {
+  const start = new Date(conflict.startTime);
+  const end = new Date(conflict.endTime);
+
+  if (conflict.type === 'LEAVE') {
+    return `Approved leave #${conflict.recordId} blocks this assignment from ${start.toLocaleDateString()} to ${end.toLocaleDateString()}.`;
+  }
+
+  return `Shift #${conflict.recordId} already runs from ${start.toLocaleString()} to ${end.toLocaleString()}.`;
 }

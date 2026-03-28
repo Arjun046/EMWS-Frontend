@@ -94,23 +94,25 @@ export class WorkspaceDataService {
       case 'payroll':
         return combineLatest([
           this.api.get<any[]>('/api/payroll/records/1', []),
-          this.api.get<number>('/api/payroll/calculate-net/1', 0)
+          this.api.get<any[]>('/api/payroll/pending', [])
         ]).pipe(
-          map(([records, net]) => {
+          map(([records, pending]) => {
             const base = WORKSPACE_CONFIGS.payroll;
             const rows = records.slice(0, 12).map((record: any) => ({
-              cycle: record.payPeriod ?? 'Current cycle',
-              team: record.department ?? 'General',
-              amount: `$${record.netPay ?? record.grossPay ?? 0}`,
+              cycle: `${record.payPeriodStart ?? 'Current'} - ${record.payPeriodEnd ?? 'Cycle'}`,
+              team: record.dataSource ?? 'SNAPSHOT',
+              amount: `$${Number(record.netPay ?? record.grossPay ?? 0).toFixed(2)}`,
               status: record.status ?? 'READY'
             }));
+
+            const net = records.reduce((sum: number, record: any) => sum + Number(record.netPay ?? 0), 0);
 
             return {
               ...base,
               stats: [
-                { label: 'Net Payroll', value: `$${Number(net || 0).toFixed(2)}`, delta: 'Employee 1 snapshot', tone: 'default' },
+                { label: 'Net Payroll', value: `$${Number(net || 0).toFixed(2)}`, delta: 'Processed records', tone: 'default' },
                 { label: 'Records Loaded', value: String(records.length), delta: 'Payroll API', tone: 'accent' },
-                { label: 'Exceptions', value: rows.filter((row) => String(row.status).includes('REVIEW')).length.toString(), delta: 'Review required', tone: 'warn' }
+                { label: 'Pending Runs', value: String(pending.length), delta: 'Current cycle', tone: 'warn' }
               ],
               rows: rows.length ? rows : base.rows
             };

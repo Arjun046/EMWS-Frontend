@@ -46,10 +46,10 @@ import { interval, Subscription } from 'rxjs';
       <!-- Main Action -->
       <div class="main-action">
         @if (status() === 'CLOCKED_OUT') {
-          <button class="clock-btn clock-in" (click)="clockIn()">
+          <button class="clock-btn clock-in" [disabled]="isClockInPending()" (click)="clockIn()">
             <div class="btn-content">
               <mat-icon>login</mat-icon>
-              <span>CLOCK IN</span>
+              <span>{{ isClockInPending() ? 'CLOCKING IN...' : 'CLOCK IN' }}</span>
             </div>
             <div class="btn-ripple"></div>
           </button>
@@ -225,6 +225,11 @@ import { interval, Subscription } from 'rxjs';
     .clock-btn:active {
       transform: scale(0.95);
     }
+    .clock-btn:disabled {
+      opacity: 0.7;
+      cursor: not-allowed;
+      transform: none;
+    }
 
     .clock-in {
       width: 200px;
@@ -359,6 +364,7 @@ export class AttendanceEmployeeComponent implements OnInit, OnDestroy {
 
   protected readonly today = new Date();
   protected readonly status = signal('CLOCKED_OUT');
+  protected readonly isClockInPending = signal(false);
   protected readonly todayRecords = signal<Attendance[]>([]);
   protected currentAttendance: Attendance | null = null;
   
@@ -414,10 +420,19 @@ export class AttendanceEmployeeComponent implements OnInit, OnDestroy {
 
   clockIn() {
     const user = this.auth.user();
-    if (user) {
-      this.attendanceApi.clockIn(user.id).subscribe(() => {
-        this.snack.open('Successfully clocked in!', 'OK', { duration: 3000 });
-        this.refreshStatus();
+    if (user && !this.isClockInPending()) {
+      this.isClockInPending.set(true);
+      const idempotencyKey = this.attendanceApi.generateClockInIdempotencyKey(user.id);
+      this.attendanceApi.clockIn(user.id, undefined, undefined, idempotencyKey).subscribe({
+        next: () => {
+          this.isClockInPending.set(false);
+          this.snack.open('Successfully clocked in!', 'OK', { duration: 3000 });
+          this.refreshStatus();
+        },
+        error: () => {
+          this.isClockInPending.set(false);
+          this.snack.open('Clock in failed. Please try again.', 'OK', { duration: 3000 });
+        }
       });
     }
   }

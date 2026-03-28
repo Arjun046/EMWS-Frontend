@@ -1,4 +1,5 @@
 import { Injectable } from '@angular/core';
+import { HttpErrorResponse } from '@angular/common/http';
 import { ApiService } from './api.service';
 import { Observable } from 'rxjs';
 
@@ -14,6 +15,25 @@ export interface Shift {
   // UI fields
   employeeName?: string;
   departmentName?: string;
+}
+
+export interface ShiftConflictRecord {
+  type: 'SHIFT' | 'LEAVE';
+  recordId: number;
+  employeeId: number;
+  startTime: string;
+  endTime: string;
+  status: string;
+  message: string;
+}
+
+export interface ShiftConflictResponse {
+  status: string;
+  message: string;
+  errorCode: string;
+  data: {
+    conflicts: ShiftConflictRecord[];
+  };
 }
 
 @Injectable({ providedIn: 'root' })
@@ -39,5 +59,18 @@ export class SchedulingService {
 
   updateStatus(id: number, status: string): Observable<Shift> {
     return this.api.patch<Shift>(`/api/shifts/${id}/status?status=${status}`, {}, undefined, this.baseUrl);
+  }
+
+  extractShiftConflict(error: unknown): ShiftConflictResponse | null {
+    if (!(error instanceof HttpErrorResponse)) {
+      return null;
+    }
+
+    const payload = error.error as ShiftConflictResponse | null;
+    if (payload?.errorCode !== 'SHIFT_CONFLICT' || !Array.isArray(payload?.data?.conflicts)) {
+      return null;
+    }
+
+    return payload;
   }
 }

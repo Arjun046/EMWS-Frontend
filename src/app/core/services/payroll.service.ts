@@ -3,24 +3,34 @@ import { ApiService } from './api.service';
 import { Observable } from 'rxjs';
 
 export interface SalaryStructure {
-  id: number;
+  id?: number;
   employeeId: number;
   basicSalary: number;
-  allowances: number;
-  bonus: number;
+  hourlyRate?: number;
   currency: string;
+  housingAllowance: number;
+  transportAllowance: number;
+  taxDeduction: number;
 }
 
 export interface PayrollRecord {
-  id: number;
+  id?: number;
   employeeId: number;
   payPeriodStart: string;
   payPeriodEnd: string;
+  basicSalary: number;
+  totalAllowances: number;
   grossPay: number;
   netPay: number;
   totalDeductions: number;
-  status: string; // PENDING, PAID
-  paymentDate?: string;
+  status: string;
+  dataSource: string;
+  locked: boolean;
+  attendanceRecordCount: number;
+  attendanceTotalHours: number;
+  attendanceOvertimeHours: number;
+  attendanceCapturedAt?: string;
+  processedDate?: string;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -29,11 +39,11 @@ export class PayrollService {
   constructor(private readonly api: ApiService) {}
 
   getSalaryStructure(employeeId: number): Observable<SalaryStructure> {
-    return this.api.get<SalaryStructure>(`/api/payroll/salary-structure/${employeeId}`, {} as any, this.baseUrl);
+    return this.api.get<SalaryStructure>(`/api/payroll/structure/${employeeId}`, {} as SalaryStructure, this.baseUrl);
   }
 
   getPayrollHistory(employeeId: number): Observable<PayrollRecord[]> {
-    return this.api.get<PayrollRecord[]>(`/api/payroll/history/${employeeId}`, [], this.baseUrl);
+    return this.api.get<PayrollRecord[]>(`/api/payroll/records/${employeeId}`, [], this.baseUrl);
   }
 
   generatePayroll(employeeId: number, start: string, end: string): Observable<PayrollRecord> {

@@ -31,9 +31,9 @@ import { AuthService } from '../../../core/services/auth.service';
 
       <div class="main-action">
         @if (currentStatus() === 'CLOCKED_OUT') {
-          <button class="clock-btn in" (click)="clockIn()">
+          <button class="clock-btn in" [disabled]="isClockInPending()" (click)="clockIn()">
             <mat-icon>login</mat-icon>
-            <span>CLOCK IN</span>
+            <span>{{ isClockInPending() ? 'CLOCKING IN...' : 'CLOCK IN' }}</span>
           </button>
         } @else if (currentStatus() === 'CLOCKED_IN') {
           <button class="clock-btn out" (click)="clockOut()">
@@ -89,6 +89,7 @@ import { AuthService } from '../../../core/services/auth.service';
       box-shadow: 0 20px 40px rgba(0,0,0,0.1); transition: all 0.2s;
     }
     .clock-btn:active { transform: scale(0.95); box-shadow: 0 10px 20px rgba(0,0,0,0.1); }
+    .clock-btn:disabled { opacity: 0.7; cursor: not-allowed; transform: none; box-shadow: 0 10px 20px rgba(0,0,0,0.08); }
     
     .clock-btn.in { background: linear-gradient(135deg, #22c55e, #16a34a); color: white; }
     .clock-btn.out { background: linear-gradient(135deg, #ef4444, #dc2626); color: white; }
@@ -124,6 +125,7 @@ export class MobileClockComponent implements OnInit, OnDestroy {
   private timerHandle?: any;
 
   protected readonly currentStatus = signal('CLOCKED_OUT');
+  protected readonly isClockInPending = signal(false);
   protected currentAttendance: Attendance | null = null;
 
   ngOnInit() {
@@ -170,10 +172,19 @@ export class MobileClockComponent implements OnInit, OnDestroy {
 
   clockIn() {
     const user = this.auth.user();
-    if (user) {
-      this.attendanceApi.clockIn(user.id).subscribe(() => {
-        this.snack.open('Successfully clocked in!', 'OK', { duration: 3000 });
-        this.refreshStatus();
+    if (user && !this.isClockInPending()) {
+      this.isClockInPending.set(true);
+      const idempotencyKey = this.attendanceApi.generateClockInIdempotencyKey(user.id);
+      this.attendanceApi.clockIn(user.id, undefined, undefined, idempotencyKey).subscribe({
+        next: () => {
+          this.isClockInPending.set(false);
+          this.snack.open('Successfully clocked in!', 'OK', { duration: 3000 });
+          this.refreshStatus();
+        },
+        error: () => {
+          this.isClockInPending.set(false);
+          this.snack.open('Clock in failed. Please try again.', 'OK', { duration: 3000 });
+        }
       });
     }
   }

@@ -7,6 +7,7 @@ const WIDGET_TOPICS = [
   '/topic/widgets/attendance',
   '/topic/widgets/scheduling',
   '/topic/widgets/leaves',
+  '/topic/widgets/payroll',
   '/topic/widgets/admin-alerts',
   '/topic/inbox'
 ];
