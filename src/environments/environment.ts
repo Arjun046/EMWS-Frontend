@@ -1,7 +1,7 @@
 export const environment = {
   production: false,
   appName: 'EWMS Workforce Console',
-  apiBaseUrl: 'https://download-cameras-travis-castle.trycloudflare.com',
-  widgetSocketUrl: 'wss://download-cameras-travis-castle.trycloudflare.com/ws-hub',
-  chatSocketUrl: 'wss://download-cameras-travis-castle.trycloudflare.com/ws-chat'
+  apiBaseUrl: 'https://cute-moons-admire.loca.lt',
+  widgetSocketUrl: 'wss://cute-moons-admire.loca.lt/ws-hub',
+  chatSocketUrl: 'wss://cute-moons-admire.loca.lt/ws-chat'
 };
