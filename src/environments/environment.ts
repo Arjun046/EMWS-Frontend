@@ -1,7 +1,7 @@
 export const environment = {
   production: false,
   appName: 'EWMS Workforce Console',
-  apiBaseUrl: 'https://specifics-human-feed-exclude.trycloudflare.com',
-  widgetSocketUrl: 'wss://specifics-human-feed-exclude.trycloudflare.com/ws-hub',
-  chatSocketUrl: 'wss://specifics-human-feed-exclude.trycloudflare.com/ws-chat'
+  apiBaseUrl: 'https://giant-tables-send.loca.lt',
+  widgetSocketUrl: 'wss://giant-tables-send.loca.lt/ws-hub',
+  chatSocketUrl: 'wss://giant-tables-send.loca.lt/ws-chat'
 };
