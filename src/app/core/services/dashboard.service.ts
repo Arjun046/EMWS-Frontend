@@ -42,34 +42,25 @@ export class DashboardService {
       this.api.get<any[]>('/api/employees', [], this.empUrl),
       this.api.get<any[]>(`/api/attendance/range?start=${todayStart}&end=${tomorrowStart}`, [], this.attUrl),
       this.api.get<any[]>('/api/leaves/status/APPROVED', [], this.leaveUrl),
-      this.api.get<any[]>('/api/tasks', [], this.taskUrl),
-      this.api.get<any[]>('/api/shifts', [], this.schedUrl),
       this.api.get<any>('/api/analytics/dashboard/admin', null, this.analyticsUrl)
-    ]).subscribe(([employees, attendance, approvedLeaves, tasks, shifts, admin]) => {
-      const activeEmployees = employees.filter((e) => e.status === 'ACTIVE').length;
+    ]).subscribe(([employees, attendance, approvedLeaves, admin]) => {
       
-      const presentCount = attendance.filter(a => a.clockOut === null).length;
-      const lateCount = attendance.filter(a => a.isLate).length;
+      // Extraction from real backend aggregation logic
+      const presentCount = admin?.currentlyClockedIn ?? attendance.filter(a => a.clockOut === null).length;
+      const totalEmployees = admin?.totalEmployees ?? employees.length;
+      const pendingLeavesCount = admin?.pendingLeaveRequests ?? 0;
       
-      // On Leave today
-      const today = new Date().toISOString().split('T')[0];
-      const onLeaveToday = approvedLeaves.filter(l => {
-        const start = l.startDate.split('T')[0];
-        const end = l.endDate.split('T')[0];
-        return today >= start && today <= end;
-      }).length;
-
-      // Absent: Scheduled for today but no attendance record
-      // This is a simplification
-      const scheduledToday = shifts.filter(s => s.startTime?.startsWith(today)).length;
+      // Derived stats or defaults
+      const lateCount = attendance.filter(a => a.isLate).length || 0;
+      const onLeaveToday = approvedLeaves.length || 0;
+      const scheduledToday = totalEmployees; // Fallback simulation
       const absentCount = Math.max(0, scheduledToday - attendance.length);
 
       const adherence = employees.length ? Math.round((presentCount / employees.length) * 100) : 0;
 
       // Extract values from admin data or provide fallbacks
-      const leavePressure = admin?.leavePressure ?? (activeEmployees ? Math.round((onLeaveToday / activeEmployees) * 100) : 0);
+      const leavePressure = admin?.leavePressure ?? (employees.length ? Math.round((onLeaveToday / employees.length) * 100) : 0);
       const scheduleCoverage = admin?.scheduleCoverage ?? (scheduledToday ? Math.round((presentCount / scheduledToday) * 100) : 0);
-      const pendingLeaves = admin?.pendingLeaves || [];
       const openShifts = admin?.openShifts || 0;
       const breakViolations = admin?.breakViolations || 0;
 
@@ -86,7 +77,7 @@ export class DashboardService {
 
       this.liveAlertsState.set([
         { title: 'Employee sync complete', detail: `${employees.length} profiles available to the UI.`, time: 'Live', tone: 'good' },
-        { title: 'Pending leave queue', detail: `${pendingLeaves.length} requests are waiting for review.`, time: 'Live', tone: pendingLeaves.length ? 'warn' : 'good' },
+        { title: 'Pending leave queue', detail: `${pendingLeavesCount} requests are waiting for review.`, time: 'Live', tone: pendingLeavesCount ? 'warn' : 'good' },
         { title: 'Operational strain', detail: `${openShifts} open shifts and ${breakViolations} break violations in the current range.`, time: 'Live', tone: openShifts || breakViolations ? 'accent' : 'good' }
       ]);
     });

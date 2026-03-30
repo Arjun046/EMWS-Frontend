@@ -77,11 +77,35 @@ export const routes: Routes = [
         loadChildren: () => import('./features/tasks/tasks.routes').then((m) => m.TASKS_ROUTES)
       },
       {
+        path: 'reports',
+        loadChildren: () => import('./features/reports/reports.routes').then((m) => m.REPORTS_ROUTES)
+      },
+      {
+        path: 'helpdesk',
+        loadChildren: () => import('./features/helpdesk/helpdesk.routes').then((m) => m.HELPDESK_ROUTES)
+      },
+      {
+        path: 'announcements',
+        loadChildren: () => import('./features/announcements/announcements.routes').then((m) => m.ANNOUNCEMENTS_ROUTES)
+      },
+      {
+        path: 'team-calendar',
+        loadChildren: () => import('./features/team-calendar/team-calendar.routes').then((m) => m.TEAM_CALENDAR_ROUTES)
+      },
+      {
+        path: 'settings',
+        loadChildren: () => import('./features/settings/settings.routes').then((m) => m.SETTINGS_ROUTES)
+      },
+      {
         path: '',
         pathMatch: 'full',
         redirectTo: 'dashboard'
       }
     ]
+  },
+  {
+    path: 'sandbox',
+    loadChildren: () => import('./features/sandbox/sandbox.routes').then(m => m.SANDBOX_ROUTES)
   },
   {
     path: '',

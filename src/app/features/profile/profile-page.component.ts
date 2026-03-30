@@ -1,263 +1,357 @@
-import { Component, inject, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { Component, inject, signal, computed, OnInit, ElementRef, ViewChild } from '@angular/core';
+import { CommonModule, DatePipe, PercentPipe, DecimalPipe } from '@angular/common';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatListModule } from '@angular/material/list';
-import { MatDialogModule, MatDialog, MatDialogRef } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
-import { MatSnackBarModule, MatSnackBar } from '@angular/material/snack-bar';
+import { MatSelectModule } from '@angular/material/select';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
-import { FormsModule, ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
+import { MatSnackBarModule, MatSnackBar } from '@angular/material/snack-bar';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { FormsModule, ReactiveFormsModule, FormBuilder, Validators, FormGroup } from '@angular/forms';
+import { Observable, of, throwError } from 'rxjs';
+import { delay, catchError, map } from 'rxjs/operators';
 import { AuthService } from '../../core/services/auth.service';
 import { PageHeaderComponent } from '../../shared/components/page-header.component';
 
-@Component({
-  selector: 'app-change-password-dialog',
-  standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, MatDialogModule, MatFormFieldModule, MatInputModule, MatButtonModule],
-  template: `
-    <h2 mat-dialog-title>Change Password</h2>
-    <mat-dialog-content>
-      <form [formGroup]="form" class="flex flex-col gap-4 mt-2">
-        <mat-form-field appearance="outline" class="w-full">
-          <mat-label>Current Password</mat-label>
-          <input matInput type="password" formControlName="oldPassword">
-        </mat-form-field>
-        <mat-form-field appearance="outline" class="w-full">
-          <mat-label>New Password</mat-label>
-          <input matInput type="password" formControlName="newPassword">
-        </mat-form-field>
-        <mat-form-field appearance="outline" class="w-full">
-          <mat-label>Confirm New Password</mat-label>
-          <input matInput type="password" formControlName="confirmPassword">
-        </mat-form-field>
-        <div *ngIf="form.errors?.['mismatch']" class="text-red-500 text-xs mt-[-1rem] mb-2">Passwords do not match</div>
-      </form>
-    </mat-dialog-content>
-    <mat-dialog-actions align="end">
-      <button mat-button (click)="dialogRef.close()">Cancel</button>
-      <button mat-flat-button color="primary" [disabled]="form.invalid" (click)="submit()">Update Password</button>
-    </mat-dialog-actions>
-  `,
-  styles: [`
-    .w-full { width: 100%; }
-    .flex { display: flex; }
-    .flex-col { flex-direction: column; }
-    .gap-4 { gap: 1rem; }
-    .mt-2 { margin-top: 0.5rem; }
-    .text-red-500 { color: #ef4444; }
-    .text-xs { font-size: 0.75rem; }
-  `]
-})
-export class ChangePasswordDialog {
-  private readonly fb = inject(FormBuilder);
-  private readonly auth = inject(AuthService);
-  private readonly snack = inject(MatSnackBar);
-  protected readonly dialogRef = inject(MatDialogRef<ChangePasswordDialog>);
+// --- MOCK API DATA MODELS ---
+interface StatData { hoursWorked: number; expectedHours: number; leaveRemaining: number; daysPresent: number; totalDays: number; pendingTasks: number; }
+interface ActivityAction { id: string; title: string; date: string; icon: string; }
+interface ScheduleItem { date: string; title: string; sub: string; type: 'shift' | 'leave'; }
+interface DocItem { id: string; title: string; status: 'pending' | 'signed'; }
+interface ManagerSummary { teamSize: number; presentToday: number; pendingApprovals: number; }
+interface PersonalInfo { fullName: string; preferredName: string; dob: string; email: string; phone: string; emergencyContactName: string; emergencyContactPhone: string; }
+interface WorkDetails { employeeId: string; joinDate: string; contractType: string; department: string; team: string; manager: string; location: string; shiftPattern: string; }
+interface ContactInfo { office: string; desk: string; workPhone: string; workEmail: string; }
 
-  protected readonly form = this.fb.group({
-    oldPassword: ['', [Validators.required]],
-    newPassword: ['', [Validators.required, Validators.minLength(8)]],
-    confirmPassword: ['', [Validators.required]]
-  }, { validators: (group: any) => group.get('newPassword').value === group.get('confirmPassword').value ? null : { mismatch: true } });
-
-  protected submit(): void {
-    const { oldPassword, newPassword } = this.form.getRawValue();
-    this.auth.changePassword(oldPassword!, newPassword!).subscribe({
-      next: () => {
-        this.snack.open('Password updated successfully', 'OK', { duration: 3000 });
-        this.dialogRef.close();
-      },
-      error: () => this.snack.open('Failed to update password. Please check your current password.', 'OK', { duration: 3000 })
-    });
-  }
-}
-
-@Component({
-  selector: 'app-two-factor-dialog',
-  standalone: true,
-  imports: [CommonModule, MatDialogModule, MatButtonModule, MatSlideToggleModule, FormsModule],
-  template: `
-    <h2 mat-dialog-title>Two-Factor Authentication</h2>
-    <mat-dialog-content>
-      <div class="flex flex-col gap-4 mt-2">
-        <p>Enhance your account security by requiring a second verification step when you log in.</p>
-        <div class="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
-          <div>
-            <h4 class="margin-0">2FA Status</h4>
-            <p class="margin-0 text-sm text-slate-500">{{ enabled ? 'Currently enabled' : 'Currently disabled' }}</p>
-          </div>
-          <mat-slide-toggle [(ngModel)]="enabled" (change)="toggle()"></mat-slide-toggle>
-        </div>
-        
-        <div *ngIf="enabled" class="mt-4 p-4 border border-blue-100 bg-blue-50 rounded-lg">
-          <p class="margin-0 text-sm">When enabled, you will receive a verification code via your registered email or mobile device during login.</p>
-        </div>
-      </div>
-    </mat-dialog-content>
-    <mat-dialog-actions align="end">
-      <button mat-flat-button color="primary" (click)="dialogRef.close()">Done</button>
-    </mat-dialog-actions>
-  `,
-  styles: [`
-    .flex { display: flex; }
-    .flex-col { flex-direction: column; }
-    .gap-4 { gap: 1rem; }
-    .mt-2 { margin-top: 0.5rem; }
-    .mt-4 { margin-top: 1rem; }
-    .items-center { align-items: center; }
-    .justify-between { justify-content: space-between; }
-    .p-4 { padding: 1rem; }
-    .bg-slate-50 { background-color: #f8fafc; }
-    .bg-blue-50 { background-color: #eff6ff; }
-    .border { border-width: 1px; }
-    .border-blue-100 { border-color: #dbeafe; }
-    .rounded-lg { border-radius: 0.5rem; }
-    .margin-0 { margin: 0; }
-    .text-sm { font-size: 0.875rem; }
-    .text-slate-500 { color: #64748b; }
-  `]
-})
-export class TwoFactorDialog {
-  protected readonly dialogRef = inject(MatDialogRef<TwoFactorDialog>);
-  private readonly snack = inject(MatSnackBar);
-  protected enabled = false;
-
-  protected toggle(): void {
-    const status = this.enabled ? 'enabled' : 'disabled';
-    this.snack.open(`Two-Factor Authentication ${status}`, 'OK', { duration: 3000 });
-  }
-}
-
+// --- THE COMPONENT ---
 @Component({
   selector: 'app-profile-page',
   standalone: true,
-  imports: [CommonModule, MatCardModule, MatButtonModule, MatIconModule, MatDividerModule, MatListModule, PageHeaderComponent, MatSnackBarModule, MatDialogModule],
-  template: `
-    <app-page-header title="My Profile" subtitle="Manage your enterprise identity, workforce credentials, and personal preferences." />
-
-    <div class="profile-grid">
-      <mat-card class="main-card">
-        <div class="user-header">
-          <div class="large-avatar">
-            <img *ngIf="auth.user()?.avatar?.startsWith('http')" [src]="auth.user()?.avatar" alt="Profile Image" class="profile-img">
-            <span *ngIf="!auth.user()?.avatar?.startsWith('http')">{{ auth.user()?.avatar }}</span>
-          </div>
-          <div class="user-info">
-            <h1>{{ auth.user()?.name }}</h1>
-            <p class="role-badge">{{ auth.user()?.role }}</p>
-            <p class="email-text">{{ auth.user()?.email }}</p>
-          </div>
-          <button mat-flat-button color="primary">Edit Profile</button>
-        </div>
-
-        <mat-divider></mat-divider>
-
-        <div class="profile-details">
-          <div class="section">
-            <h3>Personal Information</h3>
-            <div class="detail-row">
-              <span class="label">Full Name</span>
-              <span class="value">{{ auth.user()?.name }}</span>
-            </div>
-            <div class="detail-row">
-              <span class="label">Email Address</span>
-              <span class="value">{{ auth.user()?.email }}</span>
-            </div>
-            <div class="detail-row">
-              <span class="label">Phone Number</span>
-              <span class="value">+1 (555) 123-4567</span>
-            </div>
-          </div>
-
-          <div class="section">
-            <h3>Workforce Identity</h3>
-            <div class="detail-row">
-              <span class="label">Employee ID</span>
-              <span class="value">EWMS-{{ auth.user()?.id?.toString()?.padStart(4, '0') }}</span>
-            </div>
-            <div class="detail-row">
-              <span class="label">Primary Role</span>
-              <span class="value">{{ auth.user()?.role }}</span>
-            </div>
-            <div class="detail-row">
-              <span class="label">Status</span>
-              <span class="value success">Active</span>
-            </div>
-          </div>
-        </div>
-      </mat-card>
-
-      <div class="side-column">
-        <mat-card class="security-card">
-          <h3>Security & Access</h3>
-          <p>Manage your account security and password.</p>
-          <button mat-stroked-button class="w-full mb-3" (click)="openChangePassword()">Change Password</button>
-          <button mat-stroked-button class="w-full" (click)="open2FA()">Two-Factor Auth</button>
-        </mat-card>
-
-        <mat-card class="activity-card mt-4">
-          <h3>Recent Activity</h3>
-          <mat-list>
-            <mat-list-item>
-              <mat-icon matListItemIcon>login</mat-icon>
-              <div matListItemTitle>Successful Login</div>
-              <div matListItemLine>Today, 08:45 AM</div>
-            </mat-list-item>
-            <mat-list-item>
-              <mat-icon matListItemIcon>edit</mat-icon>
-              <div matListItemTitle>Profile Updated</div>
-              <div matListItemLine>Yesterday, 02:15 PM</div>
-            </mat-list-item>
-          </mat-list>
-        </mat-card>
-      </div>
-    </div>
-  `,
-  styles: [`
-    .profile-grid { display: grid; grid-template-columns: 1fr 22rem; gap: 1.5rem; margin-top: 1.5rem; }
-    
-    .main-card { border-radius: 1.2rem; border: 1px solid #e2e8f0; padding: 0; overflow: hidden; }
-    .user-header { padding: 2.5rem; display: flex; align-items: center; gap: 2rem; }
-    .large-avatar { width: 6.5rem; height: 6.5rem; border-radius: 1.5rem; background: linear-gradient(135deg, #3b82f6, #06b6d4); color: #fff; display: grid; place-items: center; font-size: 2.5rem; font-weight: 800; box-shadow: 0 12px 24px rgba(59, 130, 246, 0.25); overflow: hidden; }
-    .profile-img { width: 100%; height: 100%; object-fit: cover; }
-    .user-info { flex: 1; }
-    .user-info h1 { margin: 0 0 0.5rem; font-size: 2rem; font-weight: 800; color: #0f172a; }
-    .role-badge { display: inline-block; padding: 0.25rem 0.75rem; background: #eff6ff; color: #2563eb; border-radius: 0.5rem; font-weight: 700; font-size: 0.85rem; margin-bottom: 0.5rem; }
-    .email-text { margin: 0; color: #64748b; font-weight: 500; }
-
-    .profile-details { padding: 2.5rem; display: grid; grid-template-columns: 1fr 1fr; gap: 3rem; }
-    .section h3 { font-size: 1.1rem; font-weight: 700; color: #1e293b; margin-bottom: 1.5rem; border-bottom: 2px solid #f1f5f9; padding-bottom: 0.75rem; }
-    .detail-row { display: flex; flex-direction: column; margin-bottom: 1.25rem; }
-    .label { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: #94a3b8; letter-spacing: 0.05em; margin-bottom: 0.25rem; }
-    .value { font-size: 1rem; color: #334155; font-weight: 500; }
-    .value.success { color: #10b981; }
-
-    .side-column h3 { font-size: 1rem; font-weight: 700; margin-bottom: 1rem; }
-    .security-card, .activity-card { border-radius: 1.2rem; border: 1px solid #e2e8f0; padding: 1.5rem; }
-    .w-full { width: 100%; }
-    .mb-3 { margin-bottom: 0.75rem; }
-    .mt-4 { margin-top: 1rem; }
-
-    @media (max-width: 1100px) {
-      .profile-grid { grid-template-columns: 1fr; }
-      .profile-details { grid-template-columns: 1fr; }
-    }
-  `]
+  imports: [
+    CommonModule, MatCardModule, MatButtonModule, MatIconModule, MatDividerModule, 
+    MatListModule, MatFormFieldModule, MatInputModule, MatSelectModule, MatSlideToggleModule, 
+    MatSnackBarModule, MatProgressSpinnerModule, FormsModule, ReactiveFormsModule, PageHeaderComponent,
+    DatePipe, PercentPipe, DecimalPipe
+  ],
+  templateUrl: './profile-page.component.html',
+  styleUrls: ['./profile-page.component.scss']
 })
-export class ProfilePageComponent {
+export class ProfilePageComponent implements OnInit {
   protected readonly auth = inject(AuthService);
-  private readonly dialog = inject(MatDialog);
+  private readonly fb = inject(FormBuilder);
   private readonly snack = inject(MatSnackBar);
 
-  protected openChangePassword(): void {
-    this.dialog.open(ChangePasswordDialog, { width: '400px' });
+  // --- STATE SIGNALS ---
+  protected readonly role = computed(() => this.auth.user()?.role || 'EMPLOYEE');
+  protected readonly isManager = computed(() => ['MANAGER', 'ADMIN'].includes(this.role()));
+  protected readonly isAdmin = computed(() => this.role() === 'ADMIN');
+
+  protected editingSection = signal<string | null>(null);
+  protected isAvatarUploading = signal(false);
+
+  // Data Signals
+  protected stats = signal<StatData | null>(null);
+  protected personalInfo = signal<PersonalInfo | null>(null);
+  protected workDetails = signal<WorkDetails | null>(null);
+  protected contactInfo = signal<ContactInfo | null>(null);
+  protected activity = signal<ActivityAction[] | null>(null);
+  protected schedule = signal<ScheduleItem[] | null>(null);
+  protected documents = signal<DocItem[] | null>(null);
+  protected teamSummary = signal<ManagerSummary | null>(null);
+  protected adminPermissions = signal<string[] | null>(null);
+
+  // Loading Signals
+  protected loadIdentity = signal(true);
+  protected loadStats = signal(true);
+  protected loadLeftCol = signal(true);
+  protected loadActivity = signal(true);
+  protected loadSchedule = signal(true);
+  protected loadDocs = signal(true);
+  protected loadTeam = signal(true);
+  
+  // Error Signals
+  protected errIdentity = signal(false);
+  protected errStats = signal(false);
+  protected errLeftCol = signal(false);
+  protected errActivity = signal(false);
+  protected errSchedule = signal(false);
+  protected errDocs = signal(false);
+  protected errTeam = signal(false);
+
+  // Forms
+  protected identityForm!: FormGroup;
+  protected personalForm!: FormGroup;
+  protected contactForm!: FormGroup;
+  protected passwordForm!: FormGroup;
+  
+  // Settings
+  protected emailNotif = signal(true);
+  protected pushNotif = signal(false);
+  protected inAppNotif = signal(true);
+  protected datePref = signal('MM/DD/YYYY');
+  protected timePref = signal('12h');
+  protected langPref = signal('en');
+
+  protected showPassword = signal(false);
+  protected isPasswordSaving = signal(false);
+
+  @ViewChild('fileInput') fileInput!: ElementRef<HTMLInputElement>;
+
+  ngOnInit() {
+    this.initForms();
+    this.fetchAllData();
   }
 
-  protected open2FA(): void {
-    this.dialog.open(TwoFactorDialog, { width: '400px' });
+  // --- INITIALIZATION ---
+  private initForms() {
+    this.identityForm = this.fb.group({
+      fullName: ['', Validators.required],
+      role: ['', Validators.required],
+      status: ['', Validators.required],
+      location: ['', Validators.required]
+    });
+
+    this.personalForm = this.fb.group({
+      fullName: ['', Validators.required],
+      preferredName: [''],
+      dob: ['', Validators.required],
+      email: ['', [Validators.required, Validators.email]],
+      phone: ['', Validators.required],
+      emergencyContactName: ['', Validators.required],
+      emergencyContactPhone: ['', Validators.required]
+    });
+
+    this.contactForm = this.fb.group({
+      office: ['', Validators.required],
+      desk: [''],
+      workPhone: ['', Validators.required],
+      workEmail: ['', [Validators.required, Validators.email]]
+    });
+
+    this.passwordForm = this.fb.group({
+      current: ['', Validators.required],
+      new: ['', [Validators.required, Validators.minLength(8)]],
+      confirm: ['', Validators.required]
+    }, { validators: this.passwordMatchValidator });
+  }
+
+  private passwordMatchValidator(g: any) {
+    return g.get('new').value === g.get('confirm').value ? null : { mismatch: true };
+  }
+
+  // --- DATA FETCHING (MOCKED) ---
+  protected fetchAllData() {
+    this.fetchIdentity();
+    this.fetchStats();
+    this.fetchLeftCol();
+    this.fetchActivity();
+    this.fetchSchedule();
+    this.fetchDocs();
+    
+    if (this.isManager()) this.fetchTeamSummary();
+    if (this.isAdmin()) this.fetchAdminPerms();
+  }
+
+  protected fetchIdentity() {
+    this.loadIdentity.set(true); this.errIdentity.set(false);
+    of(true).pipe(delay(600)).subscribe(() => {
+      const u = this.auth.user();
+      this.identityForm.patchValue({
+        fullName: u?.name || 'Unknown User',
+        role: u?.role || 'Employee',
+        status: 'Active',
+        location: 'Headquarters - Floor 3'
+      });
+      this.loadIdentity.set(false);
+    });
+  }
+
+  protected fetchStats() {
+    this.loadStats.set(true); this.errStats.set(false);
+    of({
+      hoursWorked: 34.5, expectedHours: 40,
+      leaveRemaining: 12, daysPresent: 18, totalDays: 20,
+      pendingTasks: this.isAdmin() ? 5 : 0
+    }).pipe(delay(800)).subscribe(res => {
+      this.stats.set(res);
+      this.loadStats.set(false);
+    });
+  }
+
+  protected fetchLeftCol() {
+    this.loadLeftCol.set(true); this.errLeftCol.set(false);
+    of(true).pipe(delay(1000)).subscribe(() => {
+      const u = this.auth.user();
+      
+      const pInfo = {
+        fullName: u?.name || 'Unknown', preferredName: (u?.name || '').split(' ')[0],
+        dob: '1985-06-15', email: u?.email || 'user@example.com', phone: '+1 (555) 987-6543',
+        emergencyContactName: 'Jane Doe', emergencyContactPhone: '+1 (555) 123-4567'
+      };
+      this.personalInfo.set(pInfo);
+      this.personalForm.patchValue(pInfo);
+
+      this.workDetails.set({
+        employeeId: 'EWMS-' + (u?.id?.toString().padStart(4, '0') || '0000'),
+        joinDate: '2021-03-10', contractType: 'Full-time Permanent',
+        department: 'Operations', team: 'Core Platform', manager: 'Sarah Connor',
+        location: 'HQ - New York', shiftPattern: 'Mon-Fri, 9am-5pm EST'
+      });
+
+      const cInfo = { office: 'New York HQ', desk: 'Floor 3, Desk 42', workPhone: '+1 (555) 555-0199', workEmail: u?.email || 'work@company.com' };
+      this.contactInfo.set(cInfo);
+      this.contactForm.patchValue(cInfo);
+
+      this.loadLeftCol.set(false);
+    });
+  }
+
+  protected fetchActivity() {
+    this.loadActivity.set(true); this.errActivity.set(false);
+    of([
+      { id: '1', title: 'Clocked in from HQ', date: new Date().toISOString(), icon: 'login' },
+      { id: '2', title: 'Vacation leave approved', date: new Date(Date.now() - 86400000).toISOString(), icon: 'event_available' },
+      { id: '3', title: 'Completed annual security training', date: new Date(Date.now() - 172800000).toISOString(), icon: 'school' },
+      { id: '4', title: 'Shift swapped with Alex', date: new Date(Date.now() - 345600000).toISOString(), icon: 'swap_horiz' }
+    ]).pipe(delay(1200)).subscribe(res => {
+      this.activity.set(res);
+      this.loadActivity.set(false);
+    });
+  }
+
+  protected triggerActivityError() {
+    this.loadActivity.set(true); this.errActivity.set(false);
+    of(null).pipe(delay(500), map(() => { throw new Error('API Drop'); }), catchError(() => {
+      this.errActivity.set(true);
+      this.loadActivity.set(false);
+      return of(null);
+    })).subscribe();
+  }
+
+  protected fetchSchedule() {
+    this.loadSchedule.set(true); this.errSchedule.set(false);
+    of([
+      { date: 'Today, Oct 24', title: 'Morning Shift', sub: '09:00 AM - 05:00 PM', type: 'shift' as const },
+      { date: 'Tomorrow, Oct 25', title: 'Morning Shift', sub: '09:00 AM - 05:00 PM', type: 'shift' as const },
+      { date: 'Next Mon, Oct 29', title: 'Vacation', sub: 'All Day', type: 'leave' as const }
+    ]).pipe(delay(700)).subscribe(res => {
+      this.schedule.set(res);
+      this.loadSchedule.set(false);
+    });
+  }
+
+  protected fetchDocs() {
+    this.loadDocs.set(true); this.errDocs.set(false);
+    of([
+      { id: 'd1', title: 'Q4 Compliance Policy', status: 'pending' as const },
+      { id: 'd2', title: 'Remote Work Agreement', status: 'signed' as const }
+    ]).pipe(delay(900)).subscribe(res => {
+      // simulate empty state for standard employees sometimes, but let's give them data
+      this.documents.set(res);
+      this.loadDocs.set(false);
+    });
+  }
+
+  protected fetchTeamSummary() {
+    this.loadTeam.set(true); this.errTeam.set(false);
+    of({ teamSize: 12, presentToday: 10, pendingApprovals: 3 }).pipe(delay(1100)).subscribe(res => {
+      this.teamSummary.set(res);
+      this.loadTeam.set(false);
+    });
+  }
+
+  protected fetchAdminPerms() {
+    this.adminPermissions.set(['Super Admin', 'System Config', 'User Management', 'Payroll Approver']);
+  }
+
+
+  // --- USER ACTIONS & EDITING ---
+  
+  protected toggleEdit(section: string) {
+    if (this.editingSection() === section) {
+      this.editingSection.set(null); // Cancel
+      // Revert form values
+      if(section==='IDENTITY') this.identityForm.patchValue({ ...this.identityForm.value }); // handled via fetchIdentity logic or signals
+      if(section==='PERSONAL') this.personalForm.patchValue(this.personalInfo()!);
+      if(section==='CONTACT') this.contactForm.patchValue(this.contactInfo()!);
+    } else {
+      this.editingSection.set(section);
+    }
+  }
+
+  protected saveIdentity() {
+    if (this.identityForm.invalid) return;
+    this.snack.open('Identity updated.', 'OK', { duration: 2000 });
+    this.editingSection.set(null);
+  }
+
+  protected savePersonal() {
+    if (this.personalForm.invalid) return;
+    // Mock save
+    const btn = document.activeElement as HTMLButtonElement;
+    if(btn) btn.disabled = true;
+    
+    setTimeout(() => {
+      this.personalInfo.set(this.personalForm.value);
+      this.snack.open('Personal details saved successfully.', 'OK', { duration: 3000 });
+      this.editingSection.set(null);
+    }, 600);
+  }
+
+  protected saveContact() {
+    if (this.contactForm.invalid) return;
+    setTimeout(() => {
+      this.contactInfo.set(this.contactForm.value);
+      this.snack.open('Contact & Location updated.', 'OK', { duration: 3000 });
+      this.editingSection.set(null);
+    }, 600);
+  }
+
+  protected onAvatarClick() {
+    this.fileInput.nativeElement.click();
+  }
+
+  protected onFileSelected(event: any) {
+    const file = event.target.files[0];
+    if (file && file.type.startsWith('image/')) {
+      this.isAvatarUploading.set(true);
+      // Simulate fake upload
+      setTimeout(() => {
+        this.isAvatarUploading.set(false);
+        this.snack.open('Profile photo updated!', 'OK', { duration: 3000 });
+      }, 1500);
+    } else if(file) {
+      this.snack.open('Please select a valid image file.', 'OK', { duration: 3000 });
+    }
+    event.target.value = null; // reset
+  }
+
+  protected savePassword() {
+    if (this.passwordForm.invalid) return;
+    this.isPasswordSaving.set(true);
+    setTimeout(() => {
+      this.isPasswordSaving.set(false);
+      this.passwordForm.reset();
+      this.snack.open('Password successfully changed.', 'OK', { duration: 3000 });
+    }, 1000);
+  }
+
+  protected savePreference(type: string) {
+    this.snack.open('Preference saved.', '', { duration: 1500 });
+  }
+
+  protected downloadData() {
+    this.snack.open('Preparing data export. You will receive an email shortly.', 'OK', { duration: 4000 });
+  }
+
+  // --- HELPERS ---
+  protected min(a: number, b: number) { return Math.min(a, b); }
+  protected getInitials(name?: string) {
+    if (!name) return 'U';
+    return name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
   }
 }

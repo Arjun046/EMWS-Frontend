@@ -49,3 +49,75 @@ button, input, textarea, select {
 .mat-mdc-card {
   --mdc-elevated-card-container-color: rgba(255, 255, 255, 0.82);
 }
+
+/* --- OVERLAY TYPOGRAPHY FIXES --- */
+.cdk-overlay-container, .cdk-global-overlay-wrapper {
+  font-family: 'Manrope', 'Segoe UI', sans-serif !important;
+}
+
+strong, p, h1, h2, h3, h4, h5, h6, span, div {
+  font-family: inherit;
+}
+
+/* --- ENTERPRISE DROPDOWN MENU --- */
+.enterprise-menu {
+  min-width: 250px !important;
+  border-radius: 12px !important;
+  padding: 0.5rem 0 !important;
+  box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.15) !important;
+  border: 1px solid rgba(226, 232, 240, 0.8) !important;
+  overflow: hidden;
+}
+
+.enterprise-menu .menu-header {
+  padding: 1rem 1.25rem 0.5rem;
+  background: linear-gradient(to bottom, #f8fafc, #ffffff);
+}
+
+.enterprise-menu .menu-header strong {
+  display: block;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #0f172a;
+  margin-bottom: 0.2rem;
+  letter-spacing: -0.01em;
+}
+
+.enterprise-menu .menu-header p {
+  margin: 0;
+  font-size: 0.8rem;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.enterprise-menu .mat-divider {
+  margin: 0.5rem 0 !important;
+  border-color: #f1f5f9;
+}
+
+.enterprise-menu .mat-mdc-menu-item {
+  min-height: 44px;
+  font-weight: 600;
+  color: #334155;
+  margin: 0 0.5rem;
+  border-radius: 8px;
+  width: calc(100% - 1rem);
+  padding: 0 1rem;
+}
+
+.enterprise-menu .mat-mdc-menu-item mat-icon {
+  color: #64748b;
+  margin-right: 0.75rem;
+  font-size: 1.25rem;
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.enterprise-menu .mat-mdc-menu-item:hover {
+  background-color: #f1f5f9 !important;
+  color: #0f172a;
+}
+
+.enterprise-menu .mat-mdc-menu-item:hover mat-icon {
+  color: #2563eb;
+}

@@ -241,6 +241,8 @@ export class AppShellComponent {
     { label: 'Attendance', icon: 'fact_check', route: '/attendance', section: 'Workforce' },
     { label: 'Leaves', icon: 'event_busy', route: '/leaves', section: 'Workforce' },
     { label: 'Scheduling', icon: 'calendar_today', route: '/scheduling', section: 'Workforce' },
+    { label: 'Team Calendar', icon: 'date_range', route: '/team-calendar', section: 'Workforce' },
+    { label: 'Timesheet Reports', icon: 'summarize', route: '/reports', section: 'Workforce', roles: ['ADMIN', 'MANAGER'] },
     { label: 'Organization', icon: 'lan', route: '/organization', section: 'Workforce', roles: ['ADMIN'] },
     
     { label: 'Payroll', icon: 'payments', route: '/payroll', section: 'Execution' },
@@ -251,9 +253,12 @@ export class AppShellComponent {
     { label: 'Analytics', icon: 'bar_chart', route: '/analytics', section: 'Insights', roles: ['ADMIN', 'MANAGER'] },
     { label: 'Communication', icon: 'chat', route: '/communication', section: 'Insights', badge: 'Live' },
     { label: 'Tasks', icon: 'assignment_turned_in', route: '/tasks', section: 'Insights' },
+    { label: 'Announcements', icon: 'campaign', route: '/announcements', section: 'Insights' },
+    { label: 'Help Desk', icon: 'support_agent', route: '/helpdesk', section: 'Insights' },
     
     { label: 'Roles & Permissions', icon: 'security', route: '/roles', section: 'Administration', roles: ['ADMIN'] },
-    { label: 'Company Branding', icon: 'palette', route: '/organization/branding', section: 'Administration', roles: ['ADMIN'] }
+    { label: 'Company Branding', icon: 'palette', route: '/organization/branding', section: 'Administration', roles: ['ADMIN'] },
+    { label: 'Settings', icon: 'settings', route: '/settings', section: 'Administration' }
   ];
 
   protected readonly sections = computed(() => {

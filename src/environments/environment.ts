@@ -1,7 +1,7 @@
 export const environment = {
   production: false,
   appName: 'EWMS Workforce Console',
-  apiBaseUrl: 'https://rotten-shrimps-deny.loca.lt',
-  widgetSocketUrl: 'wss://rotten-shrimps-deny.loca.lt/ws-hub',
-  chatSocketUrl: 'wss://rotten-shrimps-deny.loca.lt/ws-chat'
+  apiBaseUrl: 'http://localhost:8080/api',
+  widgetSocketUrl: 'ws://localhost:8091/ws-hub',
+  chatSocketUrl: 'ws://localhost:8094/ws-chat'
 };
