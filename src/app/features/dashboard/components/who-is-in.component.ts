@@ -7,7 +7,7 @@ import { AttendanceService, Attendance } from '../../../core/services/attendance
 import { ApiService } from '../../../core/services/api.service';
 import { WidgetSocketService } from '../../../core/services/widget-socket.service';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { Employee } from '../../employees/employees-page.component';
+import { Employee } from '../../../core/services/employee-data.service';
 
 @Component({
   selector: 'app-who-is-in',

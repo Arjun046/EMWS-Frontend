@@ -1,7 +1,6 @@
 import { Injectable, inject } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
-import { Observable, of, catchError } from 'rxjs';
-import { environment } from '../../../environments/environment';
+import { Observable } from 'rxjs';
+import { ApiService } from './api.service';
 
 export interface SupportTicket {
   id: number;
@@ -30,41 +29,38 @@ export interface TicketReply {
 
 @Injectable({ providedIn: 'root' })
 export class HelpdeskService {
-  private readonly http = inject(HttpClient);
-  private readonly base = environment.apiBaseUrl;
+  private readonly api = inject(ApiService);
 
   getTickets(status?: string): Observable<SupportTicket[]> {
-    let url = `${this.base}/api/helpdesk/tickets`;
-    if (status) url += `?status=${status}`;
-    return this.http.get<SupportTicket[]>(url).pipe(catchError(() => of([])));
+    let url = `/api/helpdesk/tickets`;
+    if (status) {
+      url += `?status=${status}`;
+    }
+    return this.api.get<SupportTicket[]>(url, []);
   }
 
   getMyTickets(employeeId: number): Observable<SupportTicket[]> {
-    return this.http.get<SupportTicket[]>(
-      `${this.base}/api/helpdesk/tickets/employee/${employeeId}`
-    ).pipe(catchError(() => of([])));
+    return this.api.get<SupportTicket[]>(`/api/helpdesk/tickets/employee/${employeeId}`, []);
   }
 
   createTicket(ticket: Partial<SupportTicket>): Observable<SupportTicket> {
-    return this.http.post<SupportTicket>(`${this.base}/api/helpdesk/tickets`, ticket);
+    return this.api.post<SupportTicket>(`/api/helpdesk/tickets`, ticket);
   }
 
   updateTicketStatus(ticketId: number, status: string, resolution?: string): Observable<SupportTicket> {
-    return this.http.patch<SupportTicket>(
-      `${this.base}/api/helpdesk/tickets/${ticketId}`,
+    return this.api.patch<SupportTicket>(
+      `/api/helpdesk/tickets/${ticketId}`,
       { status, resolution }
     );
   }
 
   getReplies(ticketId: number): Observable<TicketReply[]> {
-    return this.http.get<TicketReply[]>(
-      `${this.base}/api/helpdesk/tickets/${ticketId}/replies`
-    ).pipe(catchError(() => of([])));
+    return this.api.get<TicketReply[]>(`/api/helpdesk/tickets/${ticketId}/replies`, []);
   }
 
   addReply(ticketId: number, content: string): Observable<TicketReply> {
-    return this.http.post<TicketReply>(
-      `${this.base}/api/helpdesk/tickets/${ticketId}/replies`,
+    return this.api.post<TicketReply>(
+      `/api/helpdesk/tickets/${ticketId}/replies`,
       { content }
     );
   }

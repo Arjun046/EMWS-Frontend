@@ -1,357 +1,223 @@
-import { Component, inject, signal, computed, OnInit, ElementRef, ViewChild } from '@angular/core';
-import { CommonModule, DatePipe, PercentPipe, DecimalPipe } from '@angular/common';
-import { MatCardModule } from '@angular/material/card';
-import { MatButtonModule } from '@angular/material/button';
+import { Component, inject, signal, computed, OnInit } from '@angular/core';
+import { CommonModule } from '@angular/common';
 import { MatIconModule } from '@angular/material/icon';
+import { MatButtonModule } from '@angular/material/button';
 import { MatDividerModule } from '@angular/material/divider';
-import { MatListModule } from '@angular/material/list';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
-import { MatSelectModule } from '@angular/material/select';
-import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatSnackBarModule, MatSnackBar } from '@angular/material/snack-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { FormsModule, ReactiveFormsModule, FormBuilder, Validators, FormGroup } from '@angular/forms';
-import { Observable, of, throwError } from 'rxjs';
-import { delay, catchError, map } from 'rxjs/operators';
+import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { AuthService } from '../../core/services/auth.service';
-import { PageHeaderComponent } from '../../shared/components/page-header.component';
+import { SideSheetDrawerComponent } from '../../shared/components/side-sheet-drawer/side-sheet-drawer.component';
+import { catchError, of } from 'rxjs';
 
-// --- MOCK API DATA MODELS ---
-interface StatData { hoursWorked: number; expectedHours: number; leaveRemaining: number; daysPresent: number; totalDays: number; pendingTasks: number; }
-interface ActivityAction { id: string; title: string; date: string; icon: string; }
-interface ScheduleItem { date: string; title: string; sub: string; type: 'shift' | 'leave'; }
-interface DocItem { id: string; title: string; status: 'pending' | 'signed'; }
-interface ManagerSummary { teamSize: number; presentToday: number; pendingApprovals: number; }
-interface PersonalInfo { fullName: string; preferredName: string; dob: string; email: string; phone: string; emergencyContactName: string; emergencyContactPhone: string; }
-interface WorkDetails { employeeId: string; joinDate: string; contractType: string; department: string; team: string; manager: string; location: string; shiftPattern: string; }
-interface ContactInfo { office: string; desk: string; workPhone: string; workEmail: string; }
-
-// --- THE COMPONENT ---
 @Component({
   selector: 'app-profile-page',
   standalone: true,
   imports: [
-    CommonModule, MatCardModule, MatButtonModule, MatIconModule, MatDividerModule, 
-    MatListModule, MatFormFieldModule, MatInputModule, MatSelectModule, MatSlideToggleModule, 
-    MatSnackBarModule, MatProgressSpinnerModule, FormsModule, ReactiveFormsModule, PageHeaderComponent,
-    DatePipe, PercentPipe, DecimalPipe
+    CommonModule, MatIconModule, MatButtonModule, MatDividerModule, 
+    MatSnackBarModule, MatProgressSpinnerModule, ReactiveFormsModule,
+    SideSheetDrawerComponent
   ],
-  templateUrl: './profile-page.component.html',
-  styleUrls: ['./profile-page.component.scss']
+  template: `
+    <div class="profile-viewport fade-up">
+      <div class="profile-hero-card">
+        <div class="profile-avatar-large">
+          {{ getInitials() }}
+          <div class="avatar-edit-overlay" (click)="onUploadAvatar()">
+            <mat-icon>photo_camera</mat-icon>
+          </div>
+        </div>
+        <div class="profile-hero-info">
+          <h2>{{ auth.user()?.name }}</h2>
+          <p id="profileHeroRole">ROLE_{{ auth.user()?.role }} · Operational Node · <span style="color:var(--success);">● ONLINE</span></p>
+          <div class="profile-hero-actions">
+            <button class="ui-btn ui-btn-primary" (click)="openEditDrawer()">Modify Identity</button>
+            <button class="ui-btn ui-btn-secondary" (click)="openPasswordDrawer()">Secure Password</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="profile-stats-row mt-6">
+        <div class="ui-card profile-stat-card">
+          <span class="profile-stat-value">100%</span>
+          <span class="profile-stat-label">Reliability</span>
+        </div>
+        <div class="ui-card profile-stat-card">
+          <span class="profile-stat-value">NOMINAL</span>
+          <span class="profile-stat-label">Node Health</span>
+        </div>
+        <div class="ui-card profile-stat-card">
+          <span class="profile-stat-value">LVL_4</span>
+          <span class="profile-stat-label">Sync Depth</span>
+        </div>
+      </div>
+
+      <div class="ui-card mt-6">
+        <div class="profile-section-title">Forensic Identification</div>
+        <div class="profile-details-grid">
+          <div class="profile-field-group">
+            <label>Master Identity</label>
+            <div class="profile-field-value">{{ auth.user()?.name }}</div>
+          </div>
+          <div class="profile-field-group">
+            <label>Primary Communication</label>
+            <div class="profile-field-value">{{ auth.user()?.email }}</div>
+          </div>
+          <div class="profile-field-group">
+            <label>Contact Protocol</label>
+            <div class="profile-field-value">{{ auth.user()?.phoneNumber || 'UNSET' }}</div>
+          </div>
+          <div class="profile-field-group">
+            <label>Security Clearance</label>
+            <div class="profile-field-value text-mono" style="font-weight:700; color:var(--primary);">ROLE_{{ auth.user()?.role }}</div>
+          </div>
+          <div class="profile-field-group">
+            <label>Tenant Hash</label>
+            <div class="profile-field-value text-mono">TID_{{ auth.user()?.companyId }}_AX</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- EDIT PROFILE DRAWER -->
+    <app-side-sheet-drawer
+      [isOpen]="isEditDrawerOpen"
+      [title]="'Modify Identity'"
+      [subtitle]="'Updating operational metadata for core node.'"
+      [saveText]="'Commit Packet'"
+      [saveDisabled]="profileForm.invalid"
+      (close)="isEditDrawerOpen = false"
+      (save)="saveProfile()"
+    >
+      <form [formGroup]="profileForm" class="drawer-crud-form">
+         <div class="f-grid">
+            <div class="f-group"><label>First Name</label><input class="f-input" formControlName="firstName"></div>
+            <div class="f-group"><label>Last Name</label><input class="f-input" formControlName="lastName"></div>
+         </div>
+         <div class="f-group"><label>Contact Phone</label><input class="f-input" formControlName="phoneNumber"></div>
+      </form>
+    </app-side-sheet-drawer>
+
+    <!-- PASSWORD DRAWER -->
+    <app-side-sheet-drawer
+      [isOpen]="isPasswordDrawerOpen"
+      [title]="'Secure Password Protocol'"
+      [subtitle]="'Rotating authentication credentials for session integrity.'"
+      [saveText]="'Rotate Key'"
+      [saveDisabled]="passwordForm.invalid"
+      (close)="isPasswordDrawerOpen = false"
+      (save)="savePassword()"
+    >
+      <form [formGroup]="passwordForm" class="drawer-crud-form">
+         <div class="f-group"><label>Current Credentials</label><input class="f-input" type="password" formControlName="oldPassword"></div>
+         <mat-divider style="margin:1rem 0;"></mat-divider>
+         <div class="f-group"><label>New Encryption Key</label><input class="f-input" type="password" formControlName="newPassword"></div>
+         <div class="f-group"><label>Verify Encryption Key</label><input class="f-input" type="password" formControlName="confirmPassword"></div>
+      </form>
+    </app-side-sheet-drawer>
+  `,
+  styles: [`
+    :host { display: block; height: 100%; }
+    .profile-viewport { max-width: 900px; margin: 0 auto; padding-bottom: 3rem; }
+    .profile-hero-card { display: flex; align-items: center; gap: 3rem; padding: 3rem; background: var(--surface); border: 1px solid var(--border); border-radius: 24px; box-shadow: var(--shadow-md); margin-top: 1rem; }
+    .profile-avatar-large { width: 140px; height: 140px; border-radius: 50%; background: linear-gradient(135deg, var(--primary), var(--accent)); color: #fff; display: grid; place-items: center; font-size: 3rem; font-weight: 900; position: relative; box-shadow: 0 10px 25px rgba(47, 111, 235, 0.3); }
+    .avatar-edit-overlay { position: absolute; bottom: 5px; right: 5px; width: 36px; height: 36px; background: var(--surface); border: 1px solid var(--border); border-radius: 50%; display: grid; place-items: center; cursor: pointer; color: var(--txt-secondary); box-shadow: var(--shadow-sm); }
+    .profile-hero-info h2 { font-size: 2.25rem; font-weight: 900; letter-spacing: -0.04em; margin-bottom: 0.5rem; }
+    .profile-hero-info p { color: var(--txt-muted); font-weight: 600; margin-bottom: 1.5rem; }
+    .profile-hero-actions { display: flex; gap: 0.75rem; }
+
+    .profile-stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; }
+    .profile-stat-card { text-align: center; padding: 1.5rem; }
+    .profile-stat-value { display: block; font-size: 1.5rem; font-weight: 900; letter-spacing: -0.02em; }
+    .profile-stat-label { font-size: 0.7rem; font-weight: 800; color: var(--txt-muted); text-transform: uppercase; margin-top: 0.25rem; }
+
+    .profile-section-title { font-size: 0.85rem; font-weight: 900; color: var(--primary); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 2rem; border-bottom: 1px solid var(--border); padding-bottom: 0.75rem; }
+    .profile-details-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; }
+    .profile-field-group label { font-size: 0.65rem; font-weight: 800; color: var(--txt-muted); text-transform: uppercase; letter-spacing: 0.08em; display: block; margin-bottom: 0.5rem; }
+    .profile-field-value { font-size: 1rem; font-weight: 700; }
+
+    .mt-6 { margin-top: 1.5rem; }
+    .text-mono { font-family: 'JetBrains Mono', monospace; }
+
+    .f-group { display: flex; flex-direction: column; gap: 0.4rem; margin-bottom: 1.25rem; }
+    .f-group label { font-size: 0.75rem; font-weight: 700; color: var(--txt-secondary); text-transform: uppercase; }
+    .f-input { height: 44px; border-radius: 10px; border: 1.5px solid var(--border); padding: 0 1rem; font-family: inherit; font-size: 0.9rem; background: var(--surface); color: var(--txt-main); width: 100%; outline: none; }
+    .f-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    .ui-btn { padding: 0.75rem 1.5rem; border-radius: 12px; font-weight: 800; font-size: 0.85rem; cursor: pointer; border: none; transition: 0.2s; }
+    .ui-btn-primary { background: var(--primary); color: #fff; box-shadow: 0 4px 12px rgba(47, 111, 235, 0.2); }
+    .ui-btn-secondary { background: var(--surface-2); color: var(--txt-secondary); border: 1px solid var(--border); }
+  `]
 })
 export class ProfilePageComponent implements OnInit {
   protected readonly auth = inject(AuthService);
   private readonly fb = inject(FormBuilder);
   private readonly snack = inject(MatSnackBar);
 
-  // --- STATE SIGNALS ---
-  protected readonly role = computed(() => this.auth.user()?.role || 'EMPLOYEE');
-  protected readonly isManager = computed(() => ['MANAGER', 'ADMIN'].includes(this.role()));
-  protected readonly isAdmin = computed(() => this.role() === 'ADMIN');
+  protected isEditDrawerOpen = false;
+  protected isPasswordDrawerOpen = false;
 
-  protected editingSection = signal<string | null>(null);
-  protected isAvatarUploading = signal(false);
+  profileForm: FormGroup = this.fb.group({
+    firstName: ['', [Validators.required]],
+    lastName: ['', [Validators.required]],
+    phoneNumber: [''],
+    companyId: [null]
+  });
 
-  // Data Signals
-  protected stats = signal<StatData | null>(null);
-  protected personalInfo = signal<PersonalInfo | null>(null);
-  protected workDetails = signal<WorkDetails | null>(null);
-  protected contactInfo = signal<ContactInfo | null>(null);
-  protected activity = signal<ActivityAction[] | null>(null);
-  protected schedule = signal<ScheduleItem[] | null>(null);
-  protected documents = signal<DocItem[] | null>(null);
-  protected teamSummary = signal<ManagerSummary | null>(null);
-  protected adminPermissions = signal<string[] | null>(null);
+  passwordForm: FormGroup = this.fb.group({
+    oldPassword: ['', [Validators.required]],
+    newPassword: ['', [Validators.required, Validators.minLength(6)]],
+    confirmPassword: ['', [Validators.required]]
+  }, { validators: this.passwordMatchValidator });
 
-  // Loading Signals
-  protected loadIdentity = signal(true);
-  protected loadStats = signal(true);
-  protected loadLeftCol = signal(true);
-  protected loadActivity = signal(true);
-  protected loadSchedule = signal(true);
-  protected loadDocs = signal(true);
-  protected loadTeam = signal(true);
-  
-  // Error Signals
-  protected errIdentity = signal(false);
-  protected errStats = signal(false);
-  protected errLeftCol = signal(false);
-  protected errActivity = signal(false);
-  protected errSchedule = signal(false);
-  protected errDocs = signal(false);
-  protected errTeam = signal(false);
-
-  // Forms
-  protected identityForm!: FormGroup;
-  protected personalForm!: FormGroup;
-  protected contactForm!: FormGroup;
-  protected passwordForm!: FormGroup;
-  
-  // Settings
-  protected emailNotif = signal(true);
-  protected pushNotif = signal(false);
-  protected inAppNotif = signal(true);
-  protected datePref = signal('MM/DD/YYYY');
-  protected timePref = signal('12h');
-  protected langPref = signal('en');
-
-  protected showPassword = signal(false);
-  protected isPasswordSaving = signal(false);
-
-  @ViewChild('fileInput') fileInput!: ElementRef<HTMLInputElement>;
-
-  ngOnInit() {
-    this.initForms();
-    this.fetchAllData();
-  }
-
-  // --- INITIALIZATION ---
-  private initForms() {
-    this.identityForm = this.fb.group({
-      fullName: ['', Validators.required],
-      role: ['', Validators.required],
-      status: ['', Validators.required],
-      location: ['', Validators.required]
-    });
-
-    this.personalForm = this.fb.group({
-      fullName: ['', Validators.required],
-      preferredName: [''],
-      dob: ['', Validators.required],
-      email: ['', [Validators.required, Validators.email]],
-      phone: ['', Validators.required],
-      emergencyContactName: ['', Validators.required],
-      emergencyContactPhone: ['', Validators.required]
-    });
-
-    this.contactForm = this.fb.group({
-      office: ['', Validators.required],
-      desk: [''],
-      workPhone: ['', Validators.required],
-      workEmail: ['', [Validators.required, Validators.email]]
-    });
-
-    this.passwordForm = this.fb.group({
-      current: ['', Validators.required],
-      new: ['', [Validators.required, Validators.minLength(8)]],
-      confirm: ['', Validators.required]
-    }, { validators: this.passwordMatchValidator });
-  }
-
-  private passwordMatchValidator(g: any) {
-    return g.get('new').value === g.get('confirm').value ? null : { mismatch: true };
-  }
-
-  // --- DATA FETCHING (MOCKED) ---
-  protected fetchAllData() {
-    this.fetchIdentity();
-    this.fetchStats();
-    this.fetchLeftCol();
-    this.fetchActivity();
-    this.fetchSchedule();
-    this.fetchDocs();
-    
-    if (this.isManager()) this.fetchTeamSummary();
-    if (this.isAdmin()) this.fetchAdminPerms();
-  }
-
-  protected fetchIdentity() {
-    this.loadIdentity.set(true); this.errIdentity.set(false);
-    of(true).pipe(delay(600)).subscribe(() => {
-      const u = this.auth.user();
-      this.identityForm.patchValue({
-        fullName: u?.name || 'Unknown User',
-        role: u?.role || 'Employee',
-        status: 'Active',
-        location: 'Headquarters - Floor 3'
+  ngOnInit(): void {
+    const u = this.auth.user();
+    if (u) {
+      const names = u.name.split(' ');
+      this.profileForm.patchValue({
+        firstName: names[0] || '',
+        lastName: names.slice(1).join(' ') || '',
+        phoneNumber: u.phoneNumber || '',
+        companyId: u.companyId
       });
-      this.loadIdentity.set(false);
-    });
-  }
-
-  protected fetchStats() {
-    this.loadStats.set(true); this.errStats.set(false);
-    of({
-      hoursWorked: 34.5, expectedHours: 40,
-      leaveRemaining: 12, daysPresent: 18, totalDays: 20,
-      pendingTasks: this.isAdmin() ? 5 : 0
-    }).pipe(delay(800)).subscribe(res => {
-      this.stats.set(res);
-      this.loadStats.set(false);
-    });
-  }
-
-  protected fetchLeftCol() {
-    this.loadLeftCol.set(true); this.errLeftCol.set(false);
-    of(true).pipe(delay(1000)).subscribe(() => {
-      const u = this.auth.user();
-      
-      const pInfo = {
-        fullName: u?.name || 'Unknown', preferredName: (u?.name || '').split(' ')[0],
-        dob: '1985-06-15', email: u?.email || 'user@example.com', phone: '+1 (555) 987-6543',
-        emergencyContactName: 'Jane Doe', emergencyContactPhone: '+1 (555) 123-4567'
-      };
-      this.personalInfo.set(pInfo);
-      this.personalForm.patchValue(pInfo);
-
-      this.workDetails.set({
-        employeeId: 'EWMS-' + (u?.id?.toString().padStart(4, '0') || '0000'),
-        joinDate: '2021-03-10', contractType: 'Full-time Permanent',
-        department: 'Operations', team: 'Core Platform', manager: 'Sarah Connor',
-        location: 'HQ - New York', shiftPattern: 'Mon-Fri, 9am-5pm EST'
-      });
-
-      const cInfo = { office: 'New York HQ', desk: 'Floor 3, Desk 42', workPhone: '+1 (555) 555-0199', workEmail: u?.email || 'work@company.com' };
-      this.contactInfo.set(cInfo);
-      this.contactForm.patchValue(cInfo);
-
-      this.loadLeftCol.set(false);
-    });
-  }
-
-  protected fetchActivity() {
-    this.loadActivity.set(true); this.errActivity.set(false);
-    of([
-      { id: '1', title: 'Clocked in from HQ', date: new Date().toISOString(), icon: 'login' },
-      { id: '2', title: 'Vacation leave approved', date: new Date(Date.now() - 86400000).toISOString(), icon: 'event_available' },
-      { id: '3', title: 'Completed annual security training', date: new Date(Date.now() - 172800000).toISOString(), icon: 'school' },
-      { id: '4', title: 'Shift swapped with Alex', date: new Date(Date.now() - 345600000).toISOString(), icon: 'swap_horiz' }
-    ]).pipe(delay(1200)).subscribe(res => {
-      this.activity.set(res);
-      this.loadActivity.set(false);
-    });
-  }
-
-  protected triggerActivityError() {
-    this.loadActivity.set(true); this.errActivity.set(false);
-    of(null).pipe(delay(500), map(() => { throw new Error('API Drop'); }), catchError(() => {
-      this.errActivity.set(true);
-      this.loadActivity.set(false);
-      return of(null);
-    })).subscribe();
-  }
-
-  protected fetchSchedule() {
-    this.loadSchedule.set(true); this.errSchedule.set(false);
-    of([
-      { date: 'Today, Oct 24', title: 'Morning Shift', sub: '09:00 AM - 05:00 PM', type: 'shift' as const },
-      { date: 'Tomorrow, Oct 25', title: 'Morning Shift', sub: '09:00 AM - 05:00 PM', type: 'shift' as const },
-      { date: 'Next Mon, Oct 29', title: 'Vacation', sub: 'All Day', type: 'leave' as const }
-    ]).pipe(delay(700)).subscribe(res => {
-      this.schedule.set(res);
-      this.loadSchedule.set(false);
-    });
-  }
-
-  protected fetchDocs() {
-    this.loadDocs.set(true); this.errDocs.set(false);
-    of([
-      { id: 'd1', title: 'Q4 Compliance Policy', status: 'pending' as const },
-      { id: 'd2', title: 'Remote Work Agreement', status: 'signed' as const }
-    ]).pipe(delay(900)).subscribe(res => {
-      // simulate empty state for standard employees sometimes, but let's give them data
-      this.documents.set(res);
-      this.loadDocs.set(false);
-    });
-  }
-
-  protected fetchTeamSummary() {
-    this.loadTeam.set(true); this.errTeam.set(false);
-    of({ teamSize: 12, presentToday: 10, pendingApprovals: 3 }).pipe(delay(1100)).subscribe(res => {
-      this.teamSummary.set(res);
-      this.loadTeam.set(false);
-    });
-  }
-
-  protected fetchAdminPerms() {
-    this.adminPermissions.set(['Super Admin', 'System Config', 'User Management', 'Payroll Approver']);
-  }
-
-
-  // --- USER ACTIONS & EDITING ---
-  
-  protected toggleEdit(section: string) {
-    if (this.editingSection() === section) {
-      this.editingSection.set(null); // Cancel
-      // Revert form values
-      if(section==='IDENTITY') this.identityForm.patchValue({ ...this.identityForm.value }); // handled via fetchIdentity logic or signals
-      if(section==='PERSONAL') this.personalForm.patchValue(this.personalInfo()!);
-      if(section==='CONTACT') this.contactForm.patchValue(this.contactInfo()!);
-    } else {
-      this.editingSection.set(section);
     }
   }
 
-  protected saveIdentity() {
-    if (this.identityForm.invalid) return;
-    this.snack.open('Identity updated.', 'OK', { duration: 2000 });
-    this.editingSection.set(null);
+  openEditDrawer() { this.isEditDrawerOpen = true; }
+  openPasswordDrawer() { this.isPasswordDrawerOpen = true; }
+
+  saveProfile() {
+    if (this.profileForm.invalid) return;
+    this.auth.updateProfile(this.profileForm.value).subscribe({
+      next: () => {
+        this.snack.open('Identity Packet Synchronized.', 'OK', { duration: 3000 });
+        this.isEditDrawerOpen = false;
+      },
+      error: () => this.snack.open('Synchronization Failure.', 'OK', { duration: 4000 })
+    });
   }
 
-  protected savePersonal() {
-    if (this.personalForm.invalid) return;
-    // Mock save
-    const btn = document.activeElement as HTMLButtonElement;
-    if(btn) btn.disabled = true;
-    
-    setTimeout(() => {
-      this.personalInfo.set(this.personalForm.value);
-      this.snack.open('Personal details saved successfully.', 'OK', { duration: 3000 });
-      this.editingSection.set(null);
-    }, 600);
-  }
-
-  protected saveContact() {
-    if (this.contactForm.invalid) return;
-    setTimeout(() => {
-      this.contactInfo.set(this.contactForm.value);
-      this.snack.open('Contact & Location updated.', 'OK', { duration: 3000 });
-      this.editingSection.set(null);
-    }, 600);
-  }
-
-  protected onAvatarClick() {
-    this.fileInput.nativeElement.click();
-  }
-
-  protected onFileSelected(event: any) {
-    const file = event.target.files[0];
-    if (file && file.type.startsWith('image/')) {
-      this.isAvatarUploading.set(true);
-      // Simulate fake upload
-      setTimeout(() => {
-        this.isAvatarUploading.set(false);
-        this.snack.open('Profile photo updated!', 'OK', { duration: 3000 });
-      }, 1500);
-    } else if(file) {
-      this.snack.open('Please select a valid image file.', 'OK', { duration: 3000 });
-    }
-    event.target.value = null; // reset
-  }
-
-  protected savePassword() {
+  savePassword() {
     if (this.passwordForm.invalid) return;
-    this.isPasswordSaving.set(true);
-    setTimeout(() => {
-      this.isPasswordSaving.set(false);
-      this.passwordForm.reset();
-      this.snack.open('Password successfully changed.', 'OK', { duration: 3000 });
-    }, 1000);
+    const { oldPassword, newPassword } = this.passwordForm.value;
+    this.auth.changePassword(oldPassword, newPassword).subscribe({
+      next: () => {
+        this.snack.open('Credentials Rotated.', 'OK', { duration: 3000 });
+        this.isPasswordDrawerOpen = false;
+        this.passwordForm.reset();
+      },
+      error: () => this.snack.open('Credential Rotation Failed.', 'OK', { duration: 4000 })
+    });
   }
 
-  protected savePreference(type: string) {
-    this.snack.open('Preference saved.', '', { duration: 1500 });
+  onUploadAvatar() {
+    this.snack.open('Avatar upload protocol pending implementation.', 'STANDBY', { duration: 3000 });
   }
 
-  protected downloadData() {
-    this.snack.open('Preparing data export. You will receive an email shortly.', 'OK', { duration: 4000 });
+  protected getInitials() {
+    return this.auth.user()?.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() || 'OA';
   }
 
-  // --- HELPERS ---
-  protected min(a: number, b: number) { return Math.min(a, b); }
-  protected getInitials(name?: string) {
-    if (!name) return 'U';
-    return name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
+  private passwordMatchValidator(g: FormGroup) {
+    return g.get('newPassword')?.value === g.get('confirmPassword')?.value ? null : { mismatch: true };
   }
 }

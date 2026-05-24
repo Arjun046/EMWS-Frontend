@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { ApiService } from './api.service';
 import { Observable } from 'rxjs';
+import { environment } from '../../../environments/environment';
 
 export interface SalaryStructure {
   id?: number;
@@ -35,26 +36,26 @@ export interface PayrollRecord {
 
 @Injectable({ providedIn: 'root' })
 export class PayrollService {
-  private readonly baseUrl = 'http://localhost:8080';
+  private readonly baseUrl = environment.apiBaseUrl;
   constructor(private readonly api: ApiService) {}
 
-  getSalaryStructure(employeeId: number): Observable<SalaryStructure> {
-    return this.api.get<SalaryStructure>(`/api/payroll/structure/${employeeId}`, {} as SalaryStructure, this.baseUrl);
+  getMySalaryStructure(): Observable<SalaryStructure> {
+    return this.api.get<SalaryStructure>('/api/payroll/me/structure', {} as SalaryStructure, this.baseUrl);
   }
 
-  getPayrollHistory(employeeId: number): Observable<PayrollRecord[]> {
-    return this.api.get<PayrollRecord[]>(`/api/payroll/records/${employeeId}`, [], this.baseUrl);
+  getMyPayrollHistory(): Observable<PayrollRecord[]> {
+    return this.api.get<PayrollRecord[]>('/api/payroll/me/records', [], this.baseUrl);
   }
 
   generatePayroll(employeeId: number, start: string, end: string): Observable<PayrollRecord> {
-    const params = new URLSearchParams();
-    params.append('employeeId', employeeId.toString());
-    params.append('startDate', start);
-    params.append('endDate', end);
-    return this.api.post<PayrollRecord>(`/api/payroll/process?${params.toString()}`, {}, undefined, this.baseUrl);
+    return this.api.post<PayrollRecord>(`/api/payroll/process/${employeeId}?startDate=${start}&endDate=${end}`, {}, undefined, this.baseUrl);
   }
 
-  getPendingPayroll(): Observable<PayrollRecord[]> {
-    return this.api.get<PayrollRecord[]>('/api/payroll/pending', [], this.baseUrl);
+  getCompanyPendingPayroll(): Observable<PayrollRecord[]> {
+    return this.api.get<PayrollRecord[]>('/api/payroll/company/pending', [], this.baseUrl);
+  }
+
+  downloadPayslipPdf(payrollId: number): Observable<Blob> {
+    return this.api.getBlob(`/api/payroll/records/${payrollId}/pdf`, this.baseUrl);
   }
 }

@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { ApiService } from './api.service';
 import { Observable } from 'rxjs';
+import { environment } from '../../../environments/environment';
 
 export interface Attendance {
   id: number;
@@ -23,7 +24,7 @@ export interface Attendance {
 
 @Injectable({ providedIn: 'root' })
 export class AttendanceService {
-  private readonly baseUrl = 'http://localhost:8080';
+  private readonly baseUrl = environment.apiBaseUrl;
   constructor(private readonly api: ApiService) {}
 
   getAttendanceRange(start: string, end: string): Observable<Attendance[]> {
@@ -45,8 +46,8 @@ export class AttendanceService {
   clockIn(employeeId: number, lat?: number, lng?: number, idempotencyKey?: string): Observable<Attendance> {
     const params = new URLSearchParams();
     params.append('employeeId', employeeId.toString());
-    if (lat) params.append('latitude', lat.toString());
-    if (lng) params.append('longitude', lng.toString());
+    if (lat !== undefined && lat !== null) params.append('latitude', lat.toString());
+    if (lng !== undefined && lng !== null) params.append('longitude', lng.toString());
     if (idempotencyKey) params.append('idempotencyKey', idempotencyKey);
     return this.api.post<Attendance>(`/api/attendance/clock-in?${params.toString()}`, {}, undefined, this.baseUrl);
   }

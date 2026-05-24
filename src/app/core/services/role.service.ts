@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { ApiService } from './api.service';
 import { Observable } from 'rxjs';
+import { environment } from '../../../environments/environment';
 
 export interface Permission {
   id: number;
@@ -12,12 +13,13 @@ export interface Role {
   id: number;
   name: string;
   description: string;
+  systemRole: boolean;
   permissions: Permission[];
 }
 
 @Injectable({ providedIn: 'root' })
 export class RoleService {
-  private readonly baseUrl = 'http://localhost:8080';
+  private readonly baseUrl = environment.apiBaseUrl;
   constructor(private readonly api: ApiService) {}
 
   getRoles(): Observable<Role[]> {
@@ -42,5 +44,13 @@ export class RoleService {
 
   createPermission(permission: Partial<Permission>): Observable<Permission> {
     return this.api.post<Permission>('/api/roles/permissions', permission, undefined, this.baseUrl);
+  }
+
+  updatePermission(id: number, permission: Partial<Permission>): Observable<Permission> {
+    return this.api.put<Permission>(`/api/roles/permissions/${id}`, permission, undefined, this.baseUrl);
+  }
+
+  deletePermission(id: number): Observable<void> {
+    return this.api.delete<void>(`/api/roles/permissions/${id}`, undefined, this.baseUrl);
   }
 }

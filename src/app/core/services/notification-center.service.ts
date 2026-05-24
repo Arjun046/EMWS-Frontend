@@ -3,58 +3,55 @@ import { WidgetSocketService } from './widget-socket.service';
 import { AuthService } from './auth.service';
 import { ApiService } from './api.service';
 import { NotificationItem } from '../../shared/models/ui.models';
+import { environment } from '../../../environments/environment';
 
 @Injectable({ providedIn: 'root' })
 export class NotificationCenterService {
   private readonly widgetSocket = inject(WidgetSocketService);
   private readonly auth = inject(AuthService);
   private readonly api = inject(ApiService);
+  private readonly baseUrl = environment.apiBaseUrl;
+  
   private readonly manualNotifications = signal<NotificationItem[]>([]);
-
-  private readonly seed: NotificationItem[] = [
-    { id: 1, title: 'Payroll review', content: 'Finance has 12 payroll exceptions pending approval.', category: 'Payroll', when: '10m ago', status: 'Unread', isRead: false },
-    { id: 2, title: 'Leave overlap', content: 'Two supervisors requested the same date block.', category: 'Leave', when: '45m ago', status: 'Unread', isRead: false }
-  ];
 
   readonly items = computed(() => {
     const socketItems = this.widgetSocket.events()
-      .filter(e => e.topic.includes('notifications'))
+      .filter(e => e.topic.includes('notifications.'))
       .map((event, index) => {
         const payload = event.payload as any;
         return {
-          id: 1000 + index,
-          title: payload.title || 'System Alert',
+          id: payload.id || (2000 + index),
+          title: payload.title || 'Live Alert',
           content: payload.message || payload.content || 'New event received.',
-          category: payload.type || 'Chat',
+          category: payload.type || 'System',
           when: 'Just now',
           status: 'Unread' as const,
           isRead: false
         } as NotificationItem;
       });
 
-    return [...this.manualNotifications(), ...socketItems, ...this.seed];
+    // Combine historical logs with real-time socket events
+    return [...socketItems, ...this.manualNotifications()].sort((a,b) => b.id - a.id);
   });
 
-  readonly unreadCount = computed(() => this.items().filter((item) => item.status === 'Unread').length);
+  readonly unreadCount = computed(() => this.items().filter((item) => !item.isRead).length);
 
   constructor() {
-    this.loadHistory();
-    // Automatically subscribe to personal notifications when logged in
+    this.init();
+  }
+
+  private init(): void {
     effect(() => {
       const user = this.auth.user();
       if (user) {
-        this.widgetSocket.subscribe(`/topic/notifications/${user.id}`);
+        this.loadHistory();
+        this.widgetSocket.subscribe(`/topic/notifications.${user.id}`);
       }
     });
   }
 
-  private loadHistory(): void {
-    const user = this.auth.user();
-    if (!user) return;
-
-    // Call via API Gateway (Port 8080)
-    const url = `http://localhost:8080/api/notifications/logs/${user.id}`;
-    this.api.get<any[]>(url, []).subscribe(logs => {
+  loadHistory(): void {
+    this.api.get<any[]>(`${this.baseUrl}/api/notifications/me`, []).subscribe(logs => {
       const mapped = logs.map((l: any) => ({
         id: l.id,
         title: l.title || 'System Notification',
@@ -64,7 +61,20 @@ export class NotificationCenterService {
         status: (l.status === 'READ' ? 'Read' : 'Unread') as any,
         isRead: l.status === 'READ'
       } as NotificationItem));
+
       this.manualNotifications.set(mapped);
+    });
+  }
+
+  markAllAsRead(): void {
+    this.api.patch(`${this.baseUrl}/api/notifications/me/read-all`, {}).subscribe(() => {
+      this.loadHistory();
+    });
+  }
+
+  markAsRead(id: number): void {
+    this.api.patch(`${this.baseUrl}/api/notifications/${id}/read`, {}).subscribe(() => {
+      this.loadHistory();
     });
   }
 }

@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { ApiService } from './api.service';
 import { Observable } from 'rxjs';
+import { environment } from '../../../environments/environment';
 
 export interface Task {
   id: number;
@@ -14,7 +15,7 @@ export interface Task {
 
 @Injectable({ providedIn: 'root' })
 export class TaskService {
-  private readonly baseUrl = 'http://localhost:8080';
+  private readonly baseUrl = environment.apiBaseUrl;
   constructor(private readonly api: ApiService) {}
 
   getTasks(): Observable<Task[]> {

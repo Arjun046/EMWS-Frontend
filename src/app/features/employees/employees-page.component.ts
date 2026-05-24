@@ -1,182 +1,279 @@
-import { Component, inject, signal, computed } from '@angular/core';
-import { CommonModule, DatePipe } from '@angular/common';
-import { MatCardModule } from '@angular/material/card';
+import { Component, inject, signal, computed, OnInit, ViewChild, AfterViewInit } from '@angular/core';
+import { CommonModule, CurrencyPipe, DatePipe } from '@angular/common';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
-import { MatTableModule } from '@angular/material/table';
-import { MatPaginatorModule } from '@angular/material/paginator';
-import { MatSortModule } from '@angular/material/sort';
+import { MatTableModule, MatTableDataSource } from '@angular/material/table';
+import { MatPaginatorModule, MatPaginator } from '@angular/material/paginator';
+import { MatSortModule, MatSort } from '@angular/material/sort';
 import { MatMenuModule } from '@angular/material/menu';
-import { MatChipsModule } from '@angular/material/chips';
 import { MatDialogModule, MatDialog } from '@angular/material/dialog';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
+import { MatSnackBarModule, MatSnackBar } from '@angular/material/snack-bar';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatDividerModule } from '@angular/material/divider';
-import { toSignal } from '@angular/core/rxjs-interop';
-import { ApiService } from '../../core/services/api.service';
-import { PageHeaderComponent } from '../../shared/components/page-header.component';
-
-export interface Employee {
-  id: number;
-  firstName: string;
-  lastName: string;
-  email: string;
-  jobTitle: string;
-  status: string;
-  department: string;
-}
+import { ReactiveFormsModule } from '@angular/forms';
+import { EmployeeDataService, Employee } from '../../core/services/employee-data.service';
+import { EmployeeFormComponent } from './employee-form.component';
+import { catchError, of } from 'rxjs';
+import { AuthService } from '../../core/services/auth.service';
+import { HasScopeDirective } from '../../shared/directives/has-scope.directive';
 
 @Component({
   selector: 'app-employees-page',
   standalone: true,
   imports: [
-    CommonModule, MatCardModule, MatButtonModule, MatIconModule, MatTableModule,
-    MatPaginatorModule, MatSortModule, MatMenuModule, MatChipsModule, 
-    MatDialogModule, MatFormFieldModule, MatInputModule, MatDividerModule,
-    PageHeaderComponent
+    CommonModule, MatButtonModule, MatIconModule, MatTableModule,
+    MatPaginatorModule, MatSortModule, MatMenuModule, MatDialogModule,
+    MatSnackBarModule, MatProgressSpinnerModule, MatDividerModule,
+    HasScopeDirective, ReactiveFormsModule, CurrencyPipe
   ],
   template: `
-    <app-page-header 
-      title="Workforce Directory" 
-      subtitle="Manage employee identities, contracts, and operational roles across all locations."
-      actionLabel="Add Employee"
-      icon="person_add"
-    />
-
-    <mat-card class="directory-card">
-      <div class="table-header">
-        <mat-form-field appearance="outline" class="search-field">
-          <mat-icon matPrefix>search</mat-icon>
-          <mat-label>Filter directory...</mat-label>
-          <input matInput (keyup)="applyFilter($event)" placeholder="Name, role, or department">
-        </mat-form-field>
-        
-        <div class="view-actions">
-          <button mat-icon-button title="Filter"><mat-icon>filter_list</mat-icon></button>
-          <button mat-icon-button title="Columns"><mat-icon>view_column</mat-icon></button>
+    <div class="module-page active-page fade-up" id="page-employees">
+      
+      <!-- PAGE HEADER -->
+      <div class="filter-action-row">
+        <div class="filter-ctrls-group">
+          <div class="input-icon-wrap" style="width:400px;">
+            <mat-icon style="font-size:18px; width:18px; height:18px; left:1rem; color:var(--txt-muted)">search</mat-icon>
+            <input type="text" class="f-input" style="padding-left:3rem; height:48px; border-radius:12px; background:#0f172a; border:1px solid #1e293b;" 
+                   (keyup)="applyFilter($event)" placeholder="Search employees or codes..." #filterInput>
+          </div>
         </div>
+        <button class="ui-btn ui-btn-primary" style="height:48px; padding:0 1.5rem; border-radius:12px;" (click)="openAddDialog()" *appHasScope="'USER_CREATE'">
+          <mat-icon style="font-size:1.2rem;">person_add</mat-icon>
+          Add Employee
+        </button>
       </div>
 
-      <table mat-table [dataSource]="filteredEmployees()" class="full-width-table">
-        <!-- Name Column -->
-        <ng-container matColumnDef="name">
-          <th mat-header-cell *matHeaderCellDef>Employee</th>
-          <td mat-cell *matCellDef="let emp">
-            <div class="employee-cell">
-              <div class="avatar">{{ emp.firstName.charAt(0) }}{{ emp.lastName.charAt(0) }}</div>
-              <div class="info">
-                <strong>{{ emp.firstName }} {{ emp.lastName }}</strong>
-                <span>{{ emp.email }}</span>
-              </div>
-            </div>
-          </td>
-        </ng-container>
+      <div class="ui-card" style="padding:0; overflow:visible; border-radius:0; background:transparent; border:none; box-shadow:none;">
+        @if (isLoading()) {
+          <div class="table-loading-overlay" style="padding:10rem; text-align:center;">
+            <mat-spinner diameter="40" style="margin:0 auto;"></mat-spinner>
+          </div>
+        } @else {
+          <div class="table-container custom-scrollbar">
+            <table mat-table [dataSource]="dataSource" matSort class="ui-table core-grid">
+              
+              <!-- Name & Identity Column -->
+              <ng-container matColumnDef="name">
+                <th mat-header-cell *matHeaderCellDef mat-sort-header class="grid-hdr">NAME & IDENTITY</th>
+                <td mat-cell *matCellDef="let emp">
+                  <div class="table-avatar-cell">
+                    <div class="avatar-cell-circle" [style.background]="getAvatarBg(emp.firstName)">
+                      {{ getInitials(emp) }}
+                    </div>
+                    <div style="display:flex; flex-direction:column; gap:2px;">
+                      <span class="avatar-cell-name">{{ emp.firstName }} {{ emp.lastName }}</span>
+                      <span *ngIf="emp.email" style="font-size:0.7rem; color:var(--txt-muted); text-transform:uppercase; letter-spacing:0.05em;">{{ emp.jobTitle || 'OPERATIONAL_NODE' }}</span>
+                    </div>
+                  </div>
+                </td>
+              </ng-container>
 
-        <!-- Role Column -->
-        <ng-container matColumnDef="role">
-          <th mat-header-cell *matHeaderCellDef>Position & Dept</th>
-          <td mat-cell *matCellDef="let emp">
-            <div class="role-cell">
-              <strong>{{ emp.jobTitle || 'N/A' }}</strong>
-              <span>{{ emp.department || 'Operations' }}</span>
-            </div>
-          </td>
-        </ng-container>
+              <!-- Salary Column -->
+              <ng-container matColumnDef="salary">
+                <th mat-header-cell *matHeaderCellDef mat-sort-header class="grid-hdr">SALARY (MONTHLY)</th>
+                <td mat-cell *matCellDef="let emp" class="text-mono" style="font-weight:600;">
+                   {{ (emp.salary || 2400) | currency }}
+                </td>
+              </ng-container>
 
-        <!-- Status Column -->
-        <ng-container matColumnDef="status">
-          <th mat-header-cell *matHeaderCellDef>Status</th>
-          <td mat-cell *matCellDef="let emp">
-            <span class="status-badge" [class]="emp.status?.toLowerCase()">
-              {{ emp.status }}
-            </span>
-          </td>
-        </ng-container>
+              <!-- Status Column -->
+              <ng-container matColumnDef="status">
+                <th mat-header-cell *matHeaderCellDef mat-sort-header class="grid-hdr">STATUS</th>
+                <td mat-cell *matCellDef="let emp">
+                  <span class="ui-badge" [class.ui-badge-success]="emp.status === 'ACTIVE'" 
+                                        [class.ui-badge-warning]="emp.status === 'ONBOARDING'"
+                                        [class.ui-badge-danger]="emp.status === 'TERMINATED'">
+                    {{ emp.status }}
+                  </span>
+                </td>
+              </ng-container>
 
-        <!-- Actions Column -->
-        <ng-container matColumnDef="actions">
-          <th mat-header-cell *matHeaderCellDef></th>
-          <td mat-cell *matCellDef="let emp">
-            <button mat-icon-button [matMenuTriggerFor]="menu">
-              <mat-icon>more_vert</mat-icon>
-            </button>
-            <mat-menu #menu="matMenu">
-              <button mat-menu-item>
-                <mat-icon>edit</mat-icon>
-                <span>Edit Profile</span>
-              </button>
-              <button mat-menu-item>
-                <mat-icon>history</mat-icon>
-                <span>View Timeline</span>
-              </button>
-              <mat-divider></mat-divider>
-              <button mat-menu-item class="text-red-500">
-                <mat-icon color="warn">person_off</mat-icon>
-                <span>Deactivate</span>
-              </button>
-            </mat-menu>
-          </td>
-        </ng-container>
+              <!-- Actions Column -->
+              <ng-container matColumnDef="actions">
+                <th mat-header-cell *matHeaderCellDef style="text-align:right;"></th>
+                <td mat-cell *matCellDef="let emp" style="text-align:right;">
+                  <button mat-icon-button [matMenuTriggerFor]="menu" class="action-trigger">
+                    <mat-icon style="color:var(--txt-muted); font-size:20px;">more_vert</mat-icon>
+                  </button>
+                  <mat-menu #menu="matMenu" xPosition="before" class="ui-menu">
+                    <button mat-menu-item (click)="openEditDialog(emp)" *appHasScope="'USER_WRITE'">
+                      <mat-icon>edit</mat-icon>
+                      <span>Modify Identity</span>
+                    </button>
+                    <button mat-menu-item (click)="confirmDelete(emp)" style="color:var(--danger);" *appHasScope="'USER_DEACTIVATE'">
+                      <mat-icon style="color:var(--danger);">block</mat-icon>
+                      <span>Terminate Session</span>
+                    </button>
+                  </mat-menu>
+                </td>
+              </ng-container>
 
-        <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-        <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
-      </table>
+              <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+              <tr mat-row *matRowDef="let row; columns: displayedColumns;" class="table-row-hover"></tr>
+            </table>
+          </div>
 
-      <mat-paginator [length]="employees().length" [pageSize]="10" [pageSizeOptions]="[5, 10, 25, 100]"></mat-paginator>
-    </mat-card>
+          <mat-paginator [pageSizeOptions]="[10, 25, 100]" hidePageSize="true" style="background:transparent; color:#94a3b8; font-size:0.75rem; font-weight:700;"></mat-paginator>
+        }
+      </div>
+
+    </div>
+
+    <!-- CONFIRM MODAL -->
+    <div class="confirm-modal-overlay" [class.open]="showDeleteConfirm">
+      <div class="confirm-modal-box">
+        <mat-icon style="font-size:3.5rem; width:3rem; height:3rem; color:var(--danger); margin-bottom:1.5rem;">warning</mat-icon>
+        <h3>Confirm Session Termination?</h3>
+        <p>You are about to terminate the session node for <strong>{{ selectedEmployee?.firstName }} {{ selectedEmployee?.lastName }}</strong>. This action is irreversible.</p>
+        <div style="display:flex; gap:1rem; margin-top:2.5rem; justify-content:center;">
+          <button class="ui-btn ui-btn-secondary" (click)="showDeleteConfirm = false">Abort Sync</button>
+          <button class="ui-btn ui-btn-danger" (click)="executeDelete()">Confirm Termination</button>
+        </div>
+      </div>
+    </div>
   `,
   styles: [`
-    .directory-card { border-radius: 1rem; border: 1px solid var(--wa-border, #e2e8f0); box-shadow: none !important; overflow: hidden; }
-    .table-header { padding: 1.5rem; display: flex; justify-content: space-between; align-items: center; background: #fff; }
-    .search-field { width: 20rem; }
-    ::ng-deep .search-field .mat-mdc-text-field-wrapper { height: 2.75rem; border-radius: 0.75rem !important; }
+    :host { display: block; height: 100%; }
+    .text-mono { font-family: 'JetBrains Mono', monospace; }
     
-    .full-width-table { width: 100%; }
+    .grid-hdr { font-size: 0.75rem !important; font-weight: 900 !important; color: #94a3b8 !important; letter-spacing: 0.08em !important; }
+    .core-grid { background: transparent !important; }
+    .ui-table td { padding: 1.5rem 1rem !important; border-bottom: 1px solid #1e293b !important; color: #fff !important; }
+    .table-row-hover:hover td { background: rgba(255,255,255,0.02) !important; }
+
+    .table-avatar-cell { display: flex; align-items: center; gap: 1.25rem; }
+    .avatar-cell-circle { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; font-size: 0.9rem; font-weight: 900; color: #fff; }
+    .avatar-cell-name { font-weight: 800; font-size: 1rem; color: #fff; }
+
+    .confirm-modal-overlay { position: fixed; inset: 0; background: rgba(9, 13, 22, 0.85); z-index: 9999; display: none; align-items: center; justify-content: center; backdrop-filter: blur(10px); }
+    .confirm-modal-overlay.open { display: flex; }
+    .confirm-modal-box { background: #0f172a; border: 1px solid #1e293b; border-radius: 24px; padding: 4rem 3rem; width: 500px; max-width: 95vw; box-shadow: var(--shadow-lg); text-align: center; color: #fff; }
     
-    .employee-cell { display: flex; align-items: center; gap: 1rem; padding: 0.5rem 0; }
-    .employee-cell .avatar { width: 2.5rem; height: 2.5rem; border-radius: 50%; background: #3b82f615; color: #3b82f6; display: grid; place-items: center; font-weight: 700; font-size: 0.8rem; }
-    .employee-cell .info { display: flex; flex-direction: column; }
-    .employee-cell .info strong { color: #0f172a; font-size: 0.9rem; }
-    .employee-cell .info span { color: #64748b; font-size: 0.75rem; }
-
-    .role-cell { display: flex; flex-direction: column; }
-    .role-cell strong { font-size: 0.85rem; color: #334155; }
-    .role-cell span { font-size: 0.75rem; color: #94a3b8; }
-
-    .status-badge { display: inline-block; padding: 0.25rem 0.75rem; border-radius: 999px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em; }
-    .status-badge.active { background: #f0fdf4; color: #166534; }
-    .status-badge.onboarding { background: #eff6ff; color: #1e40af; }
-    .status-badge.inactive { background: #f1f5f9; color: #475569; }
-
-    :host-context(.global-dark-mode) {
-      .directory-card, .table-header, table { background: #1e293b; border-color: #334155; }
-      th { color: #94a3b8; }
-      td { color: #cbd5e1; }
-      .employee-cell .info strong { color: #f1f5f9; }
-      .role-cell strong { color: #f1f5f9; }
-    }
+    .ui-btn { padding: 0.7rem 1.5rem; border-radius: 12px; font-size: 0.9rem; font-weight: 800; cursor: pointer; border: none; display: inline-flex; align-items: center; gap: 0.5rem; transition: 0.2s; }
+    .ui-btn-primary { background: var(--primary); color: #fff; box-shadow: 0 8px 20px rgba(47, 111, 235, 0.3); }
+    .ui-btn-danger { background: var(--danger); color: #fff; }
+    .ui-btn-secondary { background: #1e293b; color: #94a3b8; border: 1px solid #334155; }
+    .ui-menu { background: #1e293b !important; border: 1px solid #334155 !important; }
   `]
 })
-export class EmployeesPageComponent {
-  private readonly api = inject(ApiService);
-  protected readonly employees = toSignal(this.api.get<Employee[]>('/api/employees', []), { initialValue: [] });
-  protected readonly filter = signal('');
-  
-  protected readonly displayedColumns = ['name', 'role', 'status', 'actions'];
+export class EmployeesPageComponent implements OnInit, AfterViewInit {
+  private readonly employeeDataService = inject(EmployeeDataService);
+  private readonly dialog = inject(MatDialog);
+  private readonly snack = inject(MatSnackBar);
 
-  protected readonly filteredEmployees = computed(() => {
-    const s = this.filter().toLowerCase();
-    const list = this.employees();
-    if (!s) return list;
-    return list.filter(e => 
-      e.firstName.toLowerCase().includes(s) || 
-      e.lastName.toLowerCase().includes(s) || 
-      e.jobTitle?.toLowerCase().includes(s)
-    );
-  });
+  protected dataSource = new MatTableDataSource<Employee>([]);
+  protected isLoading = signal(true);
+  protected readonly displayedColumns = ['name', 'salary', 'status', 'actions'];
 
-  protected applyFilter(event: Event): void {
-    const value = (event.target as HTMLInputElement).value;
-    this.filter.set(value);
+  @ViewChild(MatPaginator) paginator!: MatPaginator;
+  @ViewChild(MatSort) sort!: MatSort;
+
+  showDeleteConfirm = false;
+  selectedEmployee: Employee | null = null;
+
+  ngOnInit(): void {
+    this.loadEmployees();
+  }
+
+  ngAfterViewInit(): void {
+    this.dataSource.paginator = this.paginator;
+    this.dataSource.sort = this.sort;
+  }
+
+  loadEmployees(): void {
+    this.isLoading.set(true);
+    this.employeeDataService.getEmployees().pipe(
+      catchError(() => {
+        this.snack.open('Registry Link Failure.', 'RETRY', { duration: 4000 });
+        return of([]);
+      })
+    ).subscribe(employees => {
+      this.dataSource.data = employees;
+      this.isLoading.set(false);
+    });
+  }
+
+  protected getInitials(emp: Employee): string {
+    return ((emp.firstName?.[0] || '') + (emp.lastName?.[0] || '')).toUpperCase() || '??';
+  }
+
+  protected getAvatarBg(name: string): string {
+    const bgs = ['#2f6feb', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444'];
+    return bgs[(name?.length || 0) % bgs.length];
+  }
+
+  applyFilter(event: Event): void {
+    const filterValue = (event.target as HTMLInputElement).value;
+    this.dataSource.filter = filterValue.trim().toLowerCase();
+  }
+
+  openAddDialog() {
+    const dialogRef = this.dialog.open(EmployeeFormComponent, {
+      width: '850px',
+      panelClass: 'pro-dev-dialog',
+      data: null
+    });
+
+    dialogRef.afterClosed().subscribe(result => {
+      if (result) {
+        this.isLoading.set(true);
+        this.employeeDataService.createEmployee(result).subscribe({
+          next: () => {
+            this.snack.open('Identity Node Initialized.', 'OK', { duration: 3000 });
+            this.loadEmployees();
+          },
+          error: () => {
+            this.snack.open('Initialization Protocol Error.', 'OK', { duration: 4000 });
+            this.isLoading.set(false);
+          }
+        });
+      }
+    });
+  }
+
+  openEditDialog(emp: Employee) {
+    const dialogRef = this.dialog.open(EmployeeFormComponent, {
+      width: '850px',
+      panelClass: 'pro-dev-dialog',
+      data: emp
+    });
+
+    dialogRef.afterClosed().subscribe(result => {
+      if (result) {
+        this.isLoading.set(true);
+        this.employeeDataService.updateEmployee(emp.id, result).subscribe({
+          next: () => {
+            this.snack.open('Identity Node Synchronized.', 'OK', { duration: 3000 });
+            this.loadEmployees();
+          },
+          error: () => {
+            this.snack.open('Synchronization Protocol Error.', 'OK', { duration: 4000 });
+            this.isLoading.set(false);
+          }
+        });
+      }
+    });
+  }
+
+  confirmDelete(emp: Employee) {
+    this.selectedEmployee = emp;
+    this.showDeleteConfirm = true;
+  }
+
+  executeDelete() {
+    if (!this.selectedEmployee) return;
+    this.isLoading.set(true);
+    this.employeeDataService.deleteEmployee(this.selectedEmployee.id).subscribe({
+      next: () => {
+        this.snack.open('Personnel Node Deactivated.', 'OK', { duration: 3000 });
+        this.showDeleteConfirm = false;
+        this.loadEmployees();
+      },
+      error: () => {
+        this.snack.open('Deactivation protocol failed.', 'OK', { duration: 4000 });
+        this.isLoading.set(false);
+      }
+    });
   }
 }

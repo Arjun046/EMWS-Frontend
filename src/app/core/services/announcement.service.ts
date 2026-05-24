@@ -1,7 +1,6 @@
 import { Injectable, inject } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
-import { Observable, of, catchError } from 'rxjs';
-import { environment } from '../../../environments/environment';
+import { Observable } from 'rxjs';
+import { ApiService } from './api.service';
 
 export interface Announcement {
   id: number;
@@ -17,22 +16,21 @@ export interface Announcement {
 
 @Injectable({ providedIn: 'root' })
 export class AnnouncementService {
-  private readonly http = inject(HttpClient);
-  private readonly base = environment.apiBaseUrl;
+  private readonly api = inject(ApiService);
 
   getAnnouncements(): Observable<Announcement[]> {
-    return this.http.get<Announcement[]>(`${this.base}/api/announcements`).pipe(catchError(() => of([])));
+    return this.api.get<Announcement[]>('/api/communication/news', []);
   }
 
   createAnnouncement(data: Partial<Announcement>): Observable<Announcement> {
-    return this.http.post<Announcement>(`${this.base}/api/announcements`, data);
+    return this.api.post<Announcement>('/api/communication/news', data);
   }
 
   deleteAnnouncement(id: number): Observable<void> {
-    return this.http.delete<void>(`${this.base}/api/announcements/${id}`);
+    return this.api.delete<void>(`/api/communication/news/${id}`);
   }
 
   pinAnnouncement(id: number, pinned: boolean): Observable<void> {
-    return this.http.patch<void>(`${this.base}/api/announcements/${id}`, { isPinned: pinned });
+    return this.api.patch<void>(`/api/communication/news/${id}`, { isPinned: pinned });
   }
 }

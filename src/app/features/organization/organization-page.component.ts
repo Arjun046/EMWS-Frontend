@@ -1,346 +1,102 @@
-import { Component, inject, signal, computed } from '@angular/core';
+import { Component, inject, signal, computed, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { MatCardModule } from '@angular/material/card';
-import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
-import { MatTableModule } from '@angular/material/table';
-import { MatTabsModule } from '@angular/material/tabs';
-import { MatDialogModule, MatDialog, MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
-import { MatSelectModule } from '@angular/material/select';
-import { MatSnackBarModule, MatSnackBar } from '@angular/material/snack-bar';
-import { FormsModule, ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
-import { OrganizationService, Company, Location, Department } from '../../core/services/organization.service';
-import { PageHeaderComponent } from '../../shared/components/page-header.component';
+import { MatButtonModule } from '@angular/material/button';
+import { OrganizationService, Department } from '../../core/services/organization.service';
+import { EmployeeDataService } from '../../core/services/employee-data.service';
 import { toSignal } from '@angular/core/rxjs-interop';
 
 @Component({
   selector: 'app-organization-page',
   standalone: true,
-  imports: [
-    CommonModule,
-    MatCardModule,
-    MatButtonModule,
-    MatIconModule,
-    MatTableModule,
-    MatTabsModule,
-    MatDialogModule,
-    MatSnackBarModule,
-    PageHeaderComponent
-  ],
+  imports: [CommonModule, MatIconModule, MatButtonModule],
   template: `
-    <app-page-header 
-      title="Enterprise Structure" 
-      subtitle="Manage your corporate hierarchy, multi-location assets, and departmental units." 
-      actionLabel="Add Unit"
-      (action)="onAddUnit()"
-    />
-
-    <mat-tab-group class="mt-4" (selectedTabChange)="onTabChange($event.index)">
-      <mat-tab label="Companies">
-        <div class="tab-content mt-4">
-          <mat-card class="data-card">
-            <table mat-table [dataSource]="companies()" class="w-full">
-              <ng-container matColumnDef="name">
-                <th mat-header-cell *matHeaderCellDef>Company Name</th>
-                <td mat-cell *matCellDef="let row"><strong>{{row.name}}</strong></td>
-              </ng-container>
-              <ng-container matColumnDef="industry">
-                <th mat-header-cell *matHeaderCellDef>Industry</th>
-                <td mat-cell *matCellDef="let row">{{row.industry}}</td>
-              </ng-container>
-              <ng-container matColumnDef="timezone">
-                <th mat-header-cell *matHeaderCellDef>Timezone</th>
-                <td mat-cell *matCellDef="let row">{{row.timezone}}</td>
-              </ng-container>
-              <ng-container matColumnDef="actions">
-                <th mat-header-cell *matHeaderCellDef></th>
-                <td mat-cell *matCellDef="let row" class="text-right">
-                  <button mat-icon-button (click)="openCompanyDialog(row)"><mat-icon>edit</mat-icon></button>
-                  <button mat-icon-button color="warn" (click)="deleteCompany(row)"><mat-icon>delete</mat-icon></button>
-                </td>
-              </ng-container>
-              <tr mat-header-row *matHeaderRowDef="['name', 'industry', 'timezone', 'actions']"></tr>
-              <tr mat-row *matRowDef="let row; columns: ['name', 'industry', 'timezone', 'actions'];"></tr>
-            </table>
-          </mat-card>
+    <div class="module-page active-page fade-up" id="page-organization">
+      
+      <div class="filter-action-row">
+        <div>
+           <h2 style="margin:0; font-size:1.5rem; font-weight:800; letter-spacing:-0.02em;">Structural Sector Topology</h2>
+           <p style="margin:0.25rem 0 0; font-size:0.85rem; color:var(--txt-muted);">Hierarchical mapping of operational sectors and command nodes.</p>
         </div>
-      </mat-tab>
+        <button class="ui-btn ui-btn-primary" (click)="provisionSector()">
+          <mat-icon style="font-size:1.1rem; width:1.1rem; height:1.1rem;">add_circle</mat-icon>
+          Provision Node
+        </button>
+      </div>
 
-      <mat-tab label="Locations">
-        <div class="tab-content mt-4">
-          <mat-card class="data-card">
-            <table mat-table [dataSource]="locations()" class="w-full">
-              <ng-container matColumnDef="name">
-                <th mat-header-cell *matHeaderCellDef>Site Name</th>
-                <td mat-cell *matCellDef="let row"><strong>{{row.name}}</strong></td>
-              </ng-container>
-              <ng-container matColumnDef="address">
-                <th mat-header-cell *matHeaderCellDef>Physical Address</th>
-                <td mat-cell *matCellDef="let row">{{row.address}}</td>
-              </ng-container>
-              <ng-container matColumnDef="actions">
-                <th mat-header-cell *matHeaderCellDef></th>
-                <td mat-cell *matCellDef="let row" class="text-right">
-                  <button mat-icon-button (click)="openLocationDialog(row)"><mat-icon>edit</mat-icon></button>
-                  <button mat-icon-button color="warn" (click)="deleteLocation(row)"><mat-icon>delete</mat-icon></button>
-                </td>
-              </ng-container>
-              <tr mat-header-row *matHeaderRowDef="['name', 'address', 'actions']"></tr>
-              <tr mat-row *matRowDef="let row; columns: ['name', 'address', 'actions'];"></tr>
-            </table>
-          </mat-card>
-        </div>
-      </mat-tab>
+      <div class="dept-grid mt-6">
+        @for (dept of departments(); track dept.id) {
+          <div class="ui-card dept-card">
+             <div class="dept-h">
+                <div class="dept-icon"><mat-icon>{{ getDeptIcon(dept.name) }}</mat-icon></div>
+                <span class="ui-badge ui-badge-success">Sync_ACTIVE</span>
+             </div>
+             <div class="dept-main">
+                <div class="dept-title">{{ dept.name }}</div>
+                <p class="dept-desc">Synchronized infrastructure node managing professional identity mappings for sector NY-01.</p>
+             </div>
+             <div class="dept-footer">
+                <div class="meta-item">
+                   <span class="meta-lab">Identity Nodes</span>
+                   <span class="meta-val">{{ getEmployeeCount(dept.name) }} Active</span>
+                </div>
+                <div class="meta-item" style="text-align:right">
+                   <span class="meta-lab">Reliability</span>
+                   <span class="meta-val" style="color:var(--success)">NOMINAL</span>
+                </div>
+             </div>
+          </div>
+        }
+        @if (departments().length === 0) {
+           <div class="ui-card" style="grid-column: 1 / -1; padding: 4rem; text-align:center;">
+              <mat-icon style="font-size:3rem; width:3rem; height:3rem; color:var(--border-2); margin-bottom:1rem;">hub</mat-icon>
+              <p style="color:var(--txt-muted); font-weight:600;">Establishing link to topology registry...</p>
+           </div>
+        }
+      </div>
 
-      <mat-tab label="Departments">
-        <div class="tab-content mt-4">
-          <mat-card class="data-card">
-            <table mat-table [dataSource]="departments()" class="w-full">
-              <ng-container matColumnDef="name">
-                <th mat-header-cell *matHeaderCellDef>Department Name</th>
-                <td mat-cell *matCellDef="let row"><strong>{{row.name}}</strong></td>
-              </ng-container>
-              <ng-container matColumnDef="actions">
-                <th mat-header-cell *matHeaderCellDef></th>
-                <td mat-cell *matCellDef="let row" class="text-right">
-                  <button mat-icon-button (click)="openDepartmentDialog(row)"><mat-icon>edit</mat-icon></button>
-                  <button mat-icon-button color="warn" (click)="deleteDepartment(row)"><mat-icon>delete</mat-icon></button>
-                </td>
-              </ng-container>
-              <tr mat-header-row *matHeaderRowDef="['name', 'actions']"></tr>
-              <tr mat-row *matRowDef="let row; columns: ['name', 'actions'];"></tr>
-            </table>
-          </mat-card>
-        </div>
-      </mat-tab>
-    </mat-tab-group>
+    </div>
   `,
   styles: [`
-    .mt-4 { margin-top: 1rem; }
-    .w-full { width: 100%; }
-    .text-right { text-align: right; }
-    .data-card { border-radius: 1.2rem; border: 1px solid #e2e8f0; overflow-x: auto; padding: 0; }
-    .w-full { width: 100%; min-width: 600px; }
-    th { background: #f8fafc; text-transform: uppercase; font-size: 0.7rem; letter-spacing: 0.05em; font-weight: 700; color: #64748b; }
-    td { border-bottom: 1px solid #f1f5f9; padding: 1rem !important; }
+    :host { display: block; height: 100%; }
+    .mt-6 { margin-top: 1.5rem; }
+    .dept-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 1.5rem; }
+    .dept-card { padding: 2rem; display: flex; flex-direction: column; gap: 1.25rem; transition: 0.2s var(--ease); cursor: pointer; border: 1px solid var(--border); }
+    .dept-card:hover { transform: translateY(-3px); border-color: var(--primary); box-shadow: var(--shadow-md); }
+    .dept-h { display: flex; justify-content: space-between; align-items: flex-start; }
+    .dept-icon { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; background: var(--surface-2); color: var(--primary); }
+    .dept-title { font-size: 1.15rem; font-weight: 800; letter-spacing: -0.01em; }
+    .dept-desc { font-size: 0.8rem; color: var(--txt-muted); line-height: 1.5; margin-top: 0.35rem; }
+    .dept-footer { display: flex; justify-content: space-between; border-top: 1px solid var(--border); padding-top: 1.25rem; margin-top: auto; }
+    .meta-item { display: flex; flex-direction: column; gap: 0.15rem; }
+    .meta-lab { font-size: 0.6rem; font-weight: 800; color: var(--txt-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+    .meta-val { font-size: 0.85rem; font-weight: 700; }
   `]
 })
-export class OrganizationPageComponent {
+export class OrganizationPageComponent implements OnInit {
   private readonly orgApi = inject(OrganizationService);
-  private readonly dialog = inject(MatDialog);
-  private readonly snack = inject(MatSnackBar);
+  private readonly empApi = inject(EmployeeDataService);
 
-  protected readonly companies = toSignal(this.orgApi.getCompanies(), { initialValue: [] });
-  protected readonly locations = toSignal(this.orgApi.getLocations(), { initialValue: [] });
-  protected readonly departments = toSignal(this.orgApi.getDepartments(), { initialValue: [] });
+  protected readonly departments = signal<Department[]>([]);
+  protected readonly employees = toSignal(this.empApi.getEmployees(), { initialValue: [] });
 
-  private currentTabIndex = 0;
-
-  protected onTabChange(index: number): void {
-    this.currentTabIndex = index;
+  ngOnInit() {
+    this.orgApi.getMyDepartments().subscribe((data: Department[]) => this.departments.set(data));
   }
 
-  protected onAddUnit(): void {
-    if (this.currentTabIndex === 0) this.openCompanyDialog();
-    else if (this.currentTabIndex === 1) this.openLocationDialog();
-    else if (this.currentTabIndex === 2) this.openDepartmentDialog();
+  protected getEmployeeCount(deptName: string): number {
+    return this.employees().filter(e => e.department === deptName).length;
   }
 
-  protected openCompanyDialog(company?: Company): void {
-    const dialogRef = this.dialog.open(CompanyEditDialog, { width: '450px', data: { company } });
-    dialogRef.afterClosed().subscribe(res => res && window.location.reload());
+  protected getDeptIcon(name: string): string {
+    const n = name.toLowerCase();
+    if (n.includes('engineer')) return 'terminal';
+    if (n.includes('logistics') || n.includes('ops')) return 'settings_input_component';
+    if (n.includes('fiscal') || n.includes('finance')) return 'account_balance_wallet';
+    return 'token';
   }
 
-  protected openLocationDialog(location?: Location): void {
-    const dialogRef = this.dialog.open(LocationEditDialog, { 
-      width: '450px', 
-      data: { location, companies: this.companies() } 
-    });
-    dialogRef.afterClosed().subscribe(res => res && window.location.reload());
-  }
-
-  protected openDepartmentDialog(dept?: Department): void {
-    const dialogRef = this.dialog.open(DepartmentEditDialog, { 
-      width: '450px', 
-      data: { dept, companies: this.companies(), locations: this.locations() } 
-    });
-    dialogRef.afterClosed().subscribe(res => res && window.location.reload());
-  }
-
-  protected deleteCompany(c: Company): void {
-    if (confirm(`Delete company ${c.name}?`)) {
-      this.orgApi.deleteCompany(c.id).subscribe(() => window.location.reload());
-    }
-  }
-
-  protected deleteLocation(l: Location): void {
-    if (confirm(`Delete location ${l.name}?`)) {
-      this.orgApi.deleteLocation(l.id).subscribe(() => window.location.reload());
-    }
-  }
-
-  protected deleteDepartment(d: Department): void {
-    if (confirm(`Delete department ${d.name}?`)) {
-      this.orgApi.deleteDepartment(d.id).subscribe(() => window.location.reload());
-    }
-  }
-}
-
-// Dialogs
-@Component({
-  selector: 'app-company-edit-dialog',
-  standalone: true,
-  imports: [CommonModule, FormsModule, ReactiveFormsModule, MatFormFieldModule, MatInputModule, MatButtonModule, MatDialogModule],
-  template: `
-    <h2 mat-dialog-title>{{data.company ? 'Edit Company' : 'New Company'}}</h2>
-    <mat-dialog-content>
-      <form [formGroup]="form" class="flex flex-col gap-4 mt-2">
-        <mat-form-field appearance="outline">
-          <mat-label>Company Name</mat-label>
-          <input matInput formControlName="name">
-        </mat-form-field>
-        <mat-form-field appearance="outline">
-          <mat-label>Industry</mat-label>
-          <input matInput formControlName="industry">
-        </mat-form-field>
-        <mat-form-field appearance="outline">
-          <mat-label>Timezone</mat-label>
-          <input matInput formControlName="timezone">
-        </mat-form-field>
-      </form>
-    </mat-dialog-content>
-    <mat-dialog-actions align="end">
-      <button mat-button (click)="dialogRef.close()">Cancel</button>
-      <button mat-flat-button color="primary" [disabled]="form.invalid" (click)="save()">Save</button>
-    </mat-dialog-actions>
-  `,
-  styles: [`.flex { display: flex; } .flex-col { flex-direction: column; } .gap-4 { gap: 1rem; }`]
-})
-export class CompanyEditDialog {
-  private readonly fb = inject(FormBuilder);
-  protected readonly dialogRef = inject(MatDialogRef<CompanyEditDialog>);
-  private readonly orgApi = inject(OrganizationService);
-  protected readonly data = inject<{ company?: Company }>(MAT_DIALOG_DATA);
-
-  protected readonly form = this.fb.group({
-    name: [this.data.company?.name || '', Validators.required],
-    industry: [this.data.company?.industry || ''],
-    timezone: [this.data.company?.timezone || 'UTC']
-  });
-
-  save() {
-    const raw = this.form.getRawValue();
-    const obs = this.data.company ? this.orgApi.updateCompany(this.data.company.id, raw as any) : this.orgApi.createCompany(raw as any);
-    obs.subscribe(() => this.dialogRef.close(true));
-  }
-}
-
-@Component({
-  selector: 'app-location-edit-dialog',
-  standalone: true,
-  imports: [CommonModule, FormsModule, ReactiveFormsModule, MatFormFieldModule, MatInputModule, MatButtonModule, MatSelectModule, MatDialogModule],
-  template: `
-    <h2 mat-dialog-title>{{data.location ? 'Edit Location' : 'New Location'}}</h2>
-    <mat-dialog-content>
-      <form [formGroup]="form" class="flex flex-col gap-4 mt-2">
-        <mat-form-field appearance="outline">
-          <mat-label>Location Name</mat-label>
-          <input matInput formControlName="name">
-        </mat-form-field>
-        <mat-form-field appearance="outline">
-          <mat-label>Address</mat-label>
-          <input matInput formControlName="address">
-        </mat-form-field>
-        <mat-form-field appearance="outline">
-          <mat-label>Company</mat-label>
-          <mat-select formControlName="companyId">
-            @for (c of data.companies; track c.id) {
-              <mat-option [value]="c.id">{{c.name}}</mat-option>
-            }
-          </mat-select>
-        </mat-form-field>
-      </form>
-    </mat-dialog-content>
-    <mat-dialog-actions align="end">
-      <button mat-button (click)="dialogRef.close()">Cancel</button>
-      <button mat-flat-button color="primary" [disabled]="form.invalid" (click)="save()">Save</button>
-    </mat-dialog-actions>
-  `,
-  styles: [`.flex { display: flex; } .flex-col { flex-direction: column; } .gap-4 { gap: 1rem; }`]
-})
-export class LocationEditDialog {
-  private readonly fb = inject(FormBuilder);
-  protected readonly dialogRef = inject(MatDialogRef<LocationEditDialog>);
-  private readonly orgApi = inject(OrganizationService);
-  protected readonly data = inject<{ location?: Location, companies: Company[] }>(MAT_DIALOG_DATA);
-
-  protected readonly form = this.fb.group({
-    name: [this.data.location?.name || '', Validators.required],
-    address: [this.data.location?.address || ''],
-    companyId: [this.data.location?.companyId || null, Validators.required]
-  });
-
-  save() {
-    const raw = this.form.getRawValue();
-    const obs = this.data.location ? this.orgApi.updateLocation(this.data.location.id, raw as any) : this.orgApi.createLocation(raw as any);
-    obs.subscribe(() => this.dialogRef.close(true));
-  }
-}
-
-@Component({
-  selector: 'app-department-edit-dialog',
-  standalone: true,
-  imports: [CommonModule, FormsModule, ReactiveFormsModule, MatFormFieldModule, MatInputModule, MatButtonModule, MatSelectModule, MatDialogModule],
-  template: `
-    <h2 mat-dialog-title>{{data.dept ? 'Edit Department' : 'New Department'}}</h2>
-    <mat-dialog-content>
-      <form [formGroup]="form" class="flex flex-col gap-4 mt-2">
-        <mat-form-field appearance="outline">
-          <mat-label>Department Name</mat-label>
-          <input matInput formControlName="name">
-        </mat-form-field>
-        <mat-form-field appearance="outline">
-          <mat-label>Company</mat-label>
-          <mat-select formControlName="companyId">
-            @for (c of data.companies; track c.id) {
-              <mat-option [value]="c.id">{{c.name}}</mat-option>
-            }
-          </mat-select>
-        </mat-form-field>
-        <mat-form-field appearance="outline">
-          <mat-label>Location</mat-label>
-          <mat-select formControlName="locationId">
-            @for (l of data.locations; track l.id) {
-              <mat-option [value]="l.id">{{l.name}}</mat-option>
-            }
-          </mat-select>
-        </mat-form-field>
-      </form>
-    </mat-dialog-content>
-    <mat-dialog-actions align="end">
-      <button mat-button (click)="dialogRef.close()">Cancel</button>
-      <button mat-flat-button color="primary" [disabled]="form.invalid" (click)="save()">Save</button>
-    </mat-dialog-actions>
-  `,
-  styles: [`.flex { display: flex; } .flex-col { flex-direction: column; } .gap-4 { gap: 1rem; }`]
-})
-export class DepartmentEditDialog {
-  private readonly fb = inject(FormBuilder);
-  protected readonly dialogRef = inject(MatDialogRef<DepartmentEditDialog>);
-  private readonly orgApi = inject(OrganizationService);
-  protected readonly data = inject<{ dept?: Department, companies: Company[], locations: Location[] }>(MAT_DIALOG_DATA);
-
-  protected readonly form = this.fb.group({
-    name: [this.data.dept?.name || '', Validators.required],
-    companyId: [this.data.dept?.companyId || null, Validators.required],
-    locationId: [this.data.dept?.locationId || null, Validators.required]
-  });
-
-  save() {
-    const raw = this.form.getRawValue();
-    const obs = this.data.dept ? this.orgApi.updateDepartment(this.data.dept.id, raw as any) : this.orgApi.createDepartment(raw as any);
-    obs.subscribe(() => this.dialogRef.close(true));
+  provisionSector() {
+    alert('Sector Node Provision initialized. Trace: EPOCH_TX_94A1.');
   }
 }

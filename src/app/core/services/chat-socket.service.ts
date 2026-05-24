@@ -9,6 +9,7 @@ export class ChatSocketService {
   private readonly messagesState = signal<ChatMessage[]>([]);
   private readonly statusState = signal<'disconnected' | 'connecting' | 'connected'>('disconnected');
   private readonly presenceState = signal<Map<number, string>>(new Map());
+  private readonly typingState = signal<Map<string, boolean>>(new Map());
   private currentUserId: number | null = null;
   private currentCompanyId: number | null = null;
   private currentGroupId: number | null = null;
@@ -16,6 +17,7 @@ export class ChatSocketService {
   readonly messages = this.messagesState.asReadonly();
   readonly status = this.statusState.asReadonly();
   readonly presence = this.presenceState.asReadonly();
+  readonly typing = this.typingState.asReadonly();
 
   connect(userId: number, companyId: number): void {
     if (this.currentUserId === userId && this.currentCompanyId === companyId && this.client?.active) {
@@ -57,6 +59,9 @@ export class ChatSocketService {
         if (this.currentGroupId) {
           this.subscribeToGroup(this.currentGroupId, companyId);
         }
+
+        // Broadcast presence
+        this.sendPresence('ONLINE');
       },
       onStompError: (frame) => {
         console.error('[ChatSocket] STOMP error', frame);
@@ -107,6 +112,30 @@ export class ChatSocketService {
     }
   }
 
+  sendPresence(status: 'ONLINE' | 'OFFLINE' | 'AWAY'): void {
+    this.send({
+      messageType: 'USER_STATUS',
+      content: status,
+      senderId: this.currentUserId!,
+      companyId: this.currentCompanyId!,
+      timestamp: new Date().toISOString()
+    } as any);
+  }
+
+  sendTyping(isTyping: boolean, recipientId?: number, groupId?: number): void {
+    const payload: any = {
+      messageType: 'TYPING',
+      content: isTyping ? '...' : '',
+      senderId: this.currentUserId!,
+      companyId: this.currentCompanyId!,
+      timestamp: new Date().toISOString()
+    };
+    if (groupId) payload.groupId = groupId;
+    else if (recipientId) payload.recipientId = recipientId;
+    
+    this.send(payload);
+  }
+
   private handleMessage(message: IMessage): void {
     try {
       const payload = JSON.parse(message.body) as ChatMessage;
@@ -118,6 +147,27 @@ export class ChatSocketService {
           newMap.set(payload.senderId!, payload.content!);
           return newMap;
         });
+        return;
+      }
+
+      if (payload.messageType === 'TYPING') {
+        const key = payload.groupId ? `G${payload.groupId}` : `U${payload.senderId}`;
+        this.typingState.update(map => {
+          const newMap = new Map(map);
+          newMap.set(key, !!payload.content);
+          return newMap;
+        });
+        
+        // Auto-clear typing after 5s
+        if (payload.content) {
+          setTimeout(() => {
+            this.typingState.update(map => {
+              const m = new Map(map);
+              if (m.get(key)) m.delete(key);
+              return m;
+            });
+          }, 5000);
+        }
         return;
       }
 
@@ -137,22 +187,21 @@ export class ChatSocketService {
       }
 
       this.messagesState.update((messages) => {
-        // WhatsApp Logic: Deduplicate
+        // Deduplicate
         const existsById = payload.id && messages.some(m => m.id === payload.id);
         if (existsById) return messages;
 
-        // Try to find matching optimistic message
+        // Matching optimistic message
         let optIdx = -1;
         if (payload.clientMsgId) {
            optIdx = messages.findIndex(m => m.clientMsgId === payload.clientMsgId);
         } else if (payload.senderId === this.currentUserId) {
-           // Fallback for missing clientMsgId: match by content and timestamp proximity
            optIdx = messages.findIndex(m => !m.id && m.content === payload.content); 
         }
 
         if (optIdx > -1) {
            const newMsgs = [...messages];
-           newMsgs[optIdx] = { ...payload }; // Use server data
+           newMsgs[optIdx] = { ...payload };
            return newMsgs;
         }
 

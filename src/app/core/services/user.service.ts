@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { ApiService } from './api.service';
 import { Observable } from 'rxjs';
+import { environment } from '../../../environments/environment';
 
 export interface User {
   id: number;
@@ -16,7 +17,7 @@ export interface User {
 
 @Injectable({ providedIn: 'root' })
 export class UserService {
-  private readonly baseUrl = 'http://localhost:8080';
+  private readonly baseUrl = environment.apiBaseUrl;
   constructor(private readonly api: ApiService) {}
 
   getAllUsers(): Observable<User[]> {
@@ -45,5 +46,13 @@ export class UserService {
 
   enableUser(id: number): Observable<User> {
     return this.api.post<User>(`/api/users/${id}/enable`, {}, undefined, this.baseUrl);
+  }
+
+  searchUserByEmail(email: string): Observable<User> {
+    return this.api.get<User>(`/api/users/search?email=${email}`, undefined, this.baseUrl);
+  }
+
+  syncAuthWithEmployeeIds(): Observable<string> {
+    return this.api.post<string>('/api/auth/sync-ids', {}, undefined, this.baseUrl);
   }
 }

@@ -6,7 +6,9 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatTableModule } from '@angular/material/table';
 import { MatTabsModule } from '@angular/material/tabs';
 import { MatDividerModule } from '@angular/material/divider';
+import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { AnalyticsService, Report, DashboardWidget } from '../../core/services/analytics.service';
+import { AuthService } from '../../core/services/auth.service';
 import { PageHeaderComponent } from '../../shared/components/page-header.component';
 import { toSignal } from '@angular/core/rxjs-interop';
 
@@ -20,6 +22,7 @@ import { toSignal } from '@angular/core/rxjs-interop';
     MatIconModule,
     MatTableModule,
     MatTabsModule,
+    MatSnackBarModule,
     MatDividerModule,
     PageHeaderComponent,
     DatePipe
@@ -28,58 +31,65 @@ import { toSignal } from '@angular/core/rxjs-interop';
     <app-page-header 
       title="Intelligence & Insights" 
       subtitle="Data-driven workforce analytics, productivity metrics, and automated enterprise reporting." 
-      actionLabel="Schedule Report"
+      [actionLabel]="canExport() ? 'Schedule Report' : undefined"
       (action)="onScheduleReport()"
     />
 
     <section class="analytics-shell">
-      <div class="metrics-grid">
-        <mat-card class="metric-card">
-          <label>Enterprise Headcount</label>
-          <div class="value">1,240</div>
-          <div class="trend up">+12% vs last quarter</div>
-        </mat-card>
-        <mat-card class="metric-card">
-          <label>Labor Utilization</label>
-          <div class="value">94.2%</div>
-          <div class="trend down">-2% vs goal</div>
-        </mat-card>
-        <mat-card class="metric-card">
-          <label>Retention Rate</label>
-          <div class="value">88%</div>
-          <div class="trend up">+5% YoY</div>
-        </mat-card>
-        <mat-card class="metric-card">
-          <label>Avg. Time to Hire</label>
-          <div class="value">18d</div>
-          <div class="trend stable">No change</div>
-        </mat-card>
-      </div>
+      <!-- 1. HIGH-LEVEL METRICS (Conditional based on scope) -->
+      @if (canReadOrgAnalytics()) {
+        <div class="metrics-grid">
+          <mat-card class="metric-card">
+            <label>Enterprise Headcount</label>
+            <div class="value">1,240</div>
+            <div class="trend up">+12% vs last quarter</div>
+          </mat-card>
+          <mat-card class="metric-card">
+            <label>Labor Utilization</label>
+            <div class="value">94.2%</div>
+            <div class="trend down">-2% vs goal</div>
+          </mat-card>
+          <mat-card class="metric-card">
+            <label>Retention Rate</label>
+            <div class="value">88%</div>
+            <div class="trend up">+5% YoY</div>
+          </mat-card>
+          <mat-card class="metric-card">
+            <label>Avg. Time to Hire</label>
+            <div class="value">18d</div>
+            <div class="trend stable">No change</div>
+          </mat-card>
+        </div>
+      }
 
       <div class="insights-grid mt-6">
-        <mat-card class="chart-card">
-          <div class="card-header">
-            <h3>Staff Allocation by Department</h3>
-            <button mat-icon-button><mat-icon>more_vert</mat-icon></button>
-          </div>
-          <div class="chart-placeholder">
-            <div class="bars">
-              <div class="bar" style="height: 80%"></div>
-              <div class="bar" style="height: 60%"></div>
-              <div class="bar" style="height: 95%"></div>
-              <div class="bar" style="height: 40%"></div>
-              <div class="bar" style="height: 70%"></div>
+        <!-- 2. DEPARTMENTAL CHART (Conditional) -->
+        @if (canReadOrgAnalytics() || canReadTeamAnalytics()) {
+          <mat-card class="chart-card">
+            <div class="card-header">
+              <h3>Staff Allocation by Department</h3>
+              <button mat-icon-button><mat-icon>more_vert</mat-icon></button>
             </div>
-            <div class="labels">
-              <span>Ops</span><span>Eng</span><span>HR</span><span>Fin</span><span>Sup</span>
+            <div class="chart-placeholder">
+              <div class="bars">
+                <div class="bar" style="height: 80%"></div>
+                <div class="bar" style="height: 60%"></div>
+                <div class="bar" style="height: 95%"></div>
+                <div class="bar" style="height: 40%"></div>
+                <div class="bar" style="height: 70%"></div>
+              </div>
+              <div class="labels">
+                <span>Ops</span><span>Eng</span><span>HR</span><span>Fin</span><span>Sup</span>
+              </div>
             </div>
-          </div>
-        </mat-card>
+          </mat-card>
+        }
 
-        <mat-card class="data-card">
+        <!-- 3. REPORT ARCHIVE -->
+        <mat-card class="data-card" [class.full-width]="!canReadTeamAnalytics()">
           <div class="card-header">
             <h3>Recent Automated Reports</h3>
-            <button mat-button color="primary">View All</button>
+            <button mat-button color="primary" *ngIf="canExport()">View All</button>
           </div>
           <table mat-table [dataSource]="reports()" class="w-full">
             <ng-container matColumnDef="name">
@@ -125,6 +135,7 @@ import { toSignal } from '@angular/core/rxjs-interop';
 
     .insights-grid { display: grid; grid-template-columns: 1fr 1.5fr; gap: 1.5rem; }
     .chart-card, .data-card { border-radius: 1.2rem; border: 1px solid #e2e8f0; padding: 0; overflow: hidden; }
+    .data-card.full-width { grid-column: span 2; }
     
     .card-header { padding: 1.25rem 1.5rem; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center; }
     .card-header h3 { margin: 0; font-size: 1rem; font-weight: 700; }
@@ -145,16 +156,35 @@ import { toSignal } from '@angular/core/rxjs-interop';
 
     @media (max-width: 1200px) {
       .insights-grid { grid-template-columns: 1fr; }
+      .data-card.full-width { grid-column: span 1; }
     }
   `]
 })
 export class AnalyticsPageComponent {
   private readonly analyticsApi = inject(AnalyticsService);
+  protected readonly auth = inject(AuthService);
+  private readonly snack = inject(MatSnackBar);
 
   protected readonly reports = toSignal(this.analyticsApi.getReports(), { initialValue: [] });
   protected readonly widgets = toSignal(this.analyticsApi.getWidgets(), { initialValue: [] });
 
   protected onScheduleReport(): void {
-    // Implement schedule report
+    if (!this.canExport()) {
+      this.snack.open('You do not have permission to schedule reports.', 'OK', { duration: 3000 });
+      return;
+    }
+    this.snack.open('Report scheduling logic coming soon.', 'OK', { duration: 2000 });
+  }
+
+  protected canExport(): boolean {
+    return this.auth.hasScope('ANALYTICS_EXPORT');
+  }
+
+  protected canReadOrgAnalytics(): boolean {
+    return this.auth.hasScope('ANALYTICS_ORG_READ');
+  }
+
+  protected canReadTeamAnalytics(): boolean {
+    return this.auth.hasScope('ANALYTICS_TEAM_READ');
   }
 }

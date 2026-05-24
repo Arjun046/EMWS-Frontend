@@ -1,0 +1,3758 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EWMS Enterprise Console - Interactive Figma Prototype</title>
+  
+  <!-- Fonts: Plus Jakarta Sans for UI, JetBrains Mono for metrics and log data -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  
+  <!-- Material Design Icons -->
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  
+  <style>
+    :root {
+      /* Light Theme Color Variables */
+      --bg: #f8fafc;
+      --surface: #ffffff;
+      --surface-2: #f1f5f9;
+      --surface-3: #e2e8f0;
+      --border: #e2e8f0;
+      --border-2: #cbd5e1;
+      
+      --primary: #2f6feb;
+      --primary-soft: #ebf1fd;
+      --primary-hover: #1e5ad4;
+      --accent: #8b5cf6;
+      --accent-soft: #f5f3ff;
+      
+      --txt-main: #0f172a;
+      --txt-secondary: #475569;
+      --txt-muted: #94a3b8;
+      
+      --success: #10b981;
+      --success-soft: #ecfdf5;
+      --warning: #f59e0b;
+      --warning-soft: #fffbeb;
+      --danger: #ef4444;
+      --danger-soft: #fef2f2;
+      
+      --radius-xl: 20px;
+      --radius-lg: 14px;
+      --radius-md: 10px;
+      --radius-sm: 8px;
+      
+      --shadow-sm: 0 1px 3px rgba(0,0,0,0.05);
+      --shadow-md: 0 4px 6px -1px rgba(15, 23, 42, 0.08);
+      --shadow-lg: 0 20px 25px -5px rgba(15, 23, 42, 0.1);
+      --ease: cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    body.global-dark-mode {
+      /* Dark Theme Color Variables */
+      --bg: #090d16;
+      --surface: #0f172a;
+      --surface-2: #1e293b;
+      --surface-3: #334155;
+      --border: #1e293b;
+      --border-2: #334155;
+      
+      --primary-soft: rgba(47, 111, 235, 0.15);
+      --accent-soft: rgba(139, 92, 246, 0.15);
+      
+      --txt-main: #f8fafc;
+      --txt-secondary: #94a3b8;
+      --txt-muted: #64748b;
+      
+      --success-soft: rgba(16, 185, 129, 0.12);
+      --warning-soft: rgba(245, 158, 11, 0.12);
+      --danger-soft: rgba(239, 68, 68, 0.12);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body, html {
+      width: 100%;
+      height: 100%;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background: var(--bg);
+      color: var(--txt-main);
+      overflow: hidden;
+      transition: background 0.3s var(--ease), color 0.3s var(--ease);
+    }
+
+    /* Scrollbar customization */
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: var(--surface-3);
+      border-radius: 99px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+      background: var(--border-2);
+    }
+
+    /* Base Layout Container */
+    .app-viewport {
+      display: flex;
+      flex-direction: column;
+      width: 100vw;
+      height: 100vh;
+    }
+
+    /* ══════════════════ 🔧 SANDBOX CONFIGURATOR BANNER ══════════════════ */
+    .sandbox-banner {
+      height: 48px;
+      background: #0b0f19;
+      border-bottom: 1px solid #1e293b;
+      color: #f8fafc;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 1.5rem;
+      z-index: 1000;
+      flex-shrink: 0;
+    }
+
+    .sandbox-brand {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      font-size: 0.78rem;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #3b82f6;
+    }
+
+    .sandbox-brand span {
+      background: #1e3a8a;
+      color: #93c5fd;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.65rem;
+    }
+
+    .sandbox-controllers {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .sandbox-label {
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .sandbox-btn {
+      background: #1e293b;
+      color: #94a3b8;
+      border: 1px solid #334155;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+      transition: all 0.2s var(--ease);
+    }
+
+    .sandbox-btn.active {
+      background: #2563eb;
+      color: #ffffff;
+      border-color: #3b82f6;
+      box-shadow: 0 0 12px rgba(37, 99, 235, 0.4);
+    }
+
+    .sandbox-btn:hover:not(.active) {
+      background: #334155;
+      color: #f8fafc;
+    }
+
+    /* ══════════════════ 🔐 AUTHENTICATION GATE SCREEN ══════════════════ */
+    .auth-gate {
+      position: fixed;
+      inset: 48px 0 0 0;
+      background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+      z-index: 999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+      transition: transform 0.6s var(--ease), opacity 0.6s var(--ease);
+    }
+
+    body.global-dark-mode .auth-gate {
+      background: linear-gradient(135deg, #090d16 0%, #020617 100%);
+    }
+
+    .auth-gate.hidden {
+      transform: translateY(-100%);
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .auth-container {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr;
+      width: 1000px;
+      max-width: 95%;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xl);
+      box-shadow: var(--shadow-lg);
+      overflow: hidden;
+    }
+
+    .auth-brand-side {
+      background: linear-gradient(135deg, #1e1b4b 0%, #0f172a 100%);
+      padding: 4rem 3rem;
+      color: #ffffff;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      position: relative;
+    }
+
+    .auth-brand-side::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at 100% 0%, rgba(139, 92, 246, 0.15) 0%, transparent 60%);
+    }
+
+    .auth-logo-row {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      font-size: 1.25rem;
+      font-weight: 900;
+      letter-spacing: -0.02em;
+    }
+
+    .auth-logo-row .logo-orb {
+      width: 36px;
+      height: 36px;
+      background: var(--primary);
+      border-radius: 10px;
+      display: grid;
+      place-items: center;
+      color: #fff;
+    }
+
+    .auth-hero-text h1 {
+      font-size: 2.25rem;
+      font-weight: 800;
+      line-height: 1.2;
+      margin-bottom: 1rem;
+      letter-spacing: -0.03em;
+    }
+
+    .auth-hero-text h1 span {
+      color: #60a5fa;
+    }
+
+    .auth-hero-text p {
+      color: #94a3b8;
+      font-size: 0.95rem;
+      line-height: 1.6;
+    }
+
+    .auth-signals-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+    }
+
+    .auth-signal-card {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      padding: 1rem;
+      border-radius: var(--radius-md);
+    }
+
+    .auth-signal-card span {
+      display: block;
+      font-size: 0.65rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #64748b;
+      margin-bottom: 0.25rem;
+    }
+
+    .auth-signal-card strong {
+      font-size: 0.85rem;
+      color: #60a5fa;
+    }
+
+    .auth-form-side {
+      padding: 4rem 3rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 2rem;
+    }
+
+    .auth-header h2 {
+      font-size: 1.5rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+    }
+
+    .auth-header p {
+      font-size: 0.85rem;
+      color: var(--txt-secondary);
+      margin-top: 0.25rem;
+    }
+
+    .f-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.45rem;
+      width: 100%;
+    }
+
+    .f-group label {
+      font-size: 0.78rem;
+      font-weight: 800;
+      color: var(--txt-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .input-icon-wrap {
+      position: relative;
+    }
+
+    .input-icon-wrap .material-icons {
+      position: absolute;
+      left: 1rem;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--txt-muted);
+      font-size: 1.2rem;
+    }
+
+    .f-input {
+      width: 100%;
+      height: 46px;
+      border-radius: var(--radius-sm);
+      border: 1.5px solid var(--border);
+      padding: 0 1rem 0 2.75rem;
+      font-family: inherit;
+      font-size: 0.9rem;
+      font-weight: 500;
+      outline: none;
+      background: var(--surface);
+      color: var(--txt-main);
+      transition: border-color 0.2s var(--ease);
+    }
+
+    .f-input:focus {
+      border-color: var(--primary);
+    }
+
+    .btn-submit {
+      width: 100%;
+      height: 48px;
+      background: var(--primary);
+      color: #ffffff;
+      border: none;
+      border-radius: var(--radius-sm);
+      font-family: inherit;
+      font-size: 0.92rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      transition: all 0.2s var(--ease);
+    }
+
+    .btn-submit:hover {
+      background: var(--primary-hover);
+      transform: translateY(-1px);
+    }
+
+    .btn-submit:active {
+      transform: translateY(0);
+    }
+
+    .auth-helper-note {
+      font-size: 0.75rem;
+      color: var(--txt-muted);
+      text-align: center;
+      line-height: 1.4;
+    }
+
+    /* ══════════════════ 💻 SYSTEM MASTER LAYOUT ══════════════════ */
+    .main-shell {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* Navigation Sidebar */
+    .app-sidebar {
+      width: 240px;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      z-index: 100;
+      transition: background 0.3s var(--ease);
+    }
+
+    .sidebar-header {
+      height: 64px;
+      padding: 0 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .sidebar-logo {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      background: var(--primary);
+      color: #ffffff;
+      display: grid;
+      place-items: center;
+      font-size: 0.8rem;
+      font-weight: 900;
+      box-shadow: 0 4px 10px rgba(47, 111, 235, 0.3);
+    }
+
+    .sidebar-brand-title {
+      font-size: 0.92rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+    }
+
+    .sidebar-brand-subtitle {
+      font-size: 0.65rem;
+      color: var(--txt-muted);
+      text-transform: uppercase;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+    }
+
+    .sidebar-nav {
+      flex: 1;
+      padding: 1rem 0.75rem;
+      overflow-y: auto;
+    }
+
+    .nav-sec-label {
+      font-size: 0.65rem;
+      font-weight: 800;
+      color: var(--txt-muted);
+      text-transform: uppercase;
+      padding: 1.25rem 1rem 0.5rem;
+      letter-spacing: 0.08em;
+      display: block;
+    }
+
+    .nav-link {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.65rem 0.85rem;
+      border-radius: var(--radius-sm);
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--txt-secondary);
+      text-decoration: none;
+      cursor: pointer;
+      transition: all 0.2s var(--ease);
+      margin-bottom: 0.15rem;
+    }
+
+    .nav-link:hover {
+      background: var(--surface-2);
+      color: var(--txt-main);
+    }
+
+    .nav-link.active {
+      background: var(--primary-soft);
+      color: var(--primary);
+    }
+
+    .nav-link .material-icons {
+      font-size: 1.2rem;
+    }
+
+    .nav-badge-count {
+      margin-left: auto;
+      background: var(--primary);
+      color: #ffffff;
+      font-size: 0.65rem;
+      font-weight: 800;
+      padding: 2px 6px;
+      border-radius: 99px;
+    }
+
+    .sidebar-footer-user {
+      padding: 1rem;
+      border-top: 1px solid var(--border);
+    }
+
+    .user-profile-widget {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.5rem;
+      border-radius: var(--radius-md);
+      cursor: pointer;
+      transition: background 0.2s var(--ease);
+    }
+
+    .user-profile-widget:hover {
+      background: var(--surface-2);
+    }
+
+    .user-avatar-circle {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--primary), var(--accent));
+      color: #ffffff;
+      display: grid;
+      place-items: center;
+      font-size: 0.82rem;
+      font-weight: 800;
+      position: relative;
+    }
+
+    .avatar-status-dot {
+      position: absolute;
+      bottom: 0;
+      right: 0;
+      width: 10px;
+      height: 10px;
+      background: var(--success);
+      border: 2px solid var(--surface);
+      border-radius: 50%;
+    }
+
+    .widget-username {
+      font-size: 0.82rem;
+      font-weight: 800;
+    }
+
+    .widget-role {
+      font-size: 0.68rem;
+      color: var(--txt-muted);
+      font-weight: 600;
+    }
+
+    /* Content Area Viewport */
+    .app-content-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* Main App Header */
+    .app-header {
+      height: 64px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 2rem;
+      z-index: 90;
+      transition: background 0.3s var(--ease);
+    }
+
+    .breadcrumb-trail {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.8rem;
+      font-weight: 700;
+    }
+
+    .breadcrumb-trail .mut {
+      color: var(--txt-muted);
+      letter-spacing: 0.05em;
+    }
+
+    .breadcrumb-trail .material-icons {
+      font-size: 1rem;
+      color: var(--txt-muted);
+    }
+
+    .header-ctrls {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .digital-clock-widget {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      padding: 0.4rem 0.8rem;
+      border-radius: var(--radius-sm);
+      font-size: 0.78rem;
+      font-weight: 800;
+      color: var(--txt-secondary);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .header-action-btn {
+      width: 36px;
+      height: 36px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--txt-secondary);
+      display: grid;
+      place-items: center;
+      cursor: pointer;
+      transition: all 0.2s var(--ease);
+      position: relative;
+    }
+
+    .header-action-btn:hover {
+      border-color: var(--primary);
+      color: var(--primary);
+      background: var(--surface-2);
+    }
+
+    .btn-notif-ping {
+      position: absolute;
+      top: 6px;
+      right: 6px;
+      width: 8px;
+      height: 8px;
+      background: var(--primary);
+      border: 2px solid var(--surface);
+      border-radius: 50%;
+    }
+
+    /* Page View Scroll Area */
+    .page-scroll-container {
+      flex: 1;
+      padding: 2rem;
+      overflow-y: auto;
+      background: var(--bg);
+      scroll-behavior: smooth;
+    }
+
+    /* Core Pages layout */
+    .module-page {
+      display: none;
+      width: 100%;
+      height: auto;
+    }
+
+    .module-page.active-page {
+      display: block;
+      animation: pageReveal 0.4s var(--ease) both;
+    }
+
+    @keyframes pageReveal {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Universal UI Components */
+    .ui-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-sm);
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+      overflow: hidden;
+    }
+
+    .ui-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.25rem;
+    }
+
+    .ui-card-header h3 {
+      font-size: 1.05rem;
+      font-weight: 800;
+      color: var(--txt-main);
+    }
+
+    .ui-badge {
+      padding: 4px 10px;
+      border-radius: 99px;
+      font-size: 0.65rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      border: 1px solid transparent;
+      display: inline-block;
+    }
+
+    .ui-badge-success { background: var(--success-soft); color: var(--success); border-color: rgba(16, 185, 129, 0.2); }
+    .ui-badge-warning { background: var(--warning-soft); color: var(--warning); border-color: rgba(245, 158, 11, 0.2); }
+    .ui-badge-danger { background: var(--danger-soft); color: var(--danger); border-color: rgba(239, 68, 68, 0.2); }
+
+    .ui-btn {
+      padding: 0.6rem 1.2rem;
+      border-radius: var(--radius-sm);
+      font-size: 0.8rem;
+      font-weight: 700;
+      cursor: pointer;
+      border: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      transition: all 0.2s var(--ease);
+      font-family: inherit;
+    }
+
+    .ui-btn-primary {
+      background: var(--primary);
+      color: #ffffff;
+      box-shadow: 0 4px 10px rgba(47, 111, 235, 0.15);
+    }
+
+    .ui-btn-primary:hover {
+      background: var(--primary-hover);
+      transform: translateY(-1px);
+    }
+
+    .ui-btn-danger {
+      background: var(--danger);
+      color: #ffffff;
+      box-shadow: 0 4px 10px rgba(239, 68, 68, 0.15);
+    }
+
+    .ui-btn-danger:hover {
+      background: #dc2626;
+      transform: translateY(-1px);
+    }
+
+    .ui-btn-secondary {
+      background: var(--surface);
+      border: 1.5px solid var(--border-2);
+      color: var(--txt-secondary);
+    }
+
+    .ui-btn-secondary:hover {
+      background: var(--surface-2);
+    }
+
+    /* Data Table layout */
+    .ui-table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+    }
+
+    .ui-table th {
+      padding: 0.85rem 1.25rem;
+      background: var(--surface-2);
+      color: var(--txt-secondary);
+      font-size: 0.68rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .ui-table td {
+      padding: 1.1rem 1.25rem;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.85rem;
+      color: var(--txt-main);
+    }
+
+    .ui-table tr:hover td {
+      background: var(--surface-2);
+    }
+
+    /* ══════════════════ 🖥️ MODULE 1: DASHBOARD COMMAND HUB ══════════════════ */
+    .dash-hero-grid {
+      display: grid;
+      grid-template-columns: 1.2fr 0.8fr;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xl);
+      box-shadow: var(--shadow-sm);
+      overflow: hidden;
+      margin-bottom: 1.5rem;
+      position: relative;
+    }
+
+    .dash-hero-grid::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: linear-gradient(to right, var(--primary), var(--accent));
+    }
+
+    .dash-hero-l {
+      padding: 2.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+      align-items: flex-start;
+    }
+
+    .status-indicator-tag {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.35rem 0.85rem;
+      border-radius: 99px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      font-size: 0.68rem;
+      font-weight: 900;
+      color: var(--txt-secondary);
+      letter-spacing: 0.05em;
+    }
+
+    .tag-pulse-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--txt-muted);
+    }
+
+    .tag-pulse-dot.active {
+      background: var(--success);
+      box-shadow: 0 0 8px var(--success);
+      animation: pulseAlert 2s infinite;
+    }
+
+    .tag-pulse-dot.break {
+      background: var(--warning);
+    }
+
+    .dash-hero-title {
+      font-size: 2rem;
+      font-weight: 900;
+      letter-spacing: -0.04em;
+      line-height: 1.2;
+    }
+
+    .dash-hero-title span {
+      color: var(--primary);
+    }
+
+    .dash-hero-sub {
+      color: var(--txt-secondary);
+      font-size: 0.95rem;
+      line-height: 1.5;
+    }
+
+    .dash-hero-actions {
+      display: flex;
+      gap: 0.75rem;
+    }
+
+    .dash-hero-r {
+      background: var(--surface-2);
+      padding: 2rem;
+      border-left: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+    }
+
+    .shift-timer-label {
+      font-size: 0.65rem;
+      font-weight: 900;
+      color: var(--txt-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      margin-bottom: 0.5rem;
+    }
+
+    .shift-timer-value {
+      font-size: 2.75rem;
+      font-weight: 800;
+      line-height: 1;
+      margin-bottom: 1rem;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--txt-main);
+    }
+
+    .shift-progress-track {
+      width: 100%;
+      height: 5px;
+      background: var(--surface-3);
+      border-radius: 99px;
+      overflow: hidden;
+    }
+
+    .shift-progress-fill {
+      height: 100%;
+      background: var(--primary);
+      width: 0%;
+      transition: width 1s linear;
+    }
+
+    .dashboard-kpi-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .kpi-card {
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+
+    .kpi-meta-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .kpi-metric-title {
+      font-size: 0.7rem;
+      font-weight: 800;
+      color: var(--txt-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .kpi-metric-value {
+      font-size: 2rem;
+      font-weight: 900;
+      letter-spacing: -0.03em;
+    }
+
+    .dashboard-splits {
+      display: grid;
+      grid-template-columns: 1.2fr 0.8fr;
+      gap: 1.5rem;
+    }
+
+    /* ══════════════════ 👥 MODULE 2: EMPLOYEES DIRECTORY ══════════════════ */
+    .filter-action-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .filter-ctrls-group {
+      display: flex;
+      gap: 0.75rem;
+      flex: 1;
+    }
+
+    .directory-search-input {
+      width: 280px;
+      height: 38px;
+      border-radius: var(--radius-sm);
+      border: 1.5px solid var(--border);
+      padding: 0 0.85rem;
+      font-family: inherit;
+      font-size: 0.82rem;
+      outline: none;
+      background: var(--surface);
+      color: var(--txt-main);
+    }
+
+    .directory-filter-dropdown {
+      height: 38px;
+      border-radius: var(--radius-sm);
+      border: 1.5px solid var(--border);
+      padding: 0 0.85rem;
+      font-family: inherit;
+      font-size: 0.82rem;
+      outline: none;
+      background: var(--surface);
+      color: var(--txt-main);
+      cursor: pointer;
+    }
+
+    .table-avatar-cell {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .avatar-cell-circle {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      font-size: 0.75rem;
+      font-weight: 800;
+      background: var(--primary-soft);
+      color: var(--primary);
+    }
+
+    .avatar-cell-circle.purple-tag {
+      background: var(--accent-soft);
+      color: var(--accent);
+    }
+
+    .avatar-cell-name {
+      font-weight: 700;
+    }
+
+    .table-pag-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 1.25rem;
+    }
+
+    .pag-counter-label {
+      font-size: 0.8rem;
+      color: var(--txt-muted);
+      font-weight: 600;
+    }
+
+    .pag-buttons-wrap {
+      display: flex;
+      gap: 0.4rem;
+    }
+
+    .pag-nav-btn {
+      width: 32px;
+      height: 32px;
+      border-radius: var(--radius-sm);
+      border: 1.5px solid var(--border);
+      background: var(--surface);
+      color: var(--txt-main);
+      display: grid;
+      place-items: center;
+      cursor: pointer;
+      font-size: 0.8rem;
+      font-weight: 700;
+      transition: all 0.2s var(--ease);
+    }
+
+    .pag-nav-btn.active-pag {
+      background: var(--primary);
+      color: #ffffff;
+      border-color: var(--primary);
+    }
+
+    /* Slide-out side sheet drawer */
+    .drawer-scrim {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(13, 17, 23, 0.4);
+      backdrop-filter: blur(4px);
+      z-index: 1000;
+    }
+
+    .drawer-scrim.active-scrim {
+      display: block;
+    }
+
+    .side-sheet-drawer {
+      position: fixed;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      width: 440px;
+      background: var(--surface);
+      border-left: 1px solid var(--border);
+      z-index: 1001;
+      transform: translateX(100%);
+      transition: transform 0.35s var(--ease);
+      padding: 2.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+      overflow-y: auto;
+      box-shadow: var(--shadow-lg);
+    }
+
+    .side-sheet-drawer.active-drawer {
+      transform: translateX(0);
+    }
+
+    .drawer-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 1rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .drawer-header h2 {
+      font-size: 1.25rem;
+      font-weight: 800;
+    }
+
+    /* ══════════════════ 📅 MODULE 3: ROSTER SCHEDULING ══════════════════ */
+    .scheduler-timeline-grid {
+      display: grid;
+      grid-template-columns: 180px repeat(3, 1fr);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      background: var(--surface);
+    }
+
+    .scheduler-hdr-cell {
+      padding: 1rem;
+      background: var(--surface-2);
+      font-size: 0.72rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--txt-secondary);
+      border-bottom: 2px solid var(--border);
+      border-right: 1px solid var(--border);
+    }
+
+    .scheduler-body-cell {
+      padding: 1rem;
+      border-bottom: 1px solid var(--border);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      min-height: 100px;
+      background: var(--bg);
+      transition: background 0.2s var(--ease);
+    }
+
+    .scheduler-body-cell.drop-target-active {
+      background: var(--primary-soft);
+      border: 2px dashed var(--primary);
+    }
+
+    .scheduler-row-employee {
+      font-weight: 700;
+      font-size: 0.85rem;
+      background: var(--surface);
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      padding-left: 1.25rem;
+    }
+
+    .shift-roster-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 0.6rem 0.85rem;
+      font-size: 0.78rem;
+      font-weight: 700;
+      cursor: grab;
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      box-shadow: var(--shadow-sm);
+      transition: transform 0.2s var(--ease), box-shadow 0.2s var(--ease);
+    }
+
+    .shift-roster-card:active {
+      cursor: grabbing;
+      opacity: 0.75;
+    }
+
+    .shift-roster-card:hover {
+      transform: translateY(-1px);
+      box-shadow: var(--shadow-md);
+      border-color: var(--primary);
+    }
+
+    .shift-roster-card.morning-shift { border-left: 3.5px solid var(--primary); }
+    .shift-roster-card.evening-shift { border-left: 3.5px solid var(--accent); }
+    .shift-roster-card.night-shift { border-left: 3.5px solid #ff7262; }
+
+    .shift-roster-card span.shift-time {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.65rem;
+      color: var(--txt-muted);
+    }
+
+    /* ══════════════════ ⏱️ MODULE 4: ATTENDANCE MAP & GEOPING ══════════════════ */
+    .attendance-grid-layout {
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      gap: 1.5rem;
+    }
+
+    .terminal-radar-map {
+      width: 100%;
+      height: 220px;
+      border-radius: var(--radius-md);
+      background: var(--surface-3);
+      position: relative;
+      overflow: hidden;
+      margin-top: 0.75rem;
+      border: 1px solid var(--border);
+    }
+
+    /* Grid coordinate overlay */
+    .radar-grid-lines {
+      position: absolute;
+      inset: 0;
+      background-size: 30px 30px;
+      background-image: linear-gradient(to right, rgba(0, 0, 0, 0.05) 1px, transparent 1px),
+                        linear-gradient(to bottom, rgba(0, 0, 0, 0.05) 1px, transparent 1px);
+    }
+
+    body.global-dark-mode .radar-grid-lines {
+      background-image: linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+                        linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+    }
+
+    .radar-crosshair {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      border: 1px solid var(--primary);
+    }
+
+    .radar-crosshair::before {
+      content: '';
+      position: absolute;
+      width: 40px;
+      height: 1px;
+      background: var(--primary);
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      opacity: 0.4;
+    }
+
+    .radar-crosshair::after {
+      content: '';
+      position: absolute;
+      width: 1px;
+      height: 40px;
+      background: var(--primary);
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      opacity: 0.4;
+    }
+
+    .map-ping-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--primary);
+      border: 2px solid #ffffff;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      box-shadow: 0 0 10px var(--primary);
+      animation: pulseAlert 2s infinite;
+    }
+
+    @keyframes pulseAlert {
+      0% {
+        box-shadow: 0 0 0 0px rgba(47, 111, 235, 0.6);
+      }
+      100% {
+        box-shadow: 0 0 0 16px rgba(47, 111, 235, 0);
+      }
+    }
+
+    /* ══════════════════ 🌴 MODULE 5: LEAVES APPROVALS ══════════════════ */
+    .leaves-balances-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .bal-indicator-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 1.25rem 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 1.25rem;
+    }
+
+    .bal-indicator-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: var(--radius-md);
+      background: var(--primary-soft);
+      color: var(--primary);
+      display: grid;
+      place-items: center;
+      font-size: 1.25rem;
+    }
+
+    .bal-indicator-icon.green-theme { background: var(--success-soft); color: var(--success); }
+    .bal-indicator-icon.warning-theme { background: var(--warning-soft); color: var(--warning); }
+
+    .bal-indicator-value {
+      font-size: 1.6rem;
+      font-weight: 800;
+      line-height: 1;
+    }
+
+    .bal-indicator-title {
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: var(--txt-muted);
+      text-transform: uppercase;
+      margin-top: 0.25rem;
+    }
+
+    /* ══════════════════ 💬 MODULE 6: COMMUNICATIONS CHAT ══════════════════ */
+    .chat-container-split {
+      display: grid;
+      grid-template-columns: 300px 1fr;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      background: var(--surface);
+      height: 640px;
+      overflow: hidden;
+    }
+
+    .chat-sidebar-threads {
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+
+    .chat-threads-search-box {
+      padding: 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .chat-threads-feed {
+      flex: 1;
+      overflow-y: auto;
+    }
+
+    .chat-thread-row {
+      padding: 1.15rem 1rem;
+      display: flex;
+      gap: 0.75rem;
+      border-bottom: 1px solid var(--surface-2);
+      cursor: pointer;
+      transition: background 0.2s var(--ease);
+      position: relative;
+    }
+
+    .chat-thread-row:hover {
+      background: var(--surface-2);
+    }
+
+    .chat-thread-row.active-thread {
+      background: var(--primary-soft);
+    }
+
+    .thread-meta-body {
+      flex: 1;
+      overflow: hidden;
+    }
+
+    .thread-header-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.2rem;
+    }
+
+    .thread-header-row strong {
+      font-size: 0.85rem;
+      font-weight: 800;
+    }
+
+    .thread-header-row span.time {
+      font-size: 0.7rem;
+      color: var(--txt-muted);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .thread-snippet-text {
+      font-size: 0.78rem;
+      color: var(--txt-secondary);
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 170px;
+    }
+
+    .thread-notif-badge {
+      position: absolute;
+      right: 1rem;
+      bottom: 1.15rem;
+      background: var(--primary);
+      color: #ffffff;
+      font-size: 0.6rem;
+      font-weight: 800;
+      padding: 2px 6px;
+      border-radius: 99px;
+    }
+
+    .chat-window-board {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      background: var(--bg);
+    }
+
+    .chat-window-header {
+      height: 64px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      padding: 0 1.5rem;
+      justify-content: space-between;
+    }
+
+    .chat-window-profile {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .chat-window-title-group h4 {
+      font-size: 0.88rem;
+      font-weight: 800;
+    }
+
+    .chat-window-title-group span {
+      font-size: 0.65rem;
+      color: var(--txt-muted);
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .chat-messages-scroll-area {
+      flex: 1;
+      padding: 1.5rem;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 1.15rem;
+    }
+
+    .bubble-wrapper {
+      display: flex;
+      width: 100%;
+    }
+
+    .bubble-wrapper.user-msg { justify-content: flex-end; }
+    .bubble-wrapper.partner-msg { justify-content: flex-start; }
+
+    .chat-bubble-card {
+      max-width: 70%;
+      padding: 0.8rem 1.15rem;
+      border-radius: 12px;
+      font-size: 0.84rem;
+      line-height: 1.5;
+      font-weight: 500;
+      position: relative;
+    }
+
+    .bubble-wrapper.partner-msg .chat-bubble-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-bottom-left-radius: 2px;
+      color: var(--txt-main);
+    }
+
+    .bubble-wrapper.user-msg .chat-bubble-card {
+      background: var(--primary);
+      color: #ffffff;
+      border-bottom-right-radius: 2px;
+    }
+
+    .chat-bubble-time {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.62rem;
+      color: var(--txt-muted);
+      margin-top: 0.35rem;
+      display: block;
+      text-align: right;
+    }
+
+    .bubble-wrapper.user-msg .chat-bubble-time {
+      color: var(--primary-soft);
+    }
+
+    .chat-input-toolbar {
+      padding: 1.15rem;
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+    }
+
+    .chat-input-wrapper {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      background: var(--bg);
+      padding: 0.4rem 0.5rem 0.4rem 1.15rem;
+      border-radius: var(--radius-sm);
+      border: 1.5px solid var(--border);
+    }
+
+    .chat-input-wrapper input {
+      border: none;
+      outline: none;
+      background: transparent;
+      flex: 1;
+      font-family: inherit;
+      font-size: 0.85rem;
+      font-weight: 500;
+      color: var(--txt-main);
+    }
+
+    /* ══════════════════ 💵 MODULE 7: PAYROLL CALCULATOR ══════════════════ */
+    .payroll-split-layout {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 1.5rem;
+    }
+
+    .payroll-calc-pane {
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+
+    .payroll-slider-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .slider-header-metrics {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.85rem;
+    }
+
+    .slider-header-metrics span.label {
+      font-weight: 800;
+      color: var(--txt-secondary);
+      text-transform: uppercase;
+      font-size: 0.75rem;
+      letter-spacing: 0.05em;
+    }
+
+    .slider-header-metrics span.value {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 800;
+      color: var(--primary);
+    }
+
+    .calc-range-slider {
+      width: 100%;
+      height: 6px;
+      border-radius: 99px;
+      outline: none;
+      background: var(--surface-3);
+      cursor: pointer;
+      appearance: none;
+    }
+
+    .calc-range-slider::-webkit-slider-thumb {
+      appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: var(--primary);
+      box-shadow: 0 0 6px rgba(47, 111, 235, 0.4);
+      transition: transform 0.1s var(--ease);
+    }
+
+    .calc-range-slider::-webkit-slider-thumb:hover {
+      transform: scale(1.15);
+    }
+
+    /* Payslip Mockup styling */
+    .payslip-visual-stubs {
+      background: #0f172a;
+      color: #ffffff;
+      border-radius: var(--radius-lg);
+      padding: 2.25rem;
+      box-shadow: var(--shadow-lg);
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+      position: relative;
+      overflow: hidden;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+    }
+
+    .payslip-visual-stubs::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+      background: linear-gradient(to right, var(--success), var(--primary));
+    }
+
+    .payslip-watermark {
+      position: absolute;
+      right: -20px;
+      bottom: -20px;
+      font-size: 8rem;
+      font-weight: 900;
+      color: rgba(255, 255, 255, 0.02);
+      pointer-events: none;
+      letter-spacing: -0.05em;
+    }
+
+    .payslip-header-group {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      padding-bottom: 1.25rem;
+    }
+
+    .payslip-logo-title strong {
+      display: block;
+      font-size: 0.95rem;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: #3b82f6;
+    }
+
+    .payslip-logo-title span {
+      font-size: 0.65rem;
+      color: #64748b;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .payslip-period-label {
+      text-align: right;
+    }
+
+    .payslip-period-label span.label {
+      display: block;
+      font-size: 0.6rem;
+      color: #64748b;
+      text-transform: uppercase;
+      font-weight: 800;
+    }
+
+    .payslip-period-label span.date {
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: #f8fafc;
+    }
+
+    .payslip-employee-meta {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1rem;
+      font-size: 0.8rem;
+      border-bottom: 1px dashed rgba(255, 255, 255, 0.08);
+      padding-bottom: 1.25rem;
+    }
+
+    .payslip-meta-col span.lbl {
+      display: block;
+      font-size: 0.6rem;
+      color: #64748b;
+      text-transform: uppercase;
+      font-weight: 800;
+      margin-bottom: 0.2rem;
+    }
+
+    .payslip-meta-col span.val {
+      font-weight: 700;
+      color: #e2e8f0;
+    }
+
+    .payslip-calculations-table {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .payslip-calc-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.82rem;
+    }
+
+    .payslip-calc-row span.lbl {
+      color: #94a3b8;
+    }
+
+    .payslip-calc-row span.val {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 700;
+    }
+
+    .payslip-calc-row.deduction span.val {
+      color: #ef4444;
+    }
+
+    .payslip-calc-row.gross span.val {
+      color: #f8fafc;
+    }
+
+    .payslip-summary-totals {
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      padding-top: 1.25rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .payslip-summary-totals span.lbl {
+      font-size: 0.85rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      color: #f8fafc;
+      letter-spacing: 0.03em;
+    }
+
+    .payslip-summary-totals span.val {
+      font-size: 1.75rem;
+      font-weight: 800;
+      color: #10b981;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* ══════════════════ 🛡️ MODULE 8: PERMISSIONS MATRIX ══════════════════ */
+    .permissions-grid-table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+    }
+
+    .permissions-grid-table th {
+      padding: 1rem;
+      background: var(--surface-2);
+      color: var(--txt-secondary);
+      font-size: 0.68rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      border-bottom: 2px solid var(--border);
+    }
+
+    .permissions-grid-table td {
+      padding: 1rem;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.82rem;
+    }
+
+    .permissions-grid-table tr:hover td {
+      background: var(--surface-2);
+    }
+
+    .permission-checkbox-cell {
+      text-align: center;
+    }
+
+    .scope-matrix-checkbox {
+      width: 16px;
+      height: 16px;
+      cursor: pointer;
+      accent-color: var(--primary);
+    }
+
+    /* ══════════════════ 🤖 MODULE 9: FLOATING AI ASSISTANT ORB ══════════════════ */
+    .intel-orb-float-box {
+      position: fixed;
+      bottom: 2.25rem;
+      right: 2.25rem;
+      z-index: 9999;
+    }
+
+    .neural-interactive-orb {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      background: #0f172a;
+      color: #ffffff;
+      border: none;
+      cursor: pointer;
+      display: grid;
+      place-items: center;
+      box-shadow: var(--shadow-lg);
+      transition: all 0.3s var(--ease);
+      position: relative;
+    }
+
+    body.global-dark-mode .neural-interactive-orb {
+      background: var(--primary);
+    }
+
+    .neural-interactive-orb:hover {
+      transform: scale(1.05);
+      box-shadow: 0 0 20px rgba(47, 111, 235, 0.4);
+    }
+
+    .neural-interactive-orb.active-orb {
+      background: var(--danger);
+      transform: rotate(90deg);
+    }
+
+    .orb-pulse-scanner-ring {
+      position: absolute;
+      inset: -4px;
+      border: 2px solid var(--primary);
+      border-radius: 50%;
+      opacity: 0.2;
+      animation: rotateRing 6s linear infinite;
+    }
+
+    @keyframes rotateRing {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    .ai-assistant-side-panel {
+      display: none;
+      position: absolute;
+      bottom: 4.75rem;
+      right: 0;
+      width: 360px;
+      height: 520px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-lg);
+      flex-direction: column;
+      overflow: hidden;
+      z-index: 9999;
+    }
+
+    .ai-assistant-side-panel.active-panel {
+      display: flex;
+      animation: sideReveal 0.3s var(--ease) both;
+    }
+
+    @keyframes sideReveal {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .ai-panel-header {
+      padding: 1rem 1.25rem;
+      background: var(--surface-2);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .ai-brand-titles-wrap {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+    }
+
+    .ai-brand-orb {
+      width: 28px;
+      height: 28px;
+      background: #0f172a;
+      color: var(--primary);
+      border-radius: 6px;
+      display: grid;
+      place-items: center;
+    }
+
+    .ai-brand-meta strong {
+      display: block;
+      font-size: 0.72rem;
+      font-family: 'JetBrains Mono', monospace;
+      letter-spacing: 0.05em;
+    }
+
+    .ai-brand-meta span {
+      font-size: 0.58rem;
+      font-weight: 800;
+      color: var(--success);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .ai-messages-logs-area {
+      flex: 1;
+      padding: 1.25rem;
+      overflow-y: auto;
+      background: var(--bg);
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .ai-bubble-row {
+      display: flex;
+      width: 100%;
+    }
+
+    .ai-bubble-row.user { justify-content: flex-end; }
+    .ai-bubble-row.system { justify-content: flex-start; }
+
+    .ai-bubble-card {
+      max-width: 85%;
+      padding: 0.8rem 1rem;
+      border-radius: var(--radius-sm);
+      font-size: 0.82rem;
+      line-height: 1.45;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--txt-main);
+    }
+
+    .ai-bubble-row.user .ai-bubble-card {
+      background: #0f172a;
+      color: #ffffff;
+      border: none;
+      border-bottom-right-radius: 2px;
+    }
+
+    body.global-dark-mode .ai-bubble-row.user .ai-bubble-card {
+      background: var(--primary);
+    }
+
+    .ai-bubble-row.system .ai-bubble-card {
+      background: var(--surface-2);
+      border-bottom-left-radius: 2px;
+    }
+
+    .ai-bubble-sys-header {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.55rem;
+      font-weight: 800;
+      color: var(--primary);
+      margin-bottom: 0.35rem;
+      letter-spacing: 0.08em;
+      display: block;
+    }
+
+    .ai-panel-footer {
+      padding: 1.15rem;
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+    }
+
+    .ai-input-wrapper {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: var(--bg);
+      padding: 0.35rem 0.5rem 0.35rem 0.85rem;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+    }
+
+    .ai-input-wrapper input {
+      border: none;
+      outline: none;
+      background: transparent;
+      flex: 1;
+      font-size: 0.8rem;
+      font-family: inherit;
+      color: var(--txt-main);
+    }
+
+    .ai-send-btn {
+      width: 32px;
+      height: 32px;
+      border-radius: var(--radius-sm);
+      background: var(--primary);
+      color: #ffffff;
+      border: none;
+      cursor: pointer;
+      display: grid;
+      place-items: center;
+    }
+
+    .ai-disclaimer-note {
+      font-size: 0.55rem;
+      color: var(--txt-muted);
+      text-align: center;
+      font-family: 'JetBrains Mono', monospace;
+      margin-top: 0.6rem;
+    }
+
+    /* Dot typing loader */
+    .typing-dots {
+      display: flex;
+      gap: 4px;
+    }
+
+    .typing-dots span {
+      width: 5px;
+      height: 5px;
+      background: var(--primary);
+      border-radius: 50%;
+      animation: jumpDot 1.4s infinite;
+    }
+
+    .typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+    .typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+    @keyframes jumpDot {
+      0%, 80%, 100% { transform: translateY(0); opacity: 0.3; }
+      40% { transform: translateY(-4px); opacity: 1; }
+    }
+
+    /* Toast system notices */
+    .toast-notifications-container {
+      position: fixed;
+      top: 60px;
+      right: 20px;
+      z-index: 10000;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      pointer-events: none;
+    }
+
+    .toast-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--primary);
+      padding: 0.85rem 1.25rem;
+      border-radius: var(--radius-sm);
+      box-shadow: var(--shadow-md);
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: var(--txt-main);
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      min-width: 280px;
+      pointer-events: auto;
+      animation: toastReveal 0.35s var(--ease) both;
+    }
+
+    @keyframes toastReveal {
+      from { transform: translateX(100%); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+
+    .toast-card.success-toast { border-left-color: var(--success); }
+    .toast-card.warning-toast { border-left-color: var(--warning); }
+    .toast-card.danger-toast { border-left-color: var(--danger); }
+  </style>
+</head>
+<body class="global-dark-mode">
+
+  <div class="app-viewport">
+    
+    <!-- ══════════════════ 🔧 SANDBOX CONFIGURATOR BANNER ══════════════════ -->
+    <header class="sandbox-banner">
+      <div class="sandbox-brand">
+        <span class="material-icons" style="font-size: 16px;">terminal</span>
+        <strong>EWMS Operational Sandbox</strong>
+        <span>Local Mockup</span>
+      </div>
+      
+      <div class="sandbox-controllers">
+        <span class="sandbox-label">Emulate Role:</span>
+        <button class="sandbox-btn active" id="btnRoleAdmin" onclick="setEmulatedRole('ADMIN')">
+          <span class="material-icons" style="font-size: 14px;">admin_panel_settings</span>
+          Ops Admin
+        </button>
+        <button class="sandbox-btn" id="btnRoleManager" onclick="setEmulatedRole('MANAGER')">
+          <span class="material-icons" style="font-size: 14px;">badge</span>
+          Shift Manager
+        </button>
+        <button class="sandbox-btn" id="btnRoleEmployee" onclick="setEmulatedRole('EMPLOYEE')">
+          <span class="material-icons" style="font-size: 14px;">person</span>
+          Employee
+        </button>
+      </div>
+    </header>
+
+    <div class="main-shell">
+      
+      <!-- ══════════════════ 🔐 AUTHENTICATION GATE SCREEN ══════════════════ -->
+      <section class="auth-gate" id="authGateView">
+        <div class="auth-container">
+          <div class="auth-brand-side">
+            <div class="auth-logo-row">
+              <div class="logo-orb">
+                <span class="material-icons" style="font-size: 18px;">domain</span>
+              </div>
+              <strong>EWMS Console</strong>
+            </div>
+            
+            <div class="auth-hero-text">
+              <h1>Workforce Operations <span>Verified.</span></h1>
+              <p>Secure operations portal for attendance, leaves, scheduling, compliance ledger, and payroll management.</p>
+            </div>
+            
+            <div class="auth-signals-grid">
+              <div class="auth-signal-card">
+                <span>GATEWAY</span>
+                <strong>ONLINE</strong>
+              </div>
+              <div class="auth-signal-card">
+                <span>SESSION</span>
+                <strong>SECURE JWT</strong>
+              </div>
+              <div class="auth-signal-card">
+                <span>TENANT</span>
+                <strong>LOCAL_ENV</strong>
+              </div>
+            </div>
+          </div>
+          
+          <div class="auth-form-side">
+            <div class="auth-header">
+              <h2>Access Workspace</h2>
+              <p>Authentication required for local operations</p>
+            </div>
+            
+            <div class="f-group">
+              <label>Email Address</label>
+              <div class="input-icon-wrap">
+                <span class="material-icons">mail</span>
+                <input type="email" class="f-input" id="authEmailInput" value="ops.admin@ewms.local" placeholder="Enter work email">
+              </div>
+            </div>
+            
+            <div class="f-group">
+              <label>Password</label>
+              <div class="input-icon-wrap">
+                <span class="material-icons">lock</span>
+                <input type="password" class="f-input" id="authPasswordInput" value="password" placeholder="Enter password">
+              </div>
+            </div>
+            
+            <button class="btn-submit" onclick="submitAuthLogin()">
+              <span>Authenticate and Enter</span>
+              <span class="material-icons">arrow_forward</span>
+            </button>
+            
+            <p class="auth-helper-note">
+              Sandbox emulation pre-fills default credentials.<br>Click "Authenticate and Enter" to sign in.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ══════════════════ 🖥️ SYSTEM MAIN WORKSPACE LAYOUT ══════════════════ -->
+      
+      <!-- Navigation Sidebar -->
+      <aside class="app-sidebar">
+        <div class="sidebar-header">
+          <div class="sidebar-logo">EW</div>
+          <div>
+            <div class="sidebar-brand-title">Enterprise OS</div>
+            <div class="sidebar-brand-subtitle">Workforce Hub</div>
+          </div>
+        </div>
+        
+        <nav class="sidebar-nav custom-scrollbar">
+          <span class="nav-sec-label">Workspace</span>
+          <a class="nav-link active" id="nav-dashboard" onclick="switchActiveView('dashboard', this)">
+            <span class="material-icons">dashboard</span>
+            <span>Dashboard</span>
+          </a>
+          <a class="nav-link" id="nav-messages" onclick="switchActiveView('messages', this)">
+            <span class="material-icons">chat</span>
+            <span>Messages</span>
+            <span class="nav-badge-count">1</span>
+          </a>
+          
+          <span class="nav-sec-label" id="lbl-sec-workforce">Workforce</span>
+          <a class="nav-link" id="nav-employees" onclick="switchActiveView('employees', this)">
+            <span class="material-icons">people</span>
+            <span>Employees</span>
+          </a>
+          <a class="nav-link" id="nav-scheduling" onclick="switchActiveView('scheduling', this)">
+            <span class="material-icons">calendar_today</span>
+            <span>Scheduling</span>
+          </a>
+          <a class="nav-link" id="nav-attendance" onclick="switchActiveView('attendance', this)">
+            <span class="material-icons">timer</span>
+            <span>Attendance</span>
+          </a>
+          <a class="nav-link" id="nav-leaves" onclick="switchActiveView('leaves', this)">
+            <span class="material-icons">event_busy</span>
+            <span>Leaves</span>
+          </a>
+          
+          <span class="nav-sec-label" id="lbl-sec-admin">Administration</span>
+          <a class="nav-link" id="nav-payroll" onclick="switchActiveView('payroll', this)">
+            <span class="material-icons">payments</span>
+            <span>Payroll Hub</span>
+          </a>
+          <a class="nav-link" id="nav-compliance" onclick="switchActiveView('compliance', this)">
+            <span class="material-icons">gavel</span>
+            <span>Compliance Ledger</span>
+          </a>
+          <a class="nav-link" id="nav-permissions" onclick="switchActiveView('permissions', this)">
+            <span class="material-icons">admin_panel_settings</span>
+            <span>Permissions</span>
+          </a>
+        </nav>
+        
+        <div class="sidebar-footer-user">
+          <div class="user-profile-widget" onclick="handleLogoutClick()">
+            <div class="user-avatar-circle" id="sidebarUserAvatar">OA</div>
+            <div>
+              <div class="widget-username" id="sidebarUsername">Ops Admin</div>
+              <div class="widget-role" id="sidebarUserRole">ROLE_ADMIN</div>
+            </div>
+            <span class="material-icons" style="margin-left: auto; color: var(--txt-muted); font-size: 16px;">logout</span>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Main App Content Area -->
+      <main class="app-content-area">
+        <header class="app-header">
+          <div class="breadcrumb-trail">
+            <span class="mut">EWMS CONSOLE</span>
+            <span class="material-icons">chevron_right</span>
+            <span id="headerBreadcrumbPage" style="font-weight: 800; text-transform: uppercase;">DASHBOARD</span>
+          </div>
+          
+          <div class="header-ctrls">
+            <div class="digital-clock-widget" id="liveDigitalClock">00:00:00 AM</div>
+            <button class="header-action-btn" onclick="toggleInterfaceTheme()" title="Toggle Light/Dark Theme">
+              <span class="material-icons" id="themeTogglerIcon">light_mode</span>
+            </button>
+            <button class="header-action-btn" onclick="switchActiveView('messages', document.getElementById('nav-messages'))" title="Notifications">
+              <span class="material-icons">notifications</span>
+              <div class="btn-notif-ping"></div>
+            </button>
+          </div>
+        </header>
+        
+        <div class="page-scroll-container custom-scrollbar">
+          
+          <!-- ══════════════════ 🖥️ SCREEN 1: DASHBOARD COMMAND HUB ══════════════════ -->
+          <div class="module-page active-page" id="page-dashboard">
+            <div class="dash-hero-grid">
+              <div class="dash-hero-l">
+                <div class="status-indicator-tag">
+                  <div class="tag-pulse-dot active" id="dashboardHeroPulse"></div>
+                  <span id="dashboardHeroStatusLabel">STATION_ACTIVE</span>
+                </div>
+                <h2 class="dash-hero-title">Workforce Readiness <span>Verified.</span></h2>
+                <p class="dash-hero-sub">Local operations terminal initialized for sector NY-01. Professional workspace mappings active.</p>
+                <div class="dash-hero-actions">
+                  <button class="ui-btn ui-btn-danger" id="btnClockInOut" onclick="handleShiftToggle()">Finish Shift</button>
+                  <button class="ui-btn ui-btn-secondary" id="btnBreakToggle" onclick="handleBreakToggle()">Break</button>
+                </div>
+              </div>
+              <div class="dash-hero-r">
+                <span class="shift-timer-label">Session Duration</span>
+                <div class="shift-timer-value" id="dashboardTimerDisplay">08:14:22</div>
+                <div class="shift-progress-track">
+                  <div class="shift-progress-fill" id="dashboardTimerProgress" style="width: 72%;"></div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Dashboard Charts section -->
+            <div class="ui-card">
+              <div class="ui-card-header">
+                <h3>Workforce Activity Telemetry (Sector NY-01)</h3>
+                <span class="ui-badge ui-badge-success">Live_Telemetry</span>
+              </div>
+              <!-- Simulated SVG Activity chart -->
+              <svg viewBox="0 0 800 160" width="100%" height="160" style="overflow: visible;">
+                <defs>
+                  <linearGradient id="telemetryChartGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" stop-color="var(--primary)" stop-opacity="0.15" />
+                    <stop offset="100%" stop-color="var(--primary)" stop-opacity="0" />
+                  </linearGradient>
+                </defs>
+                <line x1="0" y1="40" x2="800" y2="40" stroke="var(--border)" stroke-width="1" stroke-dasharray="4,4" />
+                <line x1="0" y1="80" x2="800" y2="80" stroke="var(--border)" stroke-width="1" stroke-dasharray="4,4" />
+                <line x1="0" y1="120" x2="800" y2="120" stroke="var(--border)" stroke-width="1" stroke-dasharray="4,4" />
+                
+                <path d="M 0 140 L 0 100 L 130 110 L 260 70 L 390 85 L 520 40 L 650 55 L 800 30 L 800 140 Z" fill="url(#telemetryChartGradient)" />
+                <path d="M 0 100 L 130 110 L 260 70 L 390 85 L 520 40 L 650 55 L 800 30" fill="none" stroke="var(--primary)" stroke-width="3" stroke-linecap="round" />
+                
+                <circle cx="130" cy="110" r="4" fill="var(--primary)" stroke="#fff" stroke-width="1.5" />
+                <circle cx="260" cy="70" r="4" fill="var(--primary)" stroke="#fff" stroke-width="1.5" />
+                <circle cx="390" cy="85" r="4" fill="var(--primary)" stroke="#fff" stroke-width="1.5" />
+                <circle cx="520" cy="40" r="4" fill="var(--primary)" stroke="#fff" stroke-width="1.5" />
+                <circle cx="650" cy="55" r="4" fill="var(--primary)" stroke="#fff" stroke-width="1.5" />
+                <circle cx="800" cy="30" r="4" fill="var(--primary)" stroke="#fff" stroke-width="1.5" />
+
+                <text x="130" y="155" text-anchor="middle" font-family="'Plus Jakarta Sans'" font-size="9" fill="var(--txt-muted)" font-weight="700">MON</text>
+                <text x="260" y="155" text-anchor="middle" font-family="'Plus Jakarta Sans'" font-size="9" fill="var(--txt-muted)" font-weight="700">TUE</text>
+                <text x="390" y="155" text-anchor="middle" font-family="'Plus Jakarta Sans'" font-size="9" fill="var(--txt-muted)" font-weight="700">WED</text>
+                <text x="520" y="155" text-anchor="middle" font-family="'Plus Jakarta Sans'" font-size="9" fill="var(--txt-muted)" font-weight="700">THU</text>
+                <text x="650" y="155" text-anchor="middle" font-family="'Plus Jakarta Sans'" font-size="9" fill="var(--txt-muted)" font-weight="700">FRI</text>
+                <text x="800" y="155" text-anchor="end" font-family="'Plus Jakarta Sans'" font-size="9" fill="var(--txt-muted)" font-weight="700">TODAY</text>
+              </svg>
+            </div>
+            
+            <div class="dashboard-kpi-row">
+              <div class="ui-card kpi-card">
+                <div class="kpi-meta-row">
+                  <span class="kpi-metric-title">Total Active Employees</span>
+                  <span class="ui-badge ui-badge-success">+4.2%</span>
+                </div>
+                <div class="kpi-metric-value" id="dashboardActiveEmployeesCount">128</div>
+              </div>
+              
+              <div class="ui-card kpi-card">
+                <div class="kpi-meta-row">
+                  <span class="kpi-metric-title">Shift Coverage</span>
+                  <span class="ui-badge ui-badge-success">98.4%</span>
+                </div>
+                <div class="kpi-metric-value">912h</div>
+              </div>
+              
+              <div class="ui-card kpi-card">
+                <div class="kpi-meta-row">
+                  <span class="kpi-metric-title">Pending Approvals</span>
+                  <span class="ui-badge ui-badge-warning" id="dashboardPendingLeavesBadge">14</span>
+                </div>
+                <div class="kpi-metric-value" id="dashboardPendingLeavesVal">14</div>
+              </div>
+            </div>
+            
+            <div class="dashboard-splits">
+              <div class="ui-card" style="margin-bottom: 0;">
+                <div class="ui-card-header">
+                  <h3>Real-time Operations Feed</h3>
+                  <span class="ui-badge ui-badge-success">Live_Sync</span>
+                </div>
+                <!-- Mini audit list ticker -->
+                <div style="display:flex; flex-direction:column; gap:1rem;" id="dashboardMiniAuditLogs">
+                  <!-- JS appends items here -->
+                </div>
+              </div>
+              
+              <div class="ui-card" style="margin-bottom: 0;">
+                <div class="ui-card-header">
+                  <h3>System Bulletins</h3>
+                </div>
+                <div style="display:flex; flex-direction:column; gap:1rem;">
+                  <div style="border-bottom:1px solid var(--surface-2); padding-bottom:0.75rem;">
+                    <span class="ui-badge ui-badge-danger" style="margin-bottom:0.4rem;">URGENT</span>
+                    <h4 style="font-size:0.85rem; font-weight:800; margin-bottom:0.25rem;">Server Maintenance Window</h4>
+                    <p style="font-size:0.78rem; color:var(--txt-muted); line-height:1.4;">Gateway NY-01 downtime scheduled for tonight between 01:00-02:00 UTC.</p>
+                  </div>
+                  <div>
+                    <span class="ui-badge ui-badge-warning" style="margin-bottom:0.4rem;">POLICY</span>
+                    <h4 style="font-size:0.85rem; font-weight:800; margin-bottom:0.25rem;">Roster Clock Regulations</h4>
+                    <p style="font-size:0.78rem; color:var(--txt-muted); line-height:1.4;">All break logs must include geoping telemetry parameters.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ══════════════════ 👥 SCREEN 2: EMPLOYEES DIRECTORY ══════════════════ -->
+          <div class="module-page" id="page-employees">
+            <div class="ui-card" style="margin-bottom: 0;">
+              <div class="ui-card-header">
+                <h3>Active Employees Directory</h3>
+                <span class="ui-badge ui-badge-success">Operations_Roster</span>
+              </div>
+              
+              <div class="filter-action-row">
+                <div class="filter-ctrls-group">
+                  <input type="text" class="directory-search-input" id="empSearchInput" onkeyup="handleEmployeeSearch()" placeholder="Search active directory...">
+                  <select class="directory-filter-dropdown" id="empFilterDept" onchange="handleEmployeeSearch()">
+                    <option value="">All Departments</option>
+                    <option value="Engineering">Engineering</option>
+                    <option value="Operations">Operations</option>
+                    <option value="Human Resources">Human Resources</option>
+                  </select>
+                </div>
+                <button class="ui-btn ui-btn-primary" onclick="handleDrawerOpen(true)">+ Add Employee</button>
+              </div>
+              
+              <table class="ui-table">
+                <thead>
+                  <tr>
+                    <th>Employee Name</th>
+                    <th>Code</th>
+                    <th>Department</th>
+                    <th>Designation</th>
+                    <th>Salary</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="employeeGridTableBody">
+                  <!-- Filled by JS -->
+                </tbody>
+              </table>
+              
+              <div class="table-pag-row">
+                <span class="pag-counter-label" id="empPagCountLabel">Showing 1 to 2 of 2 entries</span>
+                <div class="pag-buttons-wrap">
+                  <div class="pag-nav-btn active-pag">1</div>
+                  <div class="pag-nav-btn">2</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ══════════════════ 📅 SCREEN 3: ROSTER SCHEDULING ══════════════════ -->
+          <div class="module-page" id="page-scheduling">
+            <div class="ui-card" style="margin-bottom: 0;">
+              <div class="ui-card-header">
+                <h3>Visual Roster Timeline</h3>
+                <span class="ui-badge ui-badge-success">Drag_and_Drop</span>
+              </div>
+              <p style="font-size:0.82rem; color:var(--txt-muted); margin-bottom:1.5rem;">
+                Allocate workforce slots. Drag-and-drop shift modules across rosters below to adjust planning charts instantly.
+              </p>
+              
+              <div class="scheduler-timeline-grid">
+                <!-- Headers -->
+                <div class="scheduler-hdr-cell">Employee</div>
+                <div class="scheduler-hdr-cell">Morning Shift (08:00 - 16:00)</div>
+                <div class="scheduler-hdr-cell">Evening Shift (16:00 - 24:00)</div>
+                <div class="scheduler-hdr-cell">Night Shift (00:00 - 08:00)</div>
+                
+                <!-- Row 1: Alice -->
+                <div class="scheduler-body-cell scheduler-row-employee">Alice Vance</div>
+                <div class="scheduler-body-cell" id="drop-cell-alice-m" ondragover="allowRosterDragOver(event)" ondragleave="handleRosterDragLeave(event)" ondrop="handleRosterDrop(event, 'Alice Vance', 'Morning')">
+                  <div class="shift-roster-card morning-shift" draggable="true" id="shift-alice" ondragstart="handleRosterDragStart(event)">
+                    <strong>Active Operations</strong>
+                    <span class="shift-time">08:00 AM - 04:00 PM</span>
+                  </div>
+                </div>
+                <div class="scheduler-body-cell" id="drop-cell-alice-e" ondragover="allowRosterDragOver(event)" ondragleave="handleRosterDragLeave(event)" ondrop="handleRosterDrop(event, 'Alice Vance', 'Evening')"></div>
+                <div class="scheduler-body-cell" id="drop-cell-alice-n" ondragover="allowRosterDragOver(event)" ondragleave="handleRosterDragLeave(event)" ondrop="handleRosterDrop(event, 'Alice Vance', 'Night')"></div>
+                
+                <!-- Row 2: Bob -->
+                <div class="scheduler-body-cell scheduler-row-employee">Bob Miller</div>
+                <div class="scheduler-body-cell" id="drop-cell-bob-m" ondragover="allowRosterDragOver(event)" ondragleave="handleRosterDragLeave(event)" ondrop="handleRosterDrop(event, 'Bob Miller', 'Morning')"></div>
+                <div class="scheduler-body-cell" id="drop-cell-bob-e" ondragover="allowRosterDragOver(event)" ondragleave="handleRosterDragLeave(event)" ondrop="handleRosterDrop(event, 'Bob Miller', 'Evening')">
+                  <div class="shift-roster-card evening-shift" draggable="true" id="shift-bob" ondragstart="handleRosterDragStart(event)">
+                    <strong>Operations Lead</strong>
+                    <span class="shift-time">04:00 PM - 12:00 AM</span>
+                  </div>
+                </div>
+                <div class="scheduler-body-cell" id="drop-cell-bob-n" ondragover="allowRosterDragOver(event)" ondragleave="handleRosterDragLeave(event)" ondrop="handleRosterDrop(event, 'Bob Miller', 'Night')"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ══════════════════ ⏱️ SCREEN 4: ATTENDANCE MAP & GEOPING ══════════════════ -->
+          <div class="module-page" id="page-attendance">
+            <div class="attendance-grid-layout">
+              <div class="ui-card" style="margin-bottom: 0;">
+                <div class="ui-card-header">
+                  <h3>Check-In Terminal</h3>
+                </div>
+                
+                <div class="f-group">
+                  <label>Operational Status</label>
+                  <div class="status-indicator-tag" style="justify-content:center; padding:0.65rem;">
+                    <div class="tag-pulse-dot active" id="attendanceIndicatorPulse"></div>
+                    <strong id="attendanceIndicatorStatusLabel">STATION_ACTIVE</strong>
+                  </div>
+                </div>
+                
+                <div class="f-group" style="margin-top:1.25rem;">
+                  <label>Terminal Location Geoping</label>
+                  <div class="terminal-radar-map">
+                    <div class="radar-grid-lines"></div>
+                    <div class="radar-crosshair"></div>
+                    <div class="map-ping-dot"></div>
+                  </div>
+                  <div style="font-size:0.72rem; color:var(--txt-muted); margin-top:0.5rem; text-align:center; font-family:'JetBrains Mono';">
+                    Lat: 40.7128° N | Long: -74.0060° W (New York Gateway)
+                  </div>
+                </div>
+              </div>
+              
+              <div class="ui-card" style="margin-bottom: 0;">
+                <div class="ui-card-header">
+                  <h3>Timesheet Logging Records</h3>
+                  <span class="ui-badge ui-badge-success">Verified_Logs</span>
+                </div>
+                <table class="ui-table">
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Clock In</th>
+                      <th>Clock Out</th>
+                      <th>Regular Hours</th>
+                      <th>Overtime Hours</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>May 23, 2026</td>
+                      <td style="font-family:'JetBrains Mono'; font-weight:700;">08:00 AM</td>
+                      <td style="font-family:'JetBrains Mono'; font-weight:700;" id="attendanceTodayClockOut">--:--</td>
+                      <td style="font-family:'JetBrains Mono';">8.00</td>
+                      <td style="font-family:'JetBrains Mono';" id="attendanceTodayOvertime">0.00</td>
+                      <td><span class="ui-badge ui-badge-success" id="attendanceTodayBadge">ACTIVE_SHIFT</span></td>
+                    </tr>
+                    <tr>
+                      <td>May 22, 2026</td>
+                      <td style="font-family:'JetBrains Mono';">08:00 AM</td>
+                      <td style="font-family:'JetBrains Mono';">05:00 PM</td>
+                      <td style="font-family:'JetBrains Mono';">8.00</td>
+                      <td style="font-family:'JetBrains Mono';">1.00</td>
+                      <td><span class="ui-badge ui-badge-success" style="background:rgba(16, 185, 129, 0.08);">COMPLETED</span></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- ══════════════════ 🌴 SCREEN 5: LEAVES APPROVALS ══════════════════ -->
+          <div class="module-page" id="page-leaves">
+            <div class="leaves-balances-row">
+              <div class="bal-indicator-card">
+                <div class="bal-indicator-icon"><span class="material-icons">sick</span></div>
+                <div>
+                  <div class="bal-indicator-value">12</div>
+                  <div class="bal-indicator-title">Sick Balance</div>
+                </div>
+              </div>
+              
+              <div class="bal-indicator-card">
+                <div class="bal-indicator-icon green-theme"><span class="material-icons">flight_takeoff</span></div>
+                <div>
+                  <div class="bal-indicator-value">18</div>
+                  <div class="bal-indicator-title">Annual Leaves</div>
+                </div>
+              </div>
+              
+              <div class="bal-indicator-card">
+                <div class="bal-indicator-icon warning-theme"><span class="material-icons">event_note</span></div>
+                <div>
+                  <div class="bal-indicator-value">4</div>
+                  <div class="bal-indicator-title">Personal Days</div>
+                </div>
+              </div>
+            </div>
+            
+            <div class="ui-card" style="margin-bottom: 0;">
+              <div class="ui-card-header">
+                <h3>Leave Request Approvals</h3>
+                <span class="ui-badge ui-badge-warning" id="leavesTableAlertLabel">Requires Attention</span>
+              </div>
+              
+              <table class="ui-table">
+                <thead>
+                  <tr>
+                    <th>Employee Name</th>
+                    <th>Leave Type</th>
+                    <th>Start Date</th>
+                    <th>End Date</th>
+                    <th>Reason</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="leavesGridTableBody">
+                  <!-- Filled by JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- ══════════════════ 💬 SCREEN 6: COMMUNICATIONS CHAT ══════════════════ -->
+          <div class="module-page" id="page-messages">
+            <div class="chat-container-split">
+              <!-- Sidebar threads -->
+              <div class="chat-sidebar-threads">
+                <div class="chat-threads-search-box">
+                  <input type="text" class="directory-search-input" style="width: 100%;" placeholder="Search chats...">
+                </div>
+                <div class="chat-threads-feed">
+                  <div class="chat-thread-row active-thread" id="chatThreadAV" onclick="handleActiveThreadChange('AV')">
+                    <div class="user-avatar-circle" style="flex-shrink:0;">AV</div>
+                    <div class="thread-meta-body">
+                      <div class="thread-header-row">
+                        <strong>Alice Vance</strong>
+                        <span class="time">10:45 AM</span>
+                      </div>
+                      <p class="thread-snippet-text" id="threadAVSnippet">Alice: Understood. Telemetry packets are fully aligned.</p>
+                    </div>
+                    <div class="thread-notif-badge" id="threadAVBadgeCount" style="display:none;">1</div>
+                  </div>
+                  
+                  <div class="chat-thread-row" id="chatThreadHR" onclick="handleActiveThreadChange('HR')">
+                    <div class="user-avatar-circle" style="flex-shrink:0; background:linear-gradient(135deg, var(--success), #059669);">HR</div>
+                    <div class="thread-meta-body">
+                      <div class="thread-header-row">
+                        <strong>HR General Channel</strong>
+                        <span class="time">09:12 AM</span>
+                      </div>
+                      <p class="thread-snippet-text">Jane: Roster updates are active...</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <!-- Chat Board Window -->
+              <div class="chat-window-board">
+                <div class="chat-window-header">
+                  <div class="chat-window-profile">
+                    <div class="user-avatar-circle" id="chatHeaderAvatar">AV</div>
+                    <div class="chat-window-title-group">
+                      <h4 id="chatHeaderName">Alice Vance</h4>
+                      <span id="chatHeaderRole">STAFF ARCHITECT • ENGINEERING</span>
+                    </div>
+                  </div>
+                  <button class="header-action-btn"><span class="material-icons">phone</span></button>
+                </div>
+                
+                <!-- Messaging Area -->
+                <div class="chat-messages-scroll-area" id="chatLogScrollBox">
+                  <!-- Dynamic Chat bubbles populated by JS -->
+                </div>
+                
+                <!-- Input layout -->
+                <div class="chat-input-toolbar">
+                  <div class="chat-input-wrapper">
+                    <input type="text" id="chatMessageTextInput" placeholder="Write a message..." onkeyup="handleChatInputKeyPress(event)">
+                    <button class="ui-btn ui-btn-primary" style="padding:0.4rem 1rem; border-radius:var(--radius-sm);" onclick="submitUserChatMessage()">Send</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ══════════════════ 💵 SCREEN 7: PAYROLL HUB ══════════════════ -->
+          <div class="module-page" id="page-payroll">
+            <div class="payroll-split-layout">
+              <div class="ui-card payroll-calc-pane" style="margin-bottom: 0;">
+                <div class="ui-card-header">
+                  <h3>Interactive Pay Slip Calculator</h3>
+                  <span class="ui-badge ui-badge-success">Operational_Sim</span>
+                </div>
+                <p style="font-size:0.82rem; color:var(--txt-muted);">
+                  Adjust base operational shifts and overtime ratios to recalculate compliance deductions and tax brackets.
+                </p>
+                
+                <!-- Sliders -->
+                <div class="payroll-slider-group">
+                  <div class="slider-header-metrics">
+                    <span class="label">Regular Shift Hours (Base)</span>
+                    <span class="value" id="payrollBaseHoursDisplay">160 hrs</span>
+                  </div>
+                  <input type="range" class="calc-range-slider" id="payrollBaseHoursSlider" min="0" max="200" value="160" oninput="recalculatePayrollState()">
+                </div>
+                
+                <div class="payroll-slider-group">
+                  <div class="slider-header-metrics">
+                    <span class="label">Overtime Hours (1.5x Multiplier)</span>
+                    <span class="value" id="payrollOvertimeDisplay">12 hrs</span>
+                  </div>
+                  <input type="range" class="calc-range-slider" id="payrollOvertimeSlider" min="0" max="60" value="12" oninput="recalculatePayrollState()">
+                </div>
+                
+                <div class="payroll-slider-group">
+                  <div class="slider-header-metrics">
+                    <span class="label">Hourly Rate ($)</span>
+                    <span class="value" id="payrollHourlyRateDisplay">$50 / hr</span>
+                  </div>
+                  <input type="range" class="calc-range-slider" id="payrollHourlyRateSlider" min="20" max="150" value="65" oninput="recalculatePayrollState()">
+                </div>
+                
+                <div style="margin-top:1rem; display:flex; gap:0.75rem;">
+                  <button class="ui-btn ui-btn-primary" onclick="triggerPayrollSubmit()">Process Payroll</button>
+                  <button class="ui-btn ui-btn-secondary" onclick="alert('Payslip stub compiled and sent to local document vault.')">Export Stub</button>
+                </div>
+              </div>
+              
+              <!-- Payslip View -->
+              <div class="payslip-visual-stubs">
+                <div class="payslip-watermark">EWMS</div>
+                
+                <div class="payslip-header-group">
+                  <div class="payslip-logo-title">
+                    <strong>Enterprise Workforce OS</strong>
+                    <span>TENANT_COMP_01 • PAYSLIP</span>
+                  </div>
+                  <div class="payslip-period-label">
+                    <span class="label">Pay Period</span>
+                    <span class="date">May 01 - May 31, 2026</span>
+                  </div>
+                </div>
+                
+                <div class="payslip-employee-meta">
+                  <div class="payslip-meta-col">
+                    <span class="lbl">Employee Name</span>
+                    <span class="val" id="payslipEmployeeName">Alice Vance</span>
+                  </div>
+                  <div class="payslip-meta-col">
+                    <span class="lbl">Employee Code</span>
+                    <span class="val" id="payslipEmployeeCode">EMP-014</span>
+                  </div>
+                </div>
+                
+                <div class="payslip-calculations-table">
+                  <div class="payslip-calc-row">
+                    <span class="lbl">Regular Hours Earnings</span>
+                    <span class="val" id="payslipRegularEarnings">$10,400.00</span>
+                  </div>
+                  <div class="payslip-calc-row">
+                    <span class="lbl">Overtime Earnings (1.5x)</span>
+                    <span class="val" id="payslipOvertimeEarnings">$1,170.00</span>
+                  </div>
+                  <div class="payslip-calc-row gross">
+                    <span class="lbl">Gross Earnings</span>
+                    <span class="val" id="payslipGrossEarnings">$11,570.00</span>
+                  </div>
+                  <div class="payslip-calc-row deduction">
+                    <span class="lbl">Federal Taxes (18%)</span>
+                    <span class="val" id="payslipFederalTaxes">-$2,082.60</span>
+                  </div>
+                  <div class="payslip-calc-row deduction">
+                    <span class="lbl">Compliance Audits & Benefits (4%)</span>
+                    <span class="val" id="payslipBenefits">-$462.80</span>
+                  </div>
+                </div>
+                
+                <div class="payslip-summary-totals">
+                  <span class="lbl">Net Pay</span>
+                  <span class="val" id="payslipNetPay">$9,024.60</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ══════════════════ 🛡️ SCREEN 8: COMPLIANCE LEDGER ══════════════════ -->
+          <div class="module-page" id="page-compliance">
+            <div class="ui-card" style="margin-bottom: 0;">
+              <div class="ui-card-header">
+                <h3>SOC2 Secure Event Audit Logs</h3>
+                <span class="ui-badge ui-badge-danger" style="background:var(--danger-soft); color:var(--danger); border-color:rgba(239, 68, 68, 0.2);">SOC2 SECURE</span>
+              </div>
+              <p style="font-size:0.82rem; color:var(--txt-muted); margin-bottom:1.25rem;">
+                All security exceptions, role alterations, shift pings, and payroll process parameters are appended to this immutable audit ledger.
+              </p>
+              
+              <table class="ui-table">
+                <thead>
+                  <tr>
+                    <th>Event Timestamp</th>
+                    <th>Actor</th>
+                    <th>Service Scope</th>
+                    <th>Event Summary Description</th>
+                    <th>Tenant</th>
+                    <th>IP Geoping</th>
+                  </tr>
+                </thead>
+                <tbody id="complianceAuditLogsTableBody">
+                  <!-- Filled by JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- ══════════════════ 🛡️ SCREEN 9: PERMISSIONS MATRIX ══════════════════ -->
+          <div class="module-page" id="page-permissions">
+            <div class="ui-card" style="margin-bottom: 0;">
+              <div class="ui-card-header">
+                <h3>Workspace Scopes Permissions Matrix</h3>
+                <span class="ui-badge ui-badge-warning">RBAC_CONFIG</span>
+              </div>
+              <p style="font-size:0.82rem; color:var(--txt-muted); margin-bottom:1.5rem;">
+                Define operational scopes across roles. Modifications trigger immediate system policy state refreshes.
+              </p>
+              
+              <table class="permissions-grid-table">
+                <thead>
+                  <tr>
+                    <th>Scope Capability</th>
+                    <th style="text-align: center;">Ops Admin (ROLE_ADMIN)</th>
+                    <th style="text-align: center;">Shift Manager (ROLE_MANAGER)</th>
+                    <th style="text-align: center;">Standard Employee (ROLE_EMPLOYEE)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><strong>USER_DIRECTORY_WRITE</strong> (Add/remove employee indexes)</td>
+                    <td class="permission-checkbox-cell"><input type="checkbox" class="scope-matrix-checkbox" checked onchange="triggerScopeMatrixSave()"></td>
+                    <td class="permission-checkbox-cell"><input type="checkbox" class="scope-matrix-checkbox" checked onchange="triggerScopeMatrixSave()"></td>
+                    <td class="permission-checkbox-cell"><input type="checkbox" class="scope-matrix-checkbox" onchange="triggerScopeMatrixSave()"></td>
+                  </tr>
+                  <tr>
+                    <td><strong>ATTENDANCE_OVERRIDE</strong> (Adjust historical check-ins)</td>
+                    <td class="permission-checkbox-cell"><input type="checkbox" class="scope-matrix-checkbox" checked onchange="triggerScopeMatrixSave()"></td>
+                    <td class="permission-checkbox-cell"><input type="checkbox" class="scope-matrix-checkbox" onchange="triggerScopeMatrixSave()"></td>
+                    <td class="permission-checkbox-cell"><input type="checkbox" class="scope-matrix-checkbox" onchange="triggerScopeMatrixSave()"></td>
+                  </tr>
+                  <tr>
+                    <td><strong>PAYROLL_PROCESS_RUN</strong> (Process calculations and stub outputs)</td>
+                    <td class="permission-checkbox-cell"><input type="checkbox" class="scope-matrix-checkbox" checked onchange="triggerScopeMatrixSave()"></td>
+                    <td class="permission-checkbox-cell"><input type="checkbox" class="scope-matrix-checkbox" onchange="triggerScopeMatrixSave()"></td>
+                    <td class="permission-checkbox-cell"><input type="checkbox" class="scope-matrix-checkbox" onchange="triggerScopeMatrixSave()"></td>
+                  </tr>
+                  <tr>
+                    <td><strong>SOC2_AUDIT_EXPORT</strong> (Download compliance database ledger)</td>
+                    <td class="permission-checkbox-cell"><input type="checkbox" class="scope-matrix-checkbox" checked onchange="triggerScopeMatrixSave()"></td>
+                    <td class="permission-checkbox-cell"><input type="checkbox" class="scope-matrix-checkbox" onchange="triggerScopeMatrixSave()"></td>
+                    <td class="permission-checkbox-cell"><input type="checkbox" class="scope-matrix-checkbox" onchange="triggerScopeMatrixSave()"></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+        </div>
+      </main>
+      
+      <!-- ══════════════════ 🤖 FLOATING AI ASSISTANT ORB ══════════════════ -->
+      <div class="intel-orb-float-box" id="floatingIntelOrbBox">
+        <button class="neural-interactive-orb" id="btnNeuralCoreOrb" onclick="toggleAiPanelDisplay()">
+          <span class="material-icons" id="orbCenterIcon">psychology</span>
+          <div class="orb-pulse-scanner-ring"></div>
+        </button>
+        
+        <div class="ai-assistant-side-panel" id="aiSidePanel">
+          <header class="ai-panel-header">
+            <div class="ai-brand-titles-wrap">
+              <div class="ai-brand-orb"><span class="material-icons" style="font-size: 15px; color: #fff;">auto_awesome</span></div>
+              <div class="ai-brand-meta">
+                <strong>EWMS_INTEL_CORE_v5</strong>
+                <span>NEURAL_LINK_ACTIVE</span>
+              </div>
+            </div>
+            <button style="border:none; background:transparent; cursor:pointer; color:var(--txt-muted);" onclick="clearAiSessionLog()"><span class="material-icons" style="font-size:18px;">delete_sweep</span></button>
+          </header>
+          
+          <div class="ai-messages-logs-area custom-scrollbar" id="aiMessagesLogs">
+            <div class="ai-bubble-row system">
+              <div class="ai-bubble-card">
+                <span class="ai-bubble-sys-header">SYSTEM_CORE</span>
+                INTEL_CORE_ONLINE. Operational interface initialized. Ask me scheduling, logs, or payload analytics parameters.
+              </div>
+            </div>
+          </div>
+          
+          <footer class="ai-panel-footer">
+            <div class="ai-input-wrapper">
+              <input type="text" id="aiQueryTextInput" placeholder="Query the intelligence core..." onkeyup="handleAiInputKeyPress(event)">
+              <button class="ai-send-btn" onclick="submitAiQueryText()"><span class="material-icons" style="font-size: 16px;">bolt</span></button>
+            </div>
+            <p class="ai-disclaimer-note">INPUT_SENSITIVE_DATA_RESTRICTED</p>
+          </footer>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Slide-out form drawer components -->
+  <div class="drawer-scrim" id="globalDrawerScrim" onclick="handleDrawerOpen(false)"></div>
+  <div class="side-sheet-drawer" id="globalFormDrawer">
+    <div class="drawer-header">
+      <h2>Add New Employee</h2>
+      <span class="material-icons" style="cursor:pointer; color:var(--txt-muted);" onclick="handleDrawerOpen(false)">close</span>
+    </div>
+    
+    <div class="f-group">
+      <label>First Name</label>
+      <input type="text" class="f-input" id="formEmpFirst" style="padding: 0 1rem;" placeholder="e.g. Charlie">
+    </div>
+    <div class="f-group">
+      <label>Last Name</label>
+      <input type="text" class="f-input" id="formEmpLast" style="padding: 0 1rem;" placeholder="e.g. Smith">
+    </div>
+    <div class="f-group">
+      <label>Email Address</label>
+      <input type="email" class="f-input" id="formEmpEmail" style="padding: 0 1rem;" placeholder="charlie.smith@ewms.local">
+    </div>
+    <div class="f-group">
+      <label>Department</label>
+      <select class="f-input" id="formEmpDept" style="padding: 0 1rem;">
+        <option value="Engineering">Engineering</option>
+        <option value="Operations">Operations</option>
+        <option value="Human Resources">Human Resources</option>
+      </select>
+    </div>
+    <div class="f-group">
+      <label>Designation</label>
+      <input type="text" class="f-input" id="formEmpRole" style="padding: 0 1rem;" placeholder="e.g. Staff Architect">
+    </div>
+    <div class="f-group">
+      <label>Monthly Salary ($)</label>
+      <input type="number" class="f-input" id="formEmpSalary" style="padding: 0 1rem;" placeholder="e.g. 8500">
+    </div>
+    
+    <div style="display:flex; gap:0.75rem; margin-top:1rem; justify-content:flex-end;">
+      <button class="ui-btn ui-btn-secondary" onclick="handleDrawerOpen(false)">Cancel</button>
+      <button class="ui-btn ui-btn-primary" onclick="submitEmployeeForm()">Save Employee</button>
+    </div>
+  </div>
+
+  <!-- Toast Notices Container -->
+  <div class="toast-notifications-container" id="toastContainer"></div>
+
+  <!-- ══════════════════ 📜 SANDBOX & UI INTERACTIVE LOGIC ══════════════════ -->
+  <script>
+    // 1. Global Simulation Database and State Config
+    let emulatedRole = 'ADMIN'; 
+    let activeUser = {
+      username: 'Ops Admin',
+      role: 'ROLE_ADMIN',
+      avatar: 'OA'
+    };
+
+    let employeesList = [
+      { name: 'Alice Vance', code: 'EMP-014', dept: 'Engineering', role: 'Staff Architect', salary: 12500, status: 'ACTIVE' },
+      { name: 'Bob Miller', code: 'EMP-015', dept: 'Operations', role: 'Shift Manager', salary: 9800, status: 'ON_LEAVE' }
+    ];
+
+    let leavesList = [
+      { id: 1, name: 'Bob Miller (EMP-015)', type: 'ANNUAL', start: 'Jun 01, 2026', end: 'Jun 05, 2026', reason: 'Family vacation roster', status: 'PENDING' },
+      { id: 2, name: 'Alice Vance (EMP-014)', type: 'SICK', start: 'May 12, 2026', end: 'May 14, 2026', reason: 'Medical dental consultation', status: 'APPROVED' }
+    ];
+
+    let auditLogs = [
+      { time: '2026-05-23 15:20:00', actor: 'Ops Admin', action: 'USER_LOGIN', desc: 'User successfully authenticated session via JWT token', tenant: 'Company-01', ip: '192.168.1.100' },
+      { time: '2026-05-23 14:45:10', actor: 'EMP-014', action: 'SHIFT_CLOCK_IN', desc: 'Employee Alice Vance clocked in sector terminal NY-01', tenant: 'Company-01', ip: '192.168.1.144' },
+      { time: '2026-05-23 10:30:15', actor: 'System Core', action: 'RULE_VIOLATION', desc: 'Missing meal break geoping log parameter (warning broadcast)', tenant: 'Company-01', ip: '127.0.0.1' }
+    ];
+
+    let activeChatPartner = 'AV';
+    let chatMessages = {
+      'AV': [
+        { sender: 'partner', text: 'Hey! Did you get a chance to check the compliance metrics for NY-02?', time: '10:41 AM' },
+        { sender: 'user', text: 'Yes, I just reviewed them. Looking into the missing meal break patterns now.', time: '10:43 AM' },
+        { sender: 'partner', text: 'Awesome, let me know if you need any database schemas mapped.', time: '10:45 AM' }
+      ],
+      'HR': [
+        { sender: 'partner', text: 'Attention team: All timesheet entries must be finalized by Friday noon.', time: '09:00 AM' },
+        { sender: 'partner', text: 'Roster updates are active for NY-02 shifts.', time: '09:12 AM' }
+      ]
+    };
+
+    let isClockedIn = true;
+    let isOnBreak = false;
+    let shiftStartTime = Date.now() - (8 * 3600 * 1000 + 14 * 60 * 1000 + 22 * 1000); // 8h 14m 22s ago
+    let activeShiftInterval;
+    let draggedRosterCardId = '';
+
+    // 2. Global Initialization
+    window.addEventListener('DOMContentLoaded', () => {
+      syncClockDisplay();
+      initializeShiftCounter();
+      renderAllDynamicViews();
+    });
+
+    // 3. Digital Clock Widget Sync
+    function syncClockDisplay() {
+      setInterval(() => {
+        const time = new Date();
+        document.getElementById('liveDigitalClock').textContent = time.toLocaleTimeString();
+      }, 1000);
+    }
+
+    // 4. Session Shift Counter
+    function initializeShiftCounter() {
+      activeShiftInterval = setInterval(() => {
+        if (!isClockedIn || isOnBreak) return;
+        const elapsed = Date.now() - shiftStartTime;
+        const h = Math.floor(elapsed / 3600000);
+        const m = Math.floor((elapsed % 3600000) / 60000);
+        const s = Math.floor((elapsed % 60000) / 1000);
+        
+        const timeString = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+        document.getElementById('dashboardTimerDisplay').textContent = timeString;
+        
+        // Progress track calculation based on standard 8-hour shift
+        const pct = Math.min(100, (elapsed / (8 * 3600 * 1000)) * 100);
+        document.getElementById('dashboardTimerProgress').style.width = `${pct}%`;
+      }, 1000);
+    }
+
+    // 5. Dynamic Render Routing Engine
+    function renderAllDynamicViews() {
+      renderEmployeesTable();
+      renderLeavesTable();
+      renderComplianceLogsTable();
+      renderChatLogFeed();
+      renderMiniAuditLogsTicker();
+      recalculatePayrollState();
+    }
+
+    // Render Employee Table Directory
+    function renderEmployeesTable() {
+      const tbody = document.getElementById('employeeGridTableBody');
+      tbody.innerHTML = '';
+      
+      employeesList.forEach((emp, index) => {
+        const tr = document.createElement('tr');
+        const initials = emp.name.split(' ').map(n => n[0]).join('').toUpperCase();
+        const isPurple = index % 2 === 1;
+        
+        tr.innerHTML = `
+          <td>
+            <div class="table-avatar-cell">
+              <div class="avatar-cell-circle ${isPurple ? 'purple-tag' : ''}">${initials}</div>
+              <span class="avatar-cell-name">${emp.name}</span>
+            </div>
+          </td>
+          <td><span style="font-family:'JetBrains Mono', monospace;">${emp.code}</span></td>
+          <td>${emp.dept}</td>
+          <td>${emp.role}</td>
+          <td><span style="font-family:'JetBrains Mono', monospace;">$${emp.salary.toLocaleString('en-US', {minimumFractionDigits: 2})}</span></td>
+          <td>
+            <span class="ui-badge ${emp.status === 'ACTIVE' ? 'ui-badge-success' : 'ui-badge-warning'}">${emp.status}</span>
+          </td>
+          <td>
+            <button class="header-action-btn" style="width:28px; height:28px;" onclick="handleEmployeeActionClick('${emp.name}')">
+              <span class="material-icons" style="font-size:14px;">more_vert</span>
+            </button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+      
+      document.getElementById('empPagCountLabel').textContent = `Showing 1 to ${employeesList.length} of ${employeesList.length} entries`;
+      document.getElementById('dashboardActiveEmployeesCount').textContent = employeesList.length;
+    }
+
+    function handleEmployeeActionClick(name) {
+      triggerToastNotification(`Employee details for ${name} requested.`, 'info');
+    }
+
+    // Render Leaves Table approvals
+    function renderLeavesTable() {
+      const tbody = document.getElementById('leavesGridTableBody');
+      tbody.innerHTML = '';
+      let pendingCount = 0;
+      
+      leavesList.forEach(lv => {
+        const tr = document.createElement('tr');
+        const statusBadgeClass = lv.status === 'PENDING' ? 'ui-badge-warning' : (lv.status === 'APPROVED' ? 'ui-badge-success' : 'ui-badge-danger');
+        
+        if (lv.status === 'PENDING') pendingCount++;
+        
+        tr.innerHTML = `
+          <td><strong>${lv.name}</strong></td>
+          <td><span class="ui-badge" style="background:var(--surface-2); border-color:var(--border);">${lv.type}</span></td>
+          <td>${lv.start}</td>
+          <td>${lv.end}</td>
+          <td style="font-style: italic; color:var(--txt-secondary);">${lv.reason}</td>
+          <td><span class="ui-badge ${statusBadgeClass}">${lv.status}</span></td>
+          <td>
+            ${lv.status === 'PENDING' ? `
+              <div style="display:flex; gap:0.4rem;">
+                <button class="ui-btn ui-btn-primary" style="padding:0.35rem 0.75rem; font-size:0.7rem;" onclick="handleLeaveStatusSet(${lv.id}, 'APPROVED')">Approve</button>
+                <button class="ui-btn ui-btn-secondary" style="padding:0.35rem 0.75rem; font-size:0.7rem;" onclick="handleLeaveStatusSet(${lv.id}, 'REJECTED')">Reject</button>
+              </div>
+            ` : `<span style="color:var(--txt-muted); font-size:0.75rem; font-weight:700;">PROCESSED</span>`}
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+      
+      document.getElementById('dashboardPendingLeavesVal').textContent = pendingCount;
+      document.getElementById('dashboardPendingLeavesBadge').textContent = pendingCount;
+      
+      if (pendingCount === 0) {
+        document.getElementById('leavesTableAlertLabel').className = 'ui-badge ui-badge-success';
+        document.getElementById('leavesTableAlertLabel').textContent = 'Fully Resolved';
+      } else {
+        document.getElementById('leavesTableAlertLabel').className = 'ui-badge ui-badge-warning';
+        document.getElementById('leavesTableAlertLabel').textContent = 'Requires Attention';
+      }
+    }
+
+    function handleLeaveStatusSet(id, status) {
+      const index = leavesList.findIndex(l => l.id === id);
+      if (index !== -1) {
+        leavesList[index].status = status;
+        const employee = leavesList[index].name;
+        appendComplianceAuditLog(activeUser.username, 'LEAVE_APPROVAL', `Leave request for ${employee} status updated to ${status}`);
+        renderLeavesTable();
+        triggerToastNotification(`Leave request successfully ${status.toLowerCase()}.`, 'success');
+      }
+    }
+
+    // Render Compliance Log table
+    function renderComplianceLogsTable() {
+      const tbody = document.getElementById('complianceAuditLogsTableBody');
+      tbody.innerHTML = '';
+      
+      auditLogs.forEach(log => {
+        const tr = document.createElement('tr');
+        let actionBadgeClass = 'ui-badge-success';
+        if (log.action === 'RULE_VIOLATION' || log.action === 'SHIFT_CLOCK_OUT') {
+          actionBadgeClass = 'ui-badge-danger';
+        } else if (log.action === 'BREAK_START' || log.action === 'LEAVE_APPROVAL') {
+          actionBadgeClass = 'ui-badge-warning';
+        }
+        
+        tr.innerHTML = `
+          <td><span style="font-family:'JetBrains Mono', monospace; font-size:0.78rem;">${log.time}</span></td>
+          <td><strong>${log.actor}</strong></td>
+          <td><span class="ui-badge ${actionBadgeClass}" style="font-size:0.62rem;">${log.action}</span></td>
+          <td style="font-weight:500; font-size:0.8rem; color:var(--txt-secondary);">${log.desc}</td>
+          <td><span style="font-weight:700; font-size:0.75rem;">${log.tenant}</span></td>
+          <td><span style="font-family:'JetBrains Mono', monospace; font-size:0.78rem; color:var(--txt-muted);">${log.ip}</span></td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    // Update the mini dashboard audit log listing
+    function renderMiniAuditLogsTicker() {
+      const feed = document.getElementById('dashboardMiniAuditLogs');
+      feed.innerHTML = '';
+      
+      const sliceLogs = auditLogs.slice(0, 3);
+      sliceLogs.forEach(log => {
+        const item = document.createElement('div');
+        item.style.display = 'flex';
+        item.style.gap = '1rem';
+        item.style.borderBottom = '1px solid var(--surface-2)';
+        item.style.paddingBottom = '0.75rem';
+        
+        let iconName = 'notifications';
+        if (log.action === 'USER_LOGIN') iconName = 'lock_open';
+        else if (log.action.includes('CLOCK')) iconName = 'timer';
+        else if (log.action === 'RULE_VIOLATION') iconName = 'warning';
+        
+        item.innerHTML = `
+          <div style="width:36px; height:36px; border-radius:8px; background:var(--surface-2); display:grid; place-items:center; flex-shrink:0;">
+            <span class="material-icons" style="font-size:16px; color:var(--txt-muted);">${iconName}</span>
+          </div>
+          <div style="flex:1;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.15rem;">
+              <strong style="font-size:0.8rem; text-transform:uppercase;">${log.action}</strong>
+              <span style="font-family:'JetBrains Mono'; font-size:0.7rem; color:var(--txt-muted);">${log.time.split(' ')[1]}</span>
+            </div>
+            <p style="font-size:0.78rem; color:var(--txt-secondary); margin:0;">${log.desc}</p>
+          </div>
+        `;
+        feed.appendChild(item);
+      });
+    }
+
+    function appendComplianceAuditLog(actor, action, desc) {
+      const now = new Date();
+      const timeStr = now.toISOString().replace('T', ' ').slice(0, 19);
+      auditLogs.unshift({
+        time: timeStr,
+        actor: actor,
+        action: action,
+        desc: desc,
+        tenant: 'Company-01',
+        ip: '127.0.0.1'
+      });
+      renderComplianceLogsTable();
+      renderMiniAuditLogsTicker();
+    }
+
+    // 6. Navigation View Router
+    function switchActiveView(pageId, element) {
+      // Toggle sidebar anchor style
+      document.querySelectorAll('.nav-link').forEach(link => link.classList.remove('active'));
+      if (element) element.classList.add('active');
+      
+      // Swap page panels
+      document.querySelectorAll('.module-page').forEach(page => page.classList.remove('active-page'));
+      document.getElementById(`page-${pageId}`).classList.add('active-page');
+      
+      // Set Breadcrumb label
+      document.getElementById('headerBreadcrumbPage').textContent = pageId.replace('-', ' ');
+    }
+
+    // 7. Interactive Clock-in & Recess state changes
+    function handleShiftToggle() {
+      if (isClockedIn) {
+        if (confirm('Complete shift operations (Clock Out)?')) {
+          isClockedIn = false;
+          isOnBreak = false;
+          
+          document.getElementById('dashboardHeroPulse').className = 'tag-pulse-dot';
+          document.getElementById('attendanceIndicatorPulse').className = 'tag-pulse-dot';
+          document.getElementById('dashboardHeroStatusLabel').textContent = 'STATION_STANDBY';
+          document.getElementById('attendanceIndicatorStatusLabel').textContent = 'STATION_STANDBY';
+          
+          document.getElementById('btnClockInOut').className = 'ui-btn ui-btn-primary';
+          document.getElementById('btnClockInOut').textContent = 'Start Shift';
+          document.getElementById('btnBreakToggle').style.display = 'none';
+          
+          // Timesheet view sync
+          document.getElementById('attendanceTodayClockOut').textContent = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+          document.getElementById('attendanceTodayBadge').className = 'ui-badge ui-badge-success';
+          document.getElementById('attendanceTodayBadge').textContent = 'COMPLETED';
+          document.getElementById('attendanceTodayBadge').style.background = 'rgba(16, 185, 129, 0.08)';
+          
+          appendComplianceAuditLog(activeUser.username, 'SHIFT_CLOCK_OUT', 'User terminated operational session terminal');
+          triggerToastNotification('Shift successfully clocked out.', 'warning');
+        }
+      } else {
+        isClockedIn = true;
+        shiftStartTime = Date.now();
+        
+        document.getElementById('dashboardHeroPulse').className = 'tag-pulse-dot active';
+        document.getElementById('attendanceIndicatorPulse').className = 'tag-pulse-dot active';
+        document.getElementById('dashboardHeroStatusLabel').textContent = 'STATION_ACTIVE';
+        document.getElementById('attendanceIndicatorStatusLabel').textContent = 'STATION_ACTIVE';
+        
+        document.getElementById('btnClockInOut').className = 'ui-btn ui-btn-danger';
+        document.getElementById('btnClockInOut').textContent = 'Finish Shift';
+        document.getElementById('btnBreakToggle').style.display = 'inline-flex';
+        document.getElementById('btnBreakToggle').textContent = 'Break';
+        
+        document.getElementById('attendanceTodayClockOut').textContent = '--:--';
+        document.getElementById('attendanceTodayBadge').className = 'ui-badge ui-badge-success';
+        document.getElementById('attendanceTodayBadge').textContent = 'ACTIVE_SHIFT';
+        document.getElementById('attendanceTodayBadge').style.background = '';
+        
+        appendComplianceAuditLog(activeUser.username, 'SHIFT_CLOCK_IN', 'User initialized active shift session terminal');
+        triggerToastNotification('Shift successfully clocked in.', 'success');
+      }
+    }
+
+    function handleBreakToggle() {
+      if (!isClockedIn) return;
+      if (isOnBreak) {
+        isOnBreak = false;
+        document.getElementById('dashboardHeroPulse').className = 'tag-pulse-dot active';
+        document.getElementById('attendanceIndicatorPulse').className = 'tag-pulse-dot active';
+        document.getElementById('dashboardHeroStatusLabel').textContent = 'STATION_ACTIVE';
+        document.getElementById('attendanceIndicatorStatusLabel').textContent = 'STATION_ACTIVE';
+        document.getElementById('btnBreakToggle').textContent = 'Break';
+        
+        appendComplianceAuditLog(activeUser.username, 'BREAK_END', 'User terminated recess mode (Shift Resumed)');
+        triggerToastNotification('Recess recess ended. Shift resumed.', 'success');
+      } else {
+        isOnBreak = true;
+        document.getElementById('dashboardHeroPulse').className = 'tag-pulse-dot break';
+        document.getElementById('attendanceIndicatorPulse').className = 'tag-pulse-dot break';
+        document.getElementById('dashboardHeroStatusLabel').textContent = 'RECESS_MODE';
+        document.getElementById('attendanceIndicatorStatusLabel').textContent = 'RECESS_MODE';
+        document.getElementById('btnBreakToggle').textContent = 'Resume';
+        
+        appendComplianceAuditLog(activeUser.username, 'BREAK_START', 'User triggered recess break session mode');
+        triggerToastNotification('Recess mode initialized.', 'warning');
+      }
+    }
+
+    // 8. Add Employee Drawer Management
+    function handleDrawerOpen(isOpen) {
+      document.getElementById('globalDrawerScrim').classList.toggle('active-scrim', isOpen);
+      document.getElementById('globalFormDrawer').classList.toggle('active-drawer', isOpen);
+    }
+
+    function submitEmployeeForm() {
+      const first = document.getElementById('formEmpFirst').value.trim();
+      const last = document.getElementById('formEmpLast').value.trim();
+      const email = document.getElementById('formEmpEmail').value.trim();
+      const dept = document.getElementById('formEmpDept').value;
+      const role = document.getElementById('formEmpRole').value.trim();
+      const salaryInput = document.getElementById('formEmpSalary').value;
+      
+      if (!first || !last || !email || !role || !salaryInput) {
+        alert('Please fill out all directory fields.');
+        return;
+      }
+      
+      const salary = parseFloat(salaryInput);
+      const code = `EMP-${Math.floor(100 + Math.random() * 900)}`;
+      const name = `${first} ${last}`;
+      
+      employeesList.push({
+        name: name,
+        code: code,
+        dept: dept,
+        role: role,
+        salary: salary,
+        status: 'ACTIVE'
+      });
+      
+      appendComplianceAuditLog(activeUser.username, 'EMPLOYEE_CREATE', `Created employee profile index for ${name} (${code})`);
+      renderEmployeesTable();
+      handleDrawerOpen(false);
+      
+      // Clean inputs
+      document.getElementById('formEmpFirst').value = '';
+      document.getElementById('formEmpLast').value = '';
+      document.getElementById('formEmpEmail').value = '';
+      document.getElementById('formEmpRole').value = '';
+      document.getElementById('formEmpSalary').value = '';
+      
+      triggerToastNotification(`Employee ${name} added successfully.`, 'success');
+    }
+
+    // 9. Employee search logic
+    function handleEmployeeSearch() {
+      const query = document.getElementById('empSearchInput').value.toLowerCase();
+      const deptVal = document.getElementById('empFilterDept').value;
+      const tbody = document.getElementById('employeeGridTableBody');
+      tbody.innerHTML = '';
+      
+      const filtered = employeesList.filter(emp => {
+        const matchesQuery = emp.name.toLowerCase().includes(query) || emp.code.toLowerCase().includes(query);
+        const matchesDept = deptVal === '' || emp.dept === deptVal;
+        return matchesQuery && matchesDept;
+      });
+      
+      filtered.forEach((emp, index) => {
+        const tr = document.createElement('tr');
+        const initials = emp.name.split(' ').map(n => n[0]).join('').toUpperCase();
+        const isPurple = index % 2 === 1;
+        
+        tr.innerHTML = `
+          <td>
+            <div class="table-avatar-cell">
+              <div class="avatar-cell-circle ${isPurple ? 'purple-tag' : ''}">${initials}</div>
+              <span class="avatar-cell-name">${emp.name}</span>
+            </div>
+          </td>
+          <td><span style="font-family:'JetBrains Mono', monospace;">${emp.code}</span></td>
+          <td>${emp.dept}</td>
+          <td>${emp.role}</td>
+          <td><span style="font-family:'JetBrains Mono', monospace;">$${emp.salary.toLocaleString('en-US', {minimumFractionDigits: 2})}</span></td>
+          <td>
+            <span class="ui-badge ${emp.status === 'ACTIVE' ? 'ui-badge-success' : 'ui-badge-warning'}">${emp.status}</span>
+          </td>
+          <td>
+            <button class="header-action-btn" style="width:28px; height:28px;" onclick="handleEmployeeActionClick('${emp.name}')">
+              <span class="material-icons" style="font-size:14px;">more_vert</span>
+            </button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+      document.getElementById('empPagCountLabel').textContent = `Showing 1 to ${filtered.length} of ${filtered.length} entries`;
+    }
+
+    // 10. Drag-and-Drop Shift Scheduler Board
+    function handleRosterDragStart(event) {
+      draggedRosterCardId = event.target.id;
+      event.dataTransfer.setData('text/plain', event.target.id);
+    }
+
+    function allowRosterDragOver(event) {
+      event.preventDefault();
+      event.currentTarget.classList.add('drop-target-active');
+    }
+
+    function handleRosterDragLeave(event) {
+      event.currentTarget.classList.remove('drop-target-active');
+    }
+
+    function handleRosterDrop(event, employeeName, shiftName) {
+      event.preventDefault();
+      event.currentTarget.classList.remove('drop-target-active');
+      
+      const cardId = event.dataTransfer.getData('text/plain') || draggedRosterCardId;
+      const cardElement = document.getElementById(cardId);
+      
+      if (cardElement && event.currentTarget.innerHTML.trim() === '') {
+        event.currentTarget.appendChild(cardElement);
+        
+        // Adjust badge time text based on shift slot target
+        const timeSpan = cardElement.querySelector('span.shift-time');
+        if (shiftName === 'Morning') timeSpan.textContent = '08:00 AM - 04:00 PM';
+        else if (shiftName === 'Evening') timeSpan.textContent = '04:00 PM - 12:00 AM';
+        else if (shiftName === 'Night') timeSpan.textContent = '12:00 AM - 08:00 AM';
+        
+        appendComplianceAuditLog(activeUser.username, 'ROSTER_REALLOCATION', `Reallocated ${employeeName} shift roster slot to ${shiftName}`);
+        triggerToastNotification(`Shift allocation updated for ${employeeName}.`, 'success');
+      }
+    }
+
+    // 11. Interactive Payroll Calculations
+    function recalculatePayrollState() {
+      const baseHrs = parseFloat(document.getElementById('payrollBaseHoursSlider').value);
+      const otHrs = parseFloat(document.getElementById('payrollOvertimeSlider').value);
+      const rate = parseFloat(document.getElementById('payrollHourlyRateSlider').value);
+      
+      // Update calculator meters
+      document.getElementById('payrollBaseHoursDisplay').textContent = `${baseHrs} hrs`;
+      document.getElementById('payrollOvertimeDisplay').textContent = `${otHrs} hrs`;
+      document.getElementById('payrollHourlyRateDisplay').textContent = `$${rate} / hr`;
+      
+      // Compute stubs
+      const regularEarnings = baseHrs * rate;
+      const otEarnings = otHrs * rate * 1.5;
+      const grossEarnings = regularEarnings + otEarnings;
+      
+      const fedTaxes = grossEarnings * 0.18;
+      const benefits = grossEarnings * 0.04;
+      const netPay = grossEarnings - fedTaxes - benefits;
+      
+      // Sync Payslip DOM
+      document.getElementById('payslipRegularEarnings').textContent = `$${regularEarnings.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
+      document.getElementById('payslipOvertimeEarnings').textContent = `$${otEarnings.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
+      document.getElementById('payslipGrossEarnings').textContent = `$${grossEarnings.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
+      
+      document.getElementById('payslipFederalTaxes').textContent = `-$${fedTaxes.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
+      document.getElementById('payslipBenefits').textContent = `-$${benefits.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
+      document.getElementById('payslipNetPay').textContent = `$${netPay.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
+    }
+
+    function triggerPayrollSubmit() {
+      const net = document.getElementById('payslipNetPay').textContent;
+      const code = document.getElementById('payslipEmployeeCode').textContent;
+      const name = document.getElementById('payslipEmployeeName').textContent;
+      
+      appendComplianceAuditLog(activeUser.username, 'PAYROLL_RUN', `Processed payroll calculations for ${name} (${code}) | Net Pay: ${net}`);
+      triggerToastNotification(`Payroll completed. Net payout: ${net}`, 'success');
+    }
+
+    // 12. Chat messaging systems
+    function handleActiveThreadChange(partnerKey) {
+      activeChatPartner = partnerKey;
+      document.querySelectorAll('.chat-thread-row').forEach(row => row.classList.remove('active-thread'));
+      
+      if (partnerKey === 'AV') {
+        document.getElementById('chatThreadAV').classList.add('active-thread');
+        document.getElementById('chatHeaderAvatar').textContent = 'AV';
+        document.getElementById('chatHeaderAvatar').style.background = '';
+        document.getElementById('chatHeaderName').textContent = 'Alice Vance';
+        document.getElementById('chatHeaderRole').textContent = 'STAFF ARCHITECT • ENGINEERING';
+        document.getElementById('payslipEmployeeName').textContent = 'Alice Vance';
+        document.getElementById('payslipEmployeeCode').textContent = 'EMP-014';
+      } else {
+        document.getElementById('chatThreadHR').classList.add('active-thread');
+        document.getElementById('chatHeaderAvatar').textContent = 'HR';
+        document.getElementById('chatHeaderAvatar').style.background = 'linear-gradient(135deg, var(--success), #059669)';
+        document.getElementById('chatHeaderName').textContent = 'HR General Channel';
+        document.getElementById('chatHeaderRole').textContent = 'COMPANY-WIDE BROADCASTS';
+        document.getElementById('payslipEmployeeName').textContent = 'Bob Miller';
+        document.getElementById('payslipEmployeeCode').textContent = 'EMP-015';
+      }
+      
+      renderChatLogFeed();
+      recalculatePayrollState();
+    }
+
+    function renderChatLogFeed() {
+      const box = document.getElementById('chatLogScrollBox');
+      box.innerHTML = '';
+      
+      const list = chatMessages[activeChatPartner] || [];
+      list.forEach(msg => {
+        const wrap = document.createElement('div');
+        wrap.className = `bubble-wrapper ${msg.sender === 'user' ? 'user-msg' : 'partner-msg'}`;
+        
+        wrap.innerHTML = `
+          <div class="chat-bubble-card">
+            ${msg.text}
+            <span class="chat-bubble-time">${msg.time}</span>
+          </div>
+        `;
+        box.appendChild(wrap);
+      });
+      
+      box.scrollTop = box.scrollHeight;
+    }
+
+    function handleChatInputKeyPress(event) {
+      if (event.key === 'Enter') submitUserChatMessage();
+    }
+
+    function submitUserChatMessage() {
+      const input = document.getElementById('chatMessageTextInput');
+      const txt = input.value.trim();
+      if (!txt) return;
+      
+      input.value = '';
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+      
+      // Append user bubble
+      chatMessages[activeChatPartner].push({
+        sender: 'user',
+        text: txt,
+        time: timeStr
+      });
+      
+      document.getElementById('threadAVSnippet').textContent = `You: ${txt}`;
+      renderChatLogFeed();
+      
+      // Simulated response
+      if (activeChatPartner === 'AV') {
+        setTimeout(() => {
+          chatMessages['AV'].push({
+            sender: 'partner',
+            text: 'Understood. Telemetry packets are fully aligned on my end.',
+            time: timeStr
+          });
+          document.getElementById('threadAVSnippet').textContent = `Alice: Understood. Telemetry packets are...`;
+          
+          if (document.getElementById('page-messages').classList.contains('active-page')) {
+            renderChatLogFeed();
+          } else {
+            document.getElementById('threadAVBadgeCount').style.display = 'inline-block';
+          }
+        }, 1500);
+      }
+    }
+
+    // 13. AI Assistant Console streaming logic
+    function toggleAiPanelDisplay() {
+      const panel = document.getElementById('aiSidePanel');
+      const button = document.getElementById('btnNeuralCoreOrb');
+      const icon = document.getElementById('orbCenterIcon');
+      
+      panel.classList.toggle('active-panel');
+      button.classList.toggle('active-orb');
+      
+      if (panel.classList.contains('active-panel')) {
+        icon.textContent = 'close';
+      } else {
+        icon.textContent = 'psychology';
+      }
+    }
+
+    function handleAiInputKeyPress(event) {
+      if (event.key === 'Enter') submitAiQueryText();
+    }
+
+    function submitAiQueryText() {
+      const input = document.getElementById('aiQueryTextInput');
+      const txt = input.value.trim();
+      if (!txt) return;
+      
+      input.value = '';
+      const area = document.getElementById('aiMessagesLogs');
+      
+      // User bubble
+      const userRow = document.createElement('div');
+      userRow.className = 'ai-bubble-row user';
+      userRow.innerHTML = `<div class="ai-bubble-card">${txt}</div>`;
+      area.appendChild(userRow);
+      area.scrollTop = area.scrollHeight;
+      
+      // Dot typing load bubble
+      const loadRow = document.createElement('div');
+      loadRow.className = 'ai-bubble-row system';
+      loadRow.id = 'aiTypingLoaderBubble';
+      loadRow.innerHTML = `
+        <div class="ai-bubble-card">
+          <span class="ai-bubble-sys-header">SYSTEM_CORE</span>
+          <div class="typing-dots"><span></span><span></span><span></span></div>
+        </div>
+      `;
+      area.appendChild(loadRow);
+      area.scrollTop = area.scrollHeight;
+      
+      // Response dispatcher
+      setTimeout(() => {
+        const loader = document.getElementById('aiTypingLoaderBubble');
+        if (loader) loader.remove();
+        
+        let responseText = 'QUERY_RESOLVED. Gateway indicators nominal. Compliance levels verified.';
+        if (txt.toLowerCase().includes('roster') || txt.toLowerCase().includes('schedule')) {
+          responseText = 'ROSTER_TELEMETRY: Sector NY-01 roster compliance is at 98.4%. Alice Vance is active on Morning Shift.';
+        } else if (txt.toLowerCase().includes('employee')) {
+          responseText = `DIRECTORY_METRICS: Currently tracking ${employeesList.length} active employee logs. Sync is functional.`;
+        } else if (txt.toLowerCase().includes('payroll')) {
+          responseText = 'PAYROLL_STATUS: Calculation engine parsed. Federal tax withholding computed at standard 18%.';
+        }
+        
+        const sysRow = document.createElement('div');
+        sysRow.className = 'ai-bubble-row system';
+        sysRow.innerHTML = `
+          <div class="ai-bubble-card">
+            <span class="ai-bubble-sys-header">SYSTEM_CORE</span>
+            ${responseText}
+          </div>
+        `;
+        area.appendChild(sysRow);
+        area.scrollTop = area.scrollHeight;
+      }, 1200);
+    }
+
+    function clearAiSessionLog() {
+      document.getElementById('aiMessagesLogs').innerHTML = `
+        <div class="ai-bubble-row system">
+          <div class="ai-bubble-card">
+            <span class="ai-bubble-sys-header">SYSTEM_CORE</span>
+            CONTEXT_PURGED. Core re-initialized. Ready for operational inquiry.
+          </div>
+        </div>
+      `;
+    }
+
+    // 14. Global Interface Theme Switcher
+    function toggleInterfaceTheme() {
+      const body = document.body;
+      const icon = document.getElementById('themeTogglerIcon');
+      
+      body.classList.toggle('global-dark-mode');
+      
+      if (body.classList.contains('global-dark-mode')) {
+        icon.textContent = 'light_mode';
+        triggerToastNotification('Theme switched to Dark mode.', 'info');
+      } else {
+        icon.textContent = 'dark_mode';
+        triggerToastNotification('Theme switched to Light mode.', 'info');
+      }
+    }
+
+    // 15. Active Role Emulation Engine (Sandbox)
+    function setEmulatedRole(role) {
+      emulatedRole = role;
+      
+      // Update banner indicators
+      document.querySelectorAll('.sandbox-btn').forEach(btn => btn.classList.remove('active'));
+      
+      // Profile labels
+      const userCardAvatar = document.getElementById('sidebarUserAvatar');
+      const userCardName = document.getElementById('sidebarUsername');
+      const userCardRole = document.getElementById('sidebarUserRole');
+      
+      // Nav links elements
+      const navCompliance = document.getElementById('nav-compliance');
+      const navPermissions = document.getElementById('nav-permissions');
+      const navEmployees = document.getElementById('nav-employees');
+      const navPayroll = document.getElementById('nav-payroll');
+      
+      // Breadcrumb label resetting
+      switchActiveView('dashboard', document.getElementById('nav-dashboard'));
+      
+      if (role === 'ADMIN') {
+        document.getElementById('btnRoleAdmin').classList.add('active');
+        activeUser = { username: 'Ops Admin', role: 'ROLE_ADMIN', avatar: 'OA' };
+        
+        // Show everything
+        navCompliance.style.display = 'flex';
+        navPermissions.style.display = 'flex';
+        navEmployees.style.display = 'flex';
+        navPayroll.style.display = 'flex';
+        document.getElementById('lbl-sec-admin').style.display = 'block';
+        document.getElementById('lbl-sec-workforce').style.display = 'block';
+        
+      } else if (role === 'MANAGER') {
+        document.getElementById('btnRoleManager').classList.add('active');
+        activeUser = { username: 'Bob Miller', role: 'ROLE_MANAGER', avatar: 'BM' };
+        
+        // Hide Admin compliance/permissions
+        navCompliance.style.display = 'none';
+        navPermissions.style.display = 'none';
+        navEmployees.style.display = 'flex';
+        navPayroll.style.display = 'flex';
+        document.getElementById('lbl-sec-admin').style.display = 'none';
+        document.getElementById('lbl-sec-workforce').style.display = 'block';
+        
+      } else if (role === 'EMPLOYEE') {
+        document.getElementById('btnRoleEmployee').classList.add('active');
+        activeUser = { username: 'Alice Vance', role: 'ROLE_EMPLOYEE', avatar: 'AV' };
+        
+        // Hide Admin features & other directories
+        navCompliance.style.display = 'none';
+        navPermissions.style.display = 'none';
+        navEmployees.style.display = 'none';
+        navPayroll.style.display = 'none';
+        document.getElementById('lbl-sec-admin').style.display = 'none';
+        document.getElementById('lbl-sec-workforce').style.display = 'none';
+      }
+      
+      // Sync footer user profiles card
+      userCardAvatar.textContent = activeUser.avatar;
+      userCardName.textContent = activeUser.username;
+      userCardRole.textContent = activeUser.role;
+      
+      appendComplianceAuditLog(activeUser.username, 'ROLE_EMULATION_SWITCH', `Active terminal profile switched to ${role}`);
+      triggerToastNotification(`Active profile switched to ${role}`, 'info');
+    }
+
+    // 16. Authentication trigger from login page
+    function submitAuthLogin() {
+      const email = document.getElementById('authEmailInput').value.trim();
+      if (!email) {
+        alert('Please fill out authentication email credentials.');
+        return;
+      }
+      
+      document.getElementById('authGateView').classList.add('hidden');
+      appendComplianceAuditLog(activeUser.username, 'USER_LOGIN', 'User successfully authenticated session via JWT token');
+      triggerToastNotification('Authentication successful. Welcome.', 'success');
+    }
+
+    function handleLogoutClick() {
+      if (confirm('De-authenticate session from this console terminal?')) {
+        document.getElementById('authGateView').classList.remove('hidden');
+        setEmulatedRole('ADMIN');
+      }
+    }
+
+    // 17. Interactive Toast Messaging system
+    function triggerToastNotification(message, severity = 'info') {
+      const container = document.getElementById('toastContainer');
+      const toast = document.createElement('div');
+      toast.className = `toast-card ${severity}-toast`;
+      
+      let icon = 'info';
+      if (severity === 'success') icon = 'check_circle';
+      else if (severity === 'warning') icon = 'warning';
+      else if (severity === 'danger') icon = 'error';
+      
+      toast.innerHTML = `
+        <span class="material-icons" style="font-size: 16px;">${icon}</span>
+        <span>${message}</span>
+      `;
+      
+      container.appendChild(toast);
+      
+      // Auto dismiss after 3 seconds
+      setTimeout(() => {
+        toast.style.animation = 'toastReveal 0.3s var(--ease) reverse both';
+        setTimeout(() => toast.remove(), 300);
+      }, 3000);
+    }
+
+    function triggerScopeMatrixSave() {
+      triggerToastNotification('Workspace capability scopes matrix updated.', 'success');
+      appendComplianceAuditLog(activeUser.username, 'RBAC_UPDATE', 'Altered administrative scope matrices permissions settings');
+    }
+  </script>
+</body>
+</html>

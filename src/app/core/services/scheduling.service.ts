@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ApiService } from './api.service';
 import { Observable } from 'rxjs';
+import { environment } from '../../../environments/environment';
 
 export interface Shift {
   id: number;
@@ -10,8 +11,10 @@ export interface Shift {
   departmentId: number;
   startTime: string;
   endTime: string;
+  area?: string;
+  role?: string;
   status: string; // PUBLISHED, DRAFT, COMPLETED
-  notes: string;
+  notes?: string;
   // UI fields
   employeeName?: string;
   departmentName?: string;
@@ -38,7 +41,7 @@ export interface ShiftConflictResponse {
 
 @Injectable({ providedIn: 'root' })
 export class SchedulingService {
-  private readonly baseUrl = 'http://localhost:8080';
+  private readonly baseUrl = environment.apiBaseUrl;
   constructor(private readonly api: ApiService) {}
 
   getShifts(): Observable<Shift[]> {
@@ -59,6 +62,10 @@ export class SchedulingService {
 
   updateStatus(id: number, status: string): Observable<Shift> {
     return this.api.patch<Shift>(`/api/shifts/${id}/status?status=${status}`, {}, undefined, this.baseUrl);
+  }
+
+  deleteShift(id: number): Observable<void> {
+    return this.api.delete<void>(`/api/shifts/${id}`, undefined, this.baseUrl);
   }
 
   extractShiftConflict(error: unknown): ShiftConflictResponse | null {

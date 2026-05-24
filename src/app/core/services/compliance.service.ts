@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { ApiService } from './api.service';
 import { Observable } from 'rxjs';
+import { environment } from '../../../environments/environment';
 
 export interface ComplianceRule {
   id: number;
@@ -22,15 +23,15 @@ export interface AuditTrail {
 
 @Injectable({ providedIn: 'root' })
 export class ComplianceService {
-  private readonly baseUrl = 'http://localhost:8080';
+  private readonly baseUrl = environment.apiBaseUrl;
   constructor(private readonly api: ApiService) {}
 
   getRules(): Observable<ComplianceRule[]> {
-    return this.api.get<ComplianceRule[]>('/api/compliance/rules', [], this.baseUrl);
+    return this.api.get<ComplianceRule[]>('/api/compliance-rules', [], this.baseUrl);
   }
 
   getAuditTrails(): Observable<AuditTrail[]> {
-    return this.api.get<AuditTrail[]>('/api/compliance/audit-trails', [], this.baseUrl);
+    return this.api.get<AuditTrail[]>('/api/audit-trails', [], this.baseUrl);
   }
 
   checkCompliance(employeeId: number): Observable<any> {

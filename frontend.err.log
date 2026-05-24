@@ -1,0 +1,182 @@
+[1m[33m[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mNG8113: EmployeeFormComponent is not used within the template of EmployeesPageComponent[0m [1m[35m[plugin angular-compiler][0m
+
+    src/app/features/employees/employees-page.component.ts:30:25:
+[37m      30 │     PageHeaderComponent, [32mEmployeeFormComponent[37m
+         ╵                          [32m~~~~~~~~~~~~~~~~~~~~~[0m
+
+[39m[22m
+[1m[33m[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mNG8113: EmployeeFormComponent is not used within the template of EmployeesPageComponent[0m [1m[35m[plugin angular-compiler][0m
+
+    src/app/features/employees/employees-page.component.ts:30:25:
+[37m      30 │     PageHeaderComponent, [32mEmployeeFormComponent[37m
+         ╵                          [32m~~~~~~~~~~~~~~~~~~~~~[0m
+
+[39m[22m
+[1m[31m[31mX [41;31m[[41;97mERROR[41;31m][0m [1mTS2304: Cannot find name 'combineLatest'.[0m [1m[35m[plugin angular-compiler][0m
+
+    src/app/core/services/dashboard.service.ts:41:4:
+[37m      41 │     [32mcombineLatest[37m([
+         ╵     [32m~~~~~~~~~~~~~[0m
+
+
+[31mX [41;31m[[41;97mERROR[41;31m][0m [1mTS7031: Binding element 'employees' implicitly has an 'any' type.[0m [1m[35m[plugin angular-compiler][0m
+
+    src/app/core/services/dashboard.service.ts:46:19:
+[37m      46 │     ]).subscribe(([[32memployees[37m, attendance, approvedLeaves, admin]) ...
+         ╵                    [32m~~~~~~~~~[0m
+
+
+[31mX [41;31m[[41;97mERROR[41;31m][0m [1mTS7031: Binding element 'attendance' implicitly has an 'any' type.[0m [1m[35m[plugin angular-compiler][0m
+
+    src/app/core/services/dashboard.service.ts:46:30:
+[37m      46 │     ]).subscribe(([employees, [32mattendance[37m, approvedLeaves, admin]) ...
+         ╵                               [32m~~~~~~~~~~[0m
+
+
+[31mX [41;31m[[41;97mERROR[41;31m][0m [1mTS7031: Binding element 'approvedLeaves' implicitly has an 'any' type.[0m [1m[35m[plugin angular-compiler][0m
+
+    src/app/core/services/dashboard.service.ts:46:42:
+[37m      46 │ ...]).subscribe(([employees, attendance, [32mapprovedLeaves[37m, admin]) => {
+         ╵                                          [32m~~~~~~~~~~~~~~[0m
+
+
+[31mX [41;31m[[41;97mERROR[41;31m][0m [1mTS7031: Binding element 'admin' implicitly has an 'any' type.[0m [1m[35m[plugin angular-compiler][0m
+
+    src/app/core/services/dashboard.service.ts:46:58:
+[37m      46 │ ...]).subscribe(([employees, attendance, approvedLeaves, [32madmin[37m]) => {
+         ╵                                                          [32m~~~~~[0m
+
+
+[31mX [41;31m[[41;97mERROR[41;31m][0m [1mTS7006: Parameter 'a' implicitly has an 'any' type.[0m [1m[35m[plugin angular-compiler][0m
+
+    src/app/core/services/dashboard.service.ts:49:74:
+[37m      49 │ ...lyClockedIn ?? attendance.filter([32ma[37m => a.clockOut === null).length;
+         ╵                                     [32m^[0m
+
+
+[31mX [41;31m[[41;97mERROR[41;31m][0m [1mTS7006: Parameter 'a' implicitly has an 'any' type.[0m [1m[35m[plugin angular-compiler][0m
+
+    src/app/core/services/dashboard.service.ts:54:42:
+[37m      54 │       const lateCount = attendance.filter([32ma[37m => a.isLate).length || 0;
+         ╵                                           [32m^[0m
+
+[39m[22m
+[1m[33m[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mNG8113: EmployeeFormComponent is not used within the template of EmployeesPageComponent[0m [1m[35m[plugin angular-compiler][0m
+
+    src/app/features/employees/employees-page.component.ts:30:25:
+[37m      30 │     PageHeaderComponent, [32mEmployeeFormComponent[37m
+         ╵                          [32m~~~~~~~~~~~~~~~~~~~~~[0m
+
+[39m[22m
+[1m[33m[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mNG8113: EmployeeFormComponent is not used within the template of EmployeesPageComponent[0m [1m[35m[plugin angular-compiler][0m
+
+    src/app/features/employees/employees-page.component.ts:30:25:
+[37m      30 │     PageHeaderComponent, [32mEmployeeFormComponent[37m
+         ╵                          [32m~~~~~~~~~~~~~~~~~~~~~[0m
+
+[39m[22m
+[1m[33m[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mNG8113: EmployeeFormComponent is not used within the template of EmployeesPageComponent[0m [1m[35m[plugin angular-compiler][0m
+
+    src/app/features/employees/employees-page.component.ts:30:25:
+[37m      30 │     PageHeaderComponent, [32mEmployeeFormComponent[37m
+         ╵                          [32m~~~~~~~~~~~~~~~~~~~~~[0m
+
+[39m[22m
+[1m[33m[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mNG8113: EmployeeFormComponent is not used within the template of EmployeesPageComponent[0m [1m[35m[plugin angular-compiler][0m
+
+    src/app/features/employees/employees-page.component.ts:30:25:
+[37m      30 │     PageHeaderComponent, [32mEmployeeFormComponent[37m
+         ╵                          [32m~~~~~~~~~~~~~~~~~~~~~[0m
+
+[39m[22m
+[1m[33m[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mNG8113: EmployeeFormComponent is not used within the template of EmployeesPageComponent[0m [1m[35m[plugin angular-compiler][0m
+
+    src/app/features/employees/employees-page.component.ts:30:25:
+[37m      30 │     PageHeaderComponent, [32mEmployeeFormComponent[37m
+         ╵                          [32m~~~~~~~~~~~~~~~~~~~~~[0m
+
+[39m[22m
+[1m[33m[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mNG8113: EmployeeFormComponent is not used within the template of EmployeesPageComponent[0m [1m[35m[plugin angular-compiler][0m
+
+    src/app/features/employees/employees-page.component.ts:30:25:
+[37m      30 │     PageHeaderComponent, [32mEmployeeFormComponent[37m
+         ╵                          [32m~~~~~~~~~~~~~~~~~~~~~[0m
+
+[39m[22m
+[1m[33m[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mNG8113: EmployeeFormComponent is not used within the template of EmployeesPageComponent[0m [1m[35m[plugin angular-compiler][0m
+
+    src/app/features/employees/employees-page.component.ts:30:25:
+[37m      30 │     PageHeaderComponent, [32mEmployeeFormComponent[37m
+         ╵                          [32m~~~~~~~~~~~~~~~~~~~~~[0m
+
+[39m[22m
+[1m[33m[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mNG8113: EmployeeFormComponent is not used within the template of EmployeesPageComponent[0m [1m[35m[plugin angular-compiler][0m
+
+    src/app/features/employees/employees-page.component.ts:30:25:
+[37m      30 │     PageHeaderComponent, [32mEmployeeFormComponent[37m
+         ╵                          [32m~~~~~~~~~~~~~~~~~~~~~[0m
+
+[39m[22m
+[1m[33m[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mNG8113: EmployeeFormComponent is not used within the template of EmployeesPageComponent[0m [1m[35m[plugin angular-compiler][0m
+
+    src/app/features/employees/employees-page.component.ts:30:25:
+[37m      30 │     PageHeaderComponent, [32mEmployeeFormComponent[37m
+         ╵                          [32m~~~~~~~~~~~~~~~~~~~~~[0m
+
+[39m[22m
+[1m[33m[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mNG8113: EmployeeFormComponent is not used within the template of EmployeesPageComponent[0m [1m[35m[plugin angular-compiler][0m
+
+    src/app/features/employees/employees-page.component.ts:30:25:
+[37m      30 │     PageHeaderComponent, [32mEmployeeFormComponent[37m
+         ╵                          [32m~~~~~~~~~~~~~~~~~~~~~[0m
+
+[39m[22m
+[1m[31m[31mX [41;31m[[41;97mERROR[41;31m][0m [1mTS2339: Property 'onDownloadPdf' does not exist on type 'PayrollPageComponent'.[0m [1m[35m[plugin angular-compiler][0m
+
+    src/app/features/payroll/payroll-page.component.ts:167:95:
+[37m      167 │ ...rimary" class="rounded-lg px-6" (click)="[32monDownloadPdf[37m(payslip)">
+          ╵                                             [32m~~~~~~~~~~~~~[0m
+
+[39m[22m
+[1m[33m[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mNG8113: EmployeeFormComponent is not used within the template of EmployeesPageComponent[0m [1m[35m[plugin angular-compiler][0m
+
+    src/app/features/employees/employees-page.component.ts:30:25:
+[37m      30 │     PageHeaderComponent, [32mEmployeeFormComponent[37m
+         ╵                          [32m~~~~~~~~~~~~~~~~~~~~~[0m
+
+[39m[22m
+[1m[31m[31mX [41;31m[[41;97mERROR[41;31m][0m [1mTS2339: Property 'onDownloadPdf' does not exist on type 'PayrollPageComponent'.[0m [1m[35m[plugin angular-compiler][0m
+
+    src/app/features/payroll/payroll-page.component.ts:167:95:
+[37m      167 │ ...rimary" class="rounded-lg px-6" (click)="[32monDownloadPdf[37m(payslip)">
+          ╵                                             [32m~~~~~~~~~~~~~[0m
+
+
+[31mX [41;31m[[41;97mERROR[41;31m][0m [1mTS2339: Property 'onDownloadPdf' does not exist on type 'PayrollPageComponent'.[0m [1m[35m[plugin angular-compiler][0m
+
+    src/app/features/payroll/payroll-page.component.ts:297:71:
+[37m      297 │ ...color="primary" (click)="[32monDownloadPdf[37m(row)" matTooltip="Downl...
+          ╵                             [32m~~~~~~~~~~~~~[0m
+
+[39m[22m
+[1m[33m[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mNG8113: EmployeeFormComponent is not used within the template of EmployeesPageComponent[0m [1m[35m[plugin angular-compiler][0m
+
+    src/app/features/employees/employees-page.component.ts:30:25:
+[37m      30 │     PageHeaderComponent, [32mEmployeeFormComponent[37m
+         ╵                          [32m~~~~~~~~~~~~~~~~~~~~~[0m
+
+[39m[22m
+[1m[33m[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mNG8113: EmployeeFormComponent is not used within the template of EmployeesPageComponent[0m [1m[35m[plugin angular-compiler][0m
+
+    src/app/features/employees/employees-page.component.ts:30:25:
+[37m      30 │     PageHeaderComponent, [32mEmployeeFormComponent[37m
+         ╵                          [32m~~~~~~~~~~~~~~~~~~~~~[0m
+
+[39m[22m
+[1m[33m[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mNG8113: EmployeeFormComponent is not used within the template of EmployeesPageComponent[0m [1m[35m[plugin angular-compiler][0m
+
+    src/app/features/employees/employees-page.component.ts:30:25:
+[37m      30 │     PageHeaderComponent, [32mEmployeeFormComponent[37m
+         ╵                          [32m~~~~~~~~~~~~~~~~~~~~~[0m
+
+[39m[22m

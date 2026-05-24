@@ -1,6 +1,5 @@
-import { Injectable, inject, signal, effect } from '@angular/core';
+import { Injectable, inject, signal } from '@angular/core';
 import { ApiService } from './api.service';
-import { AuthService } from './auth.service';
 import { tap } from 'rxjs';
 
 export interface CompanyTheme {
@@ -13,94 +12,69 @@ export interface CompanyTheme {
   logoUrl?: string;
 }
 
-@Injectable({ providedIn: 'root' })
+@Injectable({
+  providedIn: 'root'
+})
 export class ThemeService {
   private readonly api = inject(ApiService);
-  private readonly auth = inject(AuthService);
-  private readonly themeState = signal<CompanyTheme | null>(null);
+  private readonly THEME_KEY = 'ewms-theme';
   
-  readonly currentTheme = this.themeState.asReadonly();
+  isDarkMode = signal<boolean>(false);
+  currentTheme = signal<CompanyTheme | null>(null);
 
   constructor() {
-    // Automatically fetch and apply theme when user logs in
-    effect(() => {
-      const user = this.auth.user();
-      if (user?.companyId) {
-        this.fetchCompanyTheme(user.companyId);
-      }
-    });
-
-    // Apply theme to document
-    effect(() => {
-      const theme = this.themeState();
-      if (theme) {
-        this.applyTheme(theme);
-      }
-    });
+    const saved = localStorage.getItem(this.THEME_KEY);
+    if (saved) {
+      this.isDarkMode.set(saved === 'dark');
+    } else {
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      this.isDarkMode.set(prefersDark);
+    }
+    this.applyTheme();
   }
 
-  private fetchCompanyTheme(companyId: number): void {
-    this.api.get<any>(`/api/organization/companies/${companyId}`, null, 'http://localhost:8080').subscribe(company => {
-      if (company) {
-        this.themeState.set({
-          primaryColor: company.primaryColor || '#2563eb',
-          secondaryColor: company.secondaryColor || '#64748b',
-          accentColor: company.accentColor || '#14b8a6',
-          backgroundColor: company.backgroundColor || '#f8fafc',
-          textColor: company.textColor || '#0f172a',
-          themeMode: company.themeMode || 'LIGHT',
-          logoUrl: company.logoUrl
-        });
-      }
-    });
+  toggleTheme() {
+    this.isDarkMode.set(!this.isDarkMode());
+    localStorage.setItem(this.THEME_KEY, this.isDarkMode() ? 'dark' : 'light');
+    this.applyTheme();
   }
 
-  updateTheme(companyId: number, theme: Partial<CompanyTheme>) {
-    return this.api.put<any>(`/api/organization/companies/${companyId}`, theme, undefined, 'http://localhost:8080').pipe(
-      tap(() => this.fetchCompanyTheme(companyId))
+  updateTheme(companyId: number, theme: CompanyTheme) {
+    return this.api.put<CompanyTheme>(`/api/organization/companies/${companyId}/branding`, theme).pipe(
+      tap(updated => {
+        this.currentTheme.set(updated);
+        this.applyBranding(updated);
+      })
     );
   }
 
   resetTheme(companyId: number) {
-    return this.api.post<any>(`/api/organization/companies/${companyId}/reset-theme`, {}, undefined, 'http://localhost:8080').pipe(
-      tap(() => this.fetchCompanyTheme(companyId))
+    return this.api.delete<void>(`/api/organization/companies/${companyId}/branding`).pipe(
+      tap(() => {
+        this.currentTheme.set(null);
+        this.clearBranding();
+      })
     );
   }
 
-  private applyTheme(theme: CompanyTheme): void {
-    const root = document.documentElement;
-    
-    root.style.setProperty('--primary-brand', theme.primaryColor);
-    root.style.setProperty('--secondary-brand', theme.secondaryColor);
-    root.style.setProperty('--accent-brand', theme.accentColor);
-    root.style.setProperty('--bg-brand', theme.backgroundColor);
-    root.style.setProperty('--text-brand', theme.textColor);
-    
-    // Auto-detect dark mode
-    const isDark = theme.themeMode === 'DARK' || 
-                  (theme.themeMode === 'SYSTEM' && window.matchMedia('(prefers-color-scheme: dark)').matches);
-    
-    if (isDark) {
-      root.classList.add('global-dark-mode');
+  private applyTheme() {
+    if (this.isDarkMode()) {
+      document.body.classList.add('global-dark-mode');
     } else {
-      root.classList.remove('global-dark-mode');
+      document.body.classList.remove('global-dark-mode');
     }
-
-    // Favicon & Title logic
-    if (theme.logoUrl) {
-      this.updateFavicon(theme.logoUrl);
-    }
-    
-    console.log('[ThemeService] Applied Company Theme:', theme);
   }
 
-  private updateFavicon(url: string): void {
-    let link: HTMLLinkElement | null = document.querySelector("link[rel*='icon']");
-    if (!link) {
-      link = document.createElement('link');
-      link.rel = 'icon';
-      document.getElementsByTagName('head')[0].appendChild(link);
-    }
-    link.href = url;
+  private applyBranding(theme: CompanyTheme) {
+    const root = document.documentElement;
+    root.style.setProperty('--primary', theme.primaryColor);
+    root.style.setProperty('--accent', theme.accentColor);
+    // ... apply other properties if needed
+  }
+
+  private clearBranding() {
+    const root = document.documentElement;
+    root.style.removeProperty('--primary');
+    root.style.removeProperty('--accent');
   }
 }

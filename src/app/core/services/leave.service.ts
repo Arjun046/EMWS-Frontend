@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { ApiService } from './api.service';
 import { Observable } from 'rxjs';
+import { environment } from '../../../environments/environment';
 
 export enum LeaveType {
   VACATION = 'VACATION',
@@ -42,30 +43,36 @@ export interface LeaveBalance {
 
 @Injectable({ providedIn: 'root' })
 export class LeaveService {
-  private readonly baseUrl = 'http://localhost:8080';
+  private readonly baseUrl = environment.apiBaseUrl;
   constructor(private readonly api: ApiService) {}
 
   createRequest(request: Partial<LeaveRequest>): Observable<LeaveRequest> {
     return this.api.post<LeaveRequest>('/api/leaves', request, undefined, this.baseUrl);
   }
 
-  getEmployeeRequests(employeeId: number): Observable<LeaveRequest[]> {
-    return this.api.get<LeaveRequest[]>(`/api/leaves/employee/${employeeId}`, [], this.baseUrl);
+  getMyRequests(): Observable<LeaveRequest[]> {
+    return this.api.get<LeaveRequest[]>('/api/leaves/me', [], this.baseUrl);
+  }
+
+  getMyBalances(): Observable<LeaveBalance[]> {
+    return this.api.get<LeaveBalance[]>('/api/leaves/me/balances', [], this.baseUrl);
+  }
+
+  getCompanyRequests(status?: LeaveStatus): Observable<LeaveRequest[]> {
+    const params: string[] = [];
+    if (status) params.push(`status=${status}`);
+    const query = params.length ? `?${params.join('&')}` : '';
+    return this.api.get<LeaveRequest[]>(`/api/leaves/company${query}`, [], this.baseUrl);
   }
 
   getRequestsByStatus(status: LeaveStatus): Observable<LeaveRequest[]> {
-    return this.api.get<LeaveRequest[]>(`/api/leaves/status/${status}`, [], this.baseUrl);
+    return this.getCompanyRequests(status);
   }
 
   updateStatus(id: number, status: LeaveStatus, comments?: string): Observable<LeaveRequest> {
-    const params = new URLSearchParams();
-    params.append('status', status);
-    if (comments) params.append('comments', comments);
-    return this.api.patch<LeaveRequest>(`/api/leaves/${id}/status?${params.toString()}`, {}, undefined, this.baseUrl);
-  }
-
-  getBalances(employeeId: number): Observable<LeaveBalance[]> {
-    return this.api.get<LeaveBalance[]>(`/api/leaves/balances/${employeeId}`, [], this.baseUrl);
+    let url = `/api/leaves/${id}/status?status=${status}`;
+    if (comments) url += `&comments=${encodeURIComponent(comments)}`;
+    return this.api.patch<LeaveRequest>(url, {}, undefined, this.baseUrl);
   }
 
   cancelRequest(id: number): Observable<void> {

@@ -1,0 +1,98 @@
+
+> ewms-frontend@0.0.0 start
+> ng serve --host 0.0.0.0
+
+[33m>[39m Building...
+[32m√[39m Building...
+[1mInitial chunk files[22m[2m | [22m[1mNames[22m               [2m | [22m [1mRaw size[22m
+[32mmain.js[39m            [2m | [22m[2mmain[22m                [2m | [22m [36m69.16 kB[39m[2m | [22m
+[32mchunk-E3CYE5C2.js[39m  [2m | [22m[2m-[22m                   [2m | [22m  [36m6.70 kB[39m[2m | [22m
+[32mstyles.css[39m         [2m | [22m[2mstyles[22m              [2m | [22m  [36m4.72 kB[39m[2m | [22m
+[32mchunk-E7QIPN7C.js[39m  [2m | [22m[2m-[22m                   [2m | [22m  [36m3.45 kB[39m[2m | [22m
+[32mchunk-J4S65XCX.js[39m  [2m | [22m[2m-[22m                   [2m | [22m  [36m3.27 kB[39m[2m | [22m
+[32mchunk-AI5W5A7T.js[39m  [2m | [22m[2m-[22m                   [2m | [22m  [36m3.07 kB[39m[2m | [22m
+[32mchunk-MSE2R5QK.js[39m  [2m | [22m[2m-[22m                   [2m | [22m  [36m2.42 kB[39m[2m | [22m
+[32mchunk-VUJOFXKG.js[39m  [2m | [22m[2m-[22m                   [2m | [22m[36m938 bytes[39m[2m | [22m
+[32mpolyfills.js[39m       [2m | [22m[2mpolyfills[22m           [2m | [22m [36m95 bytes[39m[2m | [22m
+
+[1m [22m                  [2m | [22m[1mInitial total[22m       [2m | [22m [1m93.83 kB[22m
+
+[1mLazy chunk files[22m   [2m | [22m[1mNames[22m               [2m | [22m [1mRaw size[22m
+[32mchunk-UF774OIA.js[39m  [2m | [22m[2mattendance-routes[22m   [2m | [22m [36m81.32 kB[39m[2m | [22m
+[32mchunk-E3QWELOJ.js[39m  [2m | [22m[2mreports-routes[22m      [2m | [22m [36m70.22 kB[39m[2m | [22m
+[32mchunk-2J4BBYNS.js[39m  [2m | [22m[2mhelpdesk-routes[22m     [2m | [22m [36m63.49 kB[39m[2m | [22m
+[32mchunk-BNMRJHO2.js[39m  [2m | [22m[2mauth-routes[22m         [2m | [22m [36m56.65 kB[39m[2m | [22m
+[32mchunk-7I5AUNDK.js[39m  [2m | [22m[2memployees-routes[22m    [2m | [22m [36m55.57 kB[39m[2m | [22m
+[32mchunk-IQMBI4BB.js[39m  [2m | [22m[2mannouncements-routes[22m[2m | [22m [36m44.76 kB[39m[2m | [22m
+[32mchunk-ANRQ2LEO.js[39m  [2m | [22m[2morganization-routes[22m [2m | [22m [36m41.61 kB[39m[2m | [22m
+[32mchunk-ZFPMNREG.js[39m  [2m | [22m[2mdashboard-routes[22m    [2m | [22m [36m38.99 kB[39m[2m | [22m
+[32mchunk-XZDNEIMS.js[39m  [2m | [22m[2mscheduling-routes[22m   [2m | [22m [36m36.33 kB[39m[2m | [22m
+[32mchunk-WXYT6CLS.js[39m  [2m | [22m[2mnotifications-routes[22m[2m | [22m [36m35.33 kB[39m[2m | [22m
+[32mchunk-DPASIDF4.js[39m  [2m | [22m[2mteam-calendar-routes[22m[2m | [22m [36m34.66 kB[39m[2m | [22m
+[32mchunk-5Z325LQV.js[39m  [2m | [22m[2mdocuments-routes[22m    [2m | [22m [36m32.24 kB[39m[2m | [22m
+[32mchunk-JDA56KCF.js[39m  [2m | [22m[2mpayroll-routes[22m      [2m | [22m [36m27.67 kB[39m[2m | [22m
+[32mchunk-5DCEQHZP.js[39m  [2m | [22m[2manalytics-routes[22m    [2m | [22m [36m27.43 kB[39m[2m | [22m
+[32mchunk-473SPNV6.js[39m  [2m | [22m[2mtasks-routes[22m        [2m | [22m [36m22.22 kB[39m[2m | [22m
+[2m...and 15 more lazy chunks files. Use "--verbose" to show all the files.[22m
+
+Application bundle generation complete. [10.901 seconds] - 2026-05-17T12:12:23.259Z
+
+Watch mode enabled. Watching for file changes...
+NOTE: Raw file sizes do not reflect development server per-request transformations.
+  [32m➜[39m  [1mLocal[22m:   [36mhttp://localhost:[1m4200[22m/[39m
+  [32m➜[39m  [1mNetwork[22m: [36mhttp://192.168.1.6:[1m4200[22m/[39m
+[33m>[39m Changes detected. Rebuilding...
+[32m√[39m Changes detected. Rebuilding...
+[1mInitial chunk files[22m[2m | [22m[1mNames[22m      [2m | [22m[1mRaw size[22m
+[32mmain.js[39m            [2m | [22m[2mmain[22m       [2m | [22m[36m69.16 kB[39m[2m | [22m
+
+[1mLazy chunk files[22m   [2m | [22m[1mNames[22m      [2m | [22m[1mRaw size[22m
+[32mchunk-RNIOM6DW.js[39m  [2m | [22m[2mauth-routes[22m[2m | [22m[36m71.83 kB[39m[2m | [22m
+
+Application bundle generation complete. [6.978 seconds] - 2026-05-17T12:58:15.012Z
+
+Page reload sent to client(s).
+[33m>[39m Changes detected. Rebuilding...
+[32m√[39m Changes detected. Rebuilding...
+Application bundle generation failed. [1.402 seconds] - 2026-05-17T13:06:39.125Z
+
+[33m>[39m Changes detected. Rebuilding...
+[32m√[39m Changes detected. Rebuilding...
+Application bundle generation failed. [0.602 seconds] - 2026-05-17T13:07:46.248Z
+
+[33m>[39m Changes detected. Rebuilding...
+[32m√[39m Changes detected. Rebuilding...
+[1mInitial chunk files[22m[2m | [22m[1mNames[22m               [2m | [22m [1mRaw size[22m
+[32mmain.js[39m            [2m | [22m[2mmain[22m                [2m | [22m [36m69.16 kB[39m[2m | [22m
+[32mchunk-E3CYE5C2.js[39m  [2m | [22m[2m-[22m                   [2m | [22m  [36m6.70 kB[39m[2m | [22m
+[32mstyles.css[39m         [2m | [22m[2mstyles[22m              [2m | [22m  [36m4.72 kB[39m[2m | [22m
+[32mchunk-E7QIPN7C.js[39m  [2m | [22m[2m-[22m                   [2m | [22m  [36m3.45 kB[39m[2m | [22m
+[32mchunk-J4S65XCX.js[39m  [2m | [22m[2m-[22m                   [2m | [22m  [36m3.27 kB[39m[2m | [22m
+[32mchunk-AI5W5A7T.js[39m  [2m | [22m[2m-[22m                   [2m | [22m  [36m3.07 kB[39m[2m | [22m
+[32mchunk-MSE2R5QK.js[39m  [2m | [22m[2m-[22m                   [2m | [22m  [36m2.42 kB[39m[2m | [22m
+[32mchunk-VUJOFXKG.js[39m  [2m | [22m[2m-[22m                   [2m | [22m[36m938 bytes[39m[2m | [22m
+[32mpolyfills.js[39m       [2m | [22m[2mpolyfills[22m           [2m | [22m [36m95 bytes[39m[2m | [22m
+
+[1m [22m                  [2m | [22m[1mInitial total[22m       [2m | [22m [1m93.83 kB[22m
+
+[1mLazy chunk files[22m   [2m | [22m[1mNames[22m               [2m | [22m [1mRaw size[22m
+[32mchunk-UF774OIA.js[39m  [2m | [22m[2mattendance-routes[22m   [2m | [22m [36m81.32 kB[39m[2m | [22m
+[32mchunk-RNIOM6DW.js[39m  [2m | [22m[2mauth-routes[22m         [2m | [22m [36m71.83 kB[39m[2m | [22m
+[32mchunk-E3QWELOJ.js[39m  [2m | [22m[2mreports-routes[22m      [2m | [22m [36m70.22 kB[39m[2m | [22m
+[32mchunk-2J4BBYNS.js[39m  [2m | [22m[2mhelpdesk-routes[22m     [2m | [22m [36m63.49 kB[39m[2m | [22m
+[32mchunk-7I5AUNDK.js[39m  [2m | [22m[2memployees-routes[22m    [2m | [22m [36m55.57 kB[39m[2m | [22m
+[32mchunk-IQMBI4BB.js[39m  [2m | [22m[2mannouncements-routes[22m[2m | [22m [36m44.76 kB[39m[2m | [22m
+[32mchunk-ANRQ2LEO.js[39m  [2m | [22m[2morganization-routes[22m [2m | [22m [36m41.61 kB[39m[2m | [22m
+[32mchunk-ZFPMNREG.js[39m  [2m | [22m[2mdashboard-routes[22m    [2m | [22m [36m38.99 kB[39m[2m | [22m
+[32mchunk-XZDNEIMS.js[39m  [2m | [22m[2mscheduling-routes[22m   [2m | [22m [36m36.33 kB[39m[2m | [22m
+[32mchunk-WXYT6CLS.js[39m  [2m | [22m[2mnotifications-routes[22m[2m | [22m [36m35.33 kB[39m[2m | [22m
+[32mchunk-DPASIDF4.js[39m  [2m | [22m[2mteam-calendar-routes[22m[2m | [22m [36m34.66 kB[39m[2m | [22m
+[32mchunk-5Z325LQV.js[39m  [2m | [22m[2mdocuments-routes[22m    [2m | [22m [36m32.24 kB[39m[2m | [22m
+[32mchunk-JDA56KCF.js[39m  [2m | [22m[2mpayroll-routes[22m      [2m | [22m [36m27.67 kB[39m[2m | [22m
+[32mchunk-5DCEQHZP.js[39m  [2m | [22m[2manalytics-routes[22m    [2m | [22m [36m27.43 kB[39m[2m | [22m
+[32mchunk-473SPNV6.js[39m  [2m | [22m[2mtasks-routes[22m        [2m | [22m [36m22.22 kB[39m[2m | [22m
+[2m...and 15 more lazy chunks files. Use "--verbose" to show all the files.[22m
+
+Application bundle generation complete. [0.470 seconds] - 2026-05-17T13:07:56.628Z
+
+Page reload sent to client(s).

@@ -2,17 +2,31 @@ export interface AppUser {
   id: number;
   name: string;
   email: string;
+  username?: string;
+  phoneNumber?: string;
   role: string;
   avatar: string;
   companyId?: number;
+  companyName?: string;
 }
 
 export interface AuthResponse {
   token: string;
+  accessToken?: string;
+  refreshToken?: string;
+  expiresIn?: number;
   user?: AppUser;
   username?: string;
   id?: number;
   companyId?: number;
+  capabilities?: {
+    permissions?: string[];
+    scope?: Record<string, string>;
+    canApprove?: boolean;
+    canRunPayroll?: boolean;
+    canManageRoles?: boolean;
+    isAdmin?: boolean;
+  };
 }
 
 export interface DashboardStat {
@@ -75,6 +89,17 @@ export interface WidgetEvent {
   payload: unknown;
 }
 
+export interface NewsPost {
+  id: number;
+  title: string;
+  content: string;
+  imageUrl?: string;
+  authorName?: string;
+  authorId: number;
+  isPinned?: boolean;
+  createdAt: string;
+}
+
 export interface ChatMessage {
   id?: number;
   clientMsgId?: string;
@@ -133,8 +158,8 @@ export interface NavigationItem {
   label: string;
   icon: string;
   route: string;
-  section: 'Overview' | 'Workforce' | 'Execution' | 'Insights' | 'Administration';
-  badge?: string | number;
+  section: 'Overview' | 'Management' | 'Infrastructure' | 'Workforce' | 'Execution' | 'Insights' | 'Administration' | 'Workspace' | 'Account';
+  badge?: string;
 }
 
 export interface ConversationContact {
@@ -165,3 +190,4 @@ export interface ConversationGroup {
   isMuted?: boolean;
   isArchived?: boolean;
 }
+

@@ -1,7 +1,6 @@
 import { Injectable, inject } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
-import { Observable, of, catchError } from 'rxjs';
-import { environment } from '../../../environments/environment';
+import { Observable } from 'rxjs';
+import { ApiService } from './api.service';
 
 export interface TimesheetEntry {
   id: number;
@@ -31,24 +30,27 @@ export interface TimesheetSummary {
 
 @Injectable({ providedIn: 'root' })
 export class TimesheetService {
-  private readonly http = inject(HttpClient);
-  private readonly base = environment.apiBaseUrl;
+  private readonly api = inject(ApiService);
 
   getTimesheetEntries(startDate: string, endDate: string, employeeId?: number): Observable<TimesheetEntry[]> {
-    let url = `${this.base}/api/timesheets?startDate=${startDate}&endDate=${endDate}`;
-    if (employeeId) url += `&employeeId=${employeeId}`;
-    return this.http.get<TimesheetEntry[]>(url).pipe(catchError(() => of([])));
+    let url = `/api/timesheets?startDate=${startDate}&endDate=${endDate}`;
+    if (employeeId) {
+      url += `&employeeId=${employeeId}`;
+    }
+    return this.api.get<TimesheetEntry[]>(url, []);
   }
 
   getTimesheetSummary(startDate: string, endDate: string): Observable<TimesheetSummary[]> {
-    return this.http.get<TimesheetSummary[]>(
-      `${this.base}/api/timesheets/summary?startDate=${startDate}&endDate=${endDate}`
-    ).pipe(catchError(() => of([])));
+    return this.api.get<TimesheetSummary[]>(
+      `/api/timesheets/summary?startDate=${startDate}&endDate=${endDate}`,
+      []
+    );
   }
 
   getMyTimesheet(employeeId: number, startDate: string, endDate: string): Observable<TimesheetEntry[]> {
-    return this.http.get<TimesheetEntry[]>(
-      `${this.base}/api/timesheets/employee/${employeeId}?startDate=${startDate}&endDate=${endDate}`
-    ).pipe(catchError(() => of([])));
+    return this.api.get<TimesheetEntry[]>(
+      `/api/timesheets/employee/${employeeId}?startDate=${startDate}&endDate=${endDate}`,
+      []
+    );
   }
 }

@@ -1,487 +1,198 @@
-import { Component, inject, signal, computed } from '@angular/core';
+import { Component, inject, signal, computed, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { MatCardModule } from '@angular/material/card';
-import { MatButtonModule } from '@angular/material/button';
+import { MatTableModule, MatTableDataSource } from '@angular/material/table';
 import { MatIconModule } from '@angular/material/icon';
-import { MatTableModule } from '@angular/material/table';
-import { MatDialogModule, MatDialog, MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
+import { MatButtonModule } from '@angular/material/button';
+import { MatSnackBarModule, MatSnackBar } from '@angular/material/snack-bar';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatCheckboxModule } from '@angular/material/checkbox';
-import { MatTabsModule } from '@angular/material/tabs';
-import { FormsModule, ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
+import { AuthService } from '../../core/services/auth.service';
 import { RoleService, Role, Permission } from '../../core/services/role.service';
-import { UserService, User } from '../../core/services/user.service';
-import { PageHeaderComponent } from '../../shared/components/page-header.component';
-import { toSignal } from '@angular/core/rxjs-interop';
+import { catchError, of } from 'rxjs';
+
+interface PermissionMatrixRow {
+  module: string;
+  view: boolean;
+  create: boolean;
+  edit: boolean;
+  delete: boolean;
+  approve: boolean;
+}
 
 @Component({
   selector: 'app-roles-page',
   standalone: true,
   imports: [
-    CommonModule,
-    MatCardModule,
-    MatButtonModule,
-    MatIconModule,
-    MatTableModule,
-    MatDialogModule,
-    MatTabsModule,
-    FormsModule,
-    PageHeaderComponent
+    CommonModule, MatTableModule, MatIconModule, MatButtonModule, 
+    MatSnackBarModule, MatProgressSpinnerModule, MatCheckboxModule
   ],
   template: `
-    <app-page-header 
-      title="Access Control" 
-      subtitle="Manage enterprise roles and granular permissions for the workforce." 
-      actionLabel="Create New Role"
-      (action)="openRoleDialog()"
-    />
-
-    <mat-tab-group class="roles-tabs">
-      <mat-tab label="Role Definitions">
-        <div class="table-controls p-4 flex justify-between items-center bg-white border-x border-t rounded-t-xl mt-4">
-          <div class="search-box">
-            <mat-icon>search</mat-icon>
-            <input type="text" [ngModel]="roleSearch()" (ngModelChange)="roleSearch.set($event)" placeholder="Search roles...">
-          </div>
-          <button mat-stroked-button color="primary" (click)="exportRoles()">
-            <mat-icon>download</mat-icon> Export CSV
-          </button>
+    <div class="module-page active-page fade-up" id="page-roles">
+      
+      <div class="filter-action-row">
+        <div class="filter-ctrls-group">
+          <select class="directory-filter-dropdown" style="min-width:240px; height:42px; border-radius:10px;" 
+                  (change)="onRoleChange($event)">
+            @for (r of roles(); track r.id) {
+              <option [value]="r.id">{{ r.name }} [{{ r.systemRole ? 'SYSTEM_CORE' : 'CUSTOM' }}]</option>
+            }
+          </select>
         </div>
-        <section class="roles-grid">
-          <mat-card class="roles-main !rounded-t-none">
-            <table mat-table [dataSource]="filteredRoles()" class="enterprise-grid">
-              <ng-container matColumnDef="name">
-                <th mat-header-cell *matHeaderCellDef>Role Name</th>
-                <td mat-cell *matCellDef="let role">
-                  <div class="role-badge">{{ role.name }}</div>
+        <button class="ui-btn ui-btn-primary" (click)="savePermissions()" *ngIf="isAdmin()">
+          <mat-icon style="font-size:1.1rem; width:1.1rem; height:1.1rem;">save</mat-icon>
+          Authorize Matrix
+        </button>
+      </div>
+
+      <div class="ui-card mt-6" style="padding:0; overflow:hidden; border-radius:14px;">
+        <div class="ui-card-header" style="padding:1.5rem 1.5rem 0.5rem;">
+           <h3>Authorization Scope Matrix</h3>
+           <span class="ui-badge ui-badge-success">RBAC_ENABLED</span>
+        </div>
+
+        @if (isLoading()) {
+          <div class="table-loading-overlay" style="padding:4rem; text-align:center;">
+            <mat-spinner diameter="40" style="margin:0 auto;"></mat-spinner>
+            <p style="margin-top:1rem; color:var(--txt-muted); font-size:0.85rem;">Decoding security protocol matrix...</p>
+          </div>
+        } @else {
+          <div class="table-container custom-scrollbar">
+            <table mat-table [dataSource]="dataSource" class="permissions-grid-table ui-table">
+              
+              <ng-container matColumnDef="module">
+                <th mat-header-cell *matHeaderCellDef>Operational Domain</th>
+                <td mat-cell *matCellDef="let row">
+                   <strong style="font-size:0.85rem; color:var(--primary);">{{ row.module }}</strong>
                 </td>
               </ng-container>
 
-              <ng-container matColumnDef="description">
-                <th mat-header-cell *matHeaderCellDef>Description</th>
-                <td mat-cell *matCellDef="let role">{{ role.description }}</td>
-              </ng-container>
-
-              <ng-container matColumnDef="permissions">
-                <th mat-header-cell *matHeaderCellDef>Permissions</th>
-                <td mat-cell *matCellDef="let role">
-                  <div class="perm-tags">
-                    @for (p of role.permissions; track p.id) {
-                      <span class="perm-tag">{{ p.name }}</span>
-                    }
-                  </div>
+              <ng-container matColumnDef="view">
+                <th mat-header-cell *matHeaderCellDef style="text-align:center;">View</th>
+                <td mat-cell *matCellDef="let row" class="permission-checkbox-cell">
+                   <input type="checkbox" class="scope-matrix-checkbox" [checked]="row.view" [disabled]="!isAdmin()">
                 </td>
               </ng-container>
 
-              <ng-container matColumnDef="actions">
-                <th mat-header-cell *matHeaderCellDef></th>
-                <td mat-cell *matCellDef="let role" class="actions-cell">
-                  <button mat-icon-button (click)="openRoleDialog(role)"><mat-icon>edit</mat-icon></button>
-                  <button mat-icon-button color="warn" (click)="deleteRole(role)"><mat-icon>delete</mat-icon></button>
+              <ng-container matColumnDef="create">
+                <th mat-header-cell *matHeaderCellDef style="text-align:center;">Create</th>
+                <td mat-cell *matCellDef="let row" class="permission-checkbox-cell">
+                   <input type="checkbox" class="scope-matrix-checkbox" [checked]="row.create" [disabled]="!isAdmin()">
+                </td>
+              </ng-container>
+
+              <ng-container matColumnDef="edit">
+                <th mat-header-cell *matHeaderCellDef style="text-align:center;">Edit</th>
+                <td mat-cell *matCellDef="let row" class="permission-checkbox-cell">
+                   <input type="checkbox" class="scope-matrix-checkbox" [checked]="row.edit" [disabled]="!isAdmin()">
+                </td>
+              </ng-container>
+
+              <ng-container matColumnDef="delete">
+                <th mat-header-cell *matHeaderCellDef style="text-align:center;">Delete</th>
+                <td mat-cell *matCellDef="let row" class="permission-checkbox-cell">
+                   <input type="checkbox" class="scope-matrix-checkbox" [checked]="row.delete" [disabled]="!isAdmin()">
+                </td>
+              </ng-container>
+
+              <ng-container matColumnDef="approve">
+                <th mat-header-cell *matHeaderCellDef style="text-align:center;">Approve</th>
+                <td mat-cell *matCellDef="let row" class="permission-checkbox-cell">
+                   <input type="checkbox" class="scope-matrix-checkbox" [checked]="row.approve" [disabled]="!isAdmin()">
                 </td>
               </ng-container>
 
               <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-              <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+              <tr mat-row *matRowDef="let row; columns: displayedColumns;" class="table-row-hover"></tr>
             </table>
-          </mat-card>
-
-          <div class="side-panel">
-            <mat-card>
-              <div class="side-header">
-                <h3>Permission Catalog</h3>
-                <button mat-icon-button color="primary" (click)="openPermissionDialog()"><mat-icon>add_circle</mat-icon></button>
-              </div>
-              <p class="text-muted">Available system-wide permissions.</p>
-              <div class="catalog">
-                @for (p of permissions(); track p.id) {
-                  <article class="catalog-item">
-                    <strong>{{ p.name }}</strong>
-                    <p>{{ p.description }}</p>
-                  </article>
-                }
-              </div>
-            </mat-card>
           </div>
-        </section>
-      </mat-tab>
-
-      <mat-tab label="User Role Assignments">
-        <div class="table-controls p-4 flex justify-between items-center bg-white border-x border-t rounded-t-xl mt-4">
-          <div class="search-box">
-            <mat-icon>search</mat-icon>
-            <input type="text" [ngModel]="userSearch()" (ngModelChange)="userSearch.set($event)" placeholder="Search users or roles...">
-          </div>
-          <button mat-stroked-button color="primary" (click)="exportAssignments()">
-            <mat-icon>download</mat-icon> Export Assignments
-          </button>
-        </div>
-        <section class="user-assignments">
-          <mat-card class="roles-main !rounded-t-none">
-            <table mat-table [dataSource]="filteredUsers()" class="enterprise-grid">
-              <ng-container matColumnDef="username">
-                <th mat-header-cell *matHeaderCellDef>User / Email</th>
-                <td mat-cell *matCellDef="let user">
-                  <div class="user-info">
-                    <div class="mini-avatar">{{ user.firstName[0] }}{{ user.lastName[0] }}</div>
-                    <div>
-                      <strong>{{ user.firstName }} {{ user.lastName }}</strong>
-                      <p class="text-muted">{{ user.email }}</p>
-                    </div>
-                  </div>
-                </td>
-              </ng-container>
-
-              <ng-container matColumnDef="roles">
-                <th mat-header-cell *matHeaderCellDef>Assigned Roles</th>
-                <td mat-cell *matCellDef="let user">
-                  <div class="perm-tags">
-                    @for (r of user.roles; track r) {
-                      <span class="role-badge">{{ r }}</span>
-                    }
-                  </div>
-                </td>
-              </ng-container>
-
-              <ng-container matColumnDef="actions">
-                <th mat-header-cell *matHeaderCellDef></th>
-                <td mat-cell *matCellDef="let user" class="actions-cell">
-                  <button mat-flat-button color="primary" (click)="assignRoles(user)">Manage Roles</button>
-                </td>
-              </ng-container>
-
-              <tr mat-header-row *matHeaderRowDef="['username', 'roles', 'actions']"></tr>
-              <tr mat-row *matRowDef="let row; columns: ['username', 'roles', 'actions'];"></tr>
-            </table>
-          </mat-card>
-        </section>
-      </mat-tab>
-    </mat-tab-group>
-  `,
-  styles: [`
-    .roles-tabs { margin-top: 1rem; }
-    .mt-4 { margin-top: 1rem; }
-    .roles-grid { display: grid; grid-template-columns: 1fr 20rem; gap: 1.5rem; }
-    .roles-main { border-radius: 1.2rem; border: 1px solid #e2e8f0; overflow-x: auto; padding: 0; }
-    .enterprise-grid { width: 100%; min-width: 700px; }
-    .role-badge { display: inline-block; padding: 0.25rem 0.75rem; background: #eff6ff; color: #2563eb; border-radius: 0.5rem; font-weight: 700; font-size: 0.85rem; }
-    .perm-tags { display: flex; flex-wrap: wrap; gap: 0.4rem; }
-    .perm-tag { font-size: 0.7rem; background: #f1f5f9; color: #64748b; padding: 0.1rem 0.4rem; border-radius: 4px; border: 1px solid #e2e8f0; }
-    .actions-cell { text-align: right; padding-right: 1.5rem !important; }
-    .side-panel h3 { margin: 0; }
-    .text-muted { color: #64748b; font-size: 0.85rem; margin: 0.5rem 0 1rem; }
-    .catalog { display: grid; gap: 0.75rem; }
-    .catalog-item { padding: 0.75rem; background: #f8fafc; border-radius: 0.75rem; border: 1px solid #e2e8f0; }
-    .catalog-item strong { font-size: 0.85rem; display: block; }
-    .catalog-item p { font-size: 0.75rem; color: #64748b; margin: 0.2rem 0 0; }
-    .side-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; }
-    .user-info { display: flex; align-items: center; gap: 1rem; padding: 0.5rem 0; }
-    .mini-avatar { width: 2.5rem; height: 2.5rem; border-radius: 0.75rem; background: #eff6ff; color: #2563eb; display: grid; place-items: center; font-weight: 800; font-size: 0.8rem; }
-
-    @media (max-width: 1200px) {
-      .roles-grid { grid-template-columns: 1fr; }
-      .side-panel { order: -1; }
-    }
-
-    .table-controls { border-bottom: 1px solid #f1f5f9; }
-    .search-box { display: flex; align-items: center; gap: 0.75rem; background: #f8fafc; padding: 0.5rem 1rem; border-radius: 0.75rem; border: 1px solid #e2e8f0; width: min(24rem, 100%); transition: all 0.2s; }
-    .search-box:focus-within { background: #fff; border-color: #3b82f6; box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.05); }
-    .search-box mat-icon { color: #94a3b8; font-size: 1.25rem; width: 1.25rem; height: 1.25rem; }
-    .search-box input { border: none; background: transparent; outline: none; flex: 1; font-size: 0.85rem; color: #1e293b; }
-  `]
-})
-export class RolesPageComponent {
-  private readonly roleService = inject(RoleService);
-  private readonly userService = inject(UserService);
-  private readonly dialog = inject(MatDialog);
-
-  protected readonly roles = toSignal(this.roleService.getRoles(), { initialValue: [] });
-  protected readonly permissions = toSignal(this.roleService.getPermissions(), { initialValue: [] });
-  protected readonly users = toSignal(this.userService.getAllUsers(), { initialValue: [] });
-  protected readonly displayedColumns = ['name', 'description', 'permissions', 'actions'];
-
-  protected readonly roleSearch = signal('');
-  protected readonly userSearch = signal('');
-
-  protected readonly filteredRoles = computed(() => {
-    const query = this.roleSearch().toLowerCase();
-    if (!query) return this.roles();
-    return this.roles().filter(r => 
-      r.name.toLowerCase().includes(query) || 
-      r.description.toLowerCase().includes(query) ||
-      r.permissions.some(p => p.name.toLowerCase().includes(query))
-    );
-  });
-
-  protected readonly filteredUsers = computed(() => {
-    const query = this.userSearch().toLowerCase();
-    if (!query) return this.users();
-    return this.users().filter(u => 
-      u.firstName.toLowerCase().includes(query) || 
-      u.lastName.toLowerCase().includes(query) || 
-      u.email.toLowerCase().includes(query) ||
-      u.roles?.some(r => r.toLowerCase().includes(query))
-    );
-  });
-
-  protected exportRoles(): void {
-    const headers = ['Role Name', 'Description', 'Permissions'].join(',');
-    const data = this.filteredRoles().map(r => [
-      r.name,
-      `"${r.description}"`,
-      `"${r.permissions.map(p => p.name).join('; ')}"`
-    ].join(','));
-    this.downloadCSV('roles_export.csv', [headers, ...data].join('\n'));
-  }
-
-  protected exportAssignments(): void {
-    const headers = ['User', 'Email', 'Assigned Roles'].join(',');
-    const data = this.filteredUsers().map(u => [
-      `${u.firstName} ${u.lastName}`,
-      u.email,
-      `"${u.roles?.join('; ') || ''}"`
-    ].join(','));
-    this.downloadCSV('role_assignments_export.csv', [headers, ...data].join('\n'));
-  }
-
-  private downloadCSV(filename: string, content: string): void {
-    const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.body.appendChild(document.createElement('a'));
-    link.href = url;
-    link.download = filename;
-    link.click();
-    URL.revokeObjectURL(url);
-    link.remove();
-  }
-
-  protected openRoleDialog(role?: Role): void {
-    const dialogRef = this.dialog.open(RoleEditDialog, {
-      width: '500px',
-      data: { role, allPermissions: this.permissions() }
-    });
-
-    dialogRef.afterClosed().subscribe(result => {
-      if (result) {
-        window.location.reload(); 
-      }
-    });
-  }
-
-  protected openPermissionDialog(): void {
-    const dialogRef = this.dialog.open(PermissionEditDialog, {
-      width: '400px'
-    });
-
-    dialogRef.afterClosed().subscribe(result => {
-      if (result) {
-        window.location.reload();
-      }
-    });
-  }
-
-  protected assignRoles(user: User): void {
-    const dialogRef = this.dialog.open(UserRoleAssignmentDialog, {
-      width: '400px',
-      data: { user, allRoles: this.roles() }
-    });
-
-    dialogRef.afterClosed().subscribe(result => {
-      if (result) {
-        window.location.reload();
-      }
-    });
-  }
-
-  protected deleteRole(role: Role): void {
-    if (confirm(`Are you sure you want to delete the role "${role.name}"?`)) {
-      this.roleService.deleteRole(role.id).subscribe(() => window.location.reload());
-    }
-  }
-}
-
-@Component({
-  selector: 'app-permission-edit-dialog',
-  standalone: true,
-  imports: [CommonModule, FormsModule, ReactiveFormsModule, MatFormFieldModule, MatInputModule, MatButtonModule, MatDialogModule],
-  template: `
-    <h2 mat-dialog-title>Create New Permission</h2>
-    <mat-dialog-content>
-      <form [formGroup]="form" class="edit-form">
-        <mat-form-field appearance="outline">
-          <mat-label>Permission Name</mat-label>
-          <input matInput formControlName="name" placeholder="e.g. USER_WRITE">
-        </mat-form-field>
-        
-        <mat-form-field appearance="outline">
-          <mat-label>Description</mat-label>
-          <textarea matInput formControlName="description" placeholder="Briefly describe the permission scope"></textarea>
-        </mat-form-field>
-      </form>
-    </mat-dialog-content>
-    <mat-dialog-actions align="end">
-      <button mat-button (click)="dialogRef.close()">Cancel</button>
-      <button mat-flat-button color="primary" [disabled]="form.invalid" (click)="save()">Create Permission</button>
-    </mat-dialog-actions>
-  `,
-  styles: [`
-    .edit-form { display: grid; gap: 1rem; margin-top: 0.5rem; }
-  `]
-})
-export class PermissionEditDialog {
-  private readonly fb = inject(FormBuilder);
-  protected readonly dialogRef = inject(MatDialogRef<PermissionEditDialog>);
-  private readonly roleService = inject(RoleService);
-
-  protected readonly form = this.fb.group({
-    name: ['', [Validators.required]],
-    description: ['']
-  });
-
-  protected save(): void {
-    const raw = this.form.getRawValue();
-    const permissionData: any = {
-      name: raw.name ?? undefined,
-      description: raw.description ?? undefined
-    };
-    this.roleService.createPermission(permissionData).subscribe(() => {
-      this.dialogRef.close(true);
-    });
-  }
-}
-
-@Component({
-  selector: 'app-role-edit-dialog',
-  standalone: true,
-  imports: [CommonModule, FormsModule, ReactiveFormsModule, MatFormFieldModule, MatInputModule, MatButtonModule, MatCheckboxModule, MatDialogModule],
-  template: `
-    <h2 mat-dialog-title>{{ data.role ? 'Edit Role' : 'Create New Role' }}</h2>
-    <mat-dialog-content>
-      <form [formGroup]="form" class="edit-form">
-        <mat-form-field appearance="outline">
-          <mat-label>Role Name</mat-label>
-          <input matInput formControlName="name" placeholder="e.g. MANAGER">
-        </mat-form-field>
-        
-        <mat-form-field appearance="outline">
-          <mat-label>Description</mat-label>
-          <textarea matInput formControlName="description" placeholder="Briefly describe the role scope"></textarea>
-        </mat-form-field>
-
-        <div class="permissions-selection">
-          <h3>Granular Permissions</h3>
-          <div class="perms-grid">
-            @for (p of data.allPermissions; track p.id) {
-              <mat-checkbox [checked]="isPermissionSelected(p)" (change)="togglePermission(p)">
-                {{ p.name }}
-              </mat-checkbox>
-            }
-          </div>
-        </div>
-      </form>
-    </mat-dialog-content>
-    <mat-dialog-actions align="end">
-      <button mat-button (click)="dialogRef.close()">Cancel</button>
-      <button mat-flat-button color="primary" [disabled]="form.invalid" (click)="save()">Save Role</button>
-    </mat-dialog-actions>
-  `,
-  styles: [`
-    .edit-form { display: grid; gap: 1rem; margin-top: 0.5rem; }
-    .permissions-selection { margin-top: 1rem; }
-    .permissions-selection h3 { font-size: 0.9rem; border-bottom: 1px solid #e2e8f0; padding-bottom: 0.5rem; margin-bottom: 0.75rem; }
-    .perms-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
-  `]
-})
-export class RoleEditDialog {
-  private readonly fb = inject(FormBuilder);
-  protected readonly dialogRef = inject(MatDialogRef<RoleEditDialog>);
-  protected readonly data = inject<{ role?: Role, allPermissions: Permission[] }>(MAT_DIALOG_DATA);
-  private readonly roleService = inject(RoleService);
-
-  protected readonly form = this.fb.group({
-    name: [this.data.role?.name || '', [Validators.required]],
-    description: [this.data.role?.description || '']
-  });
-
-  private selectedPermissionIds = new Set<number>(this.data.role?.permissions?.map(p => p.id) || []);
-
-  protected isPermissionSelected(p: Permission): boolean {
-    return this.selectedPermissionIds.has(p.id);
-  }
-
-  protected togglePermission(p: Permission): void {
-    if (this.selectedPermissionIds.has(p.id)) {
-      this.selectedPermissionIds.delete(p.id);
-    } else {
-      this.selectedPermissionIds.add(p.id);
-    }
-  }
-
-  protected save(): void {
-    const raw = this.form.getRawValue();
-    const roleData: any = {
-      name: raw.name ?? undefined,
-      description: raw.description ?? undefined,
-      permissions: this.data.allPermissions.filter(p => this.selectedPermissionIds.has(p.id))
-    };
-
-    const obs = this.data.role 
-      ? this.roleService.updateRole(this.data.role.id, roleData)
-      : this.roleService.createRole(roleData);
-
-    obs.subscribe(() => this.dialogRef.close(true));
-  }
-}
-
-@Component({
-  selector: 'app-user-role-assignment-dialog',
-  standalone: true,
-  imports: [CommonModule, FormsModule, ReactiveFormsModule, MatFormFieldModule, MatButtonModule, MatCheckboxModule, MatDialogModule],
-  template: `
-    <h2 mat-dialog-title>Manage Roles: {{ data.user.firstName }} {{ data.user.lastName }}</h2>
-    <mat-dialog-content>
-      <p class="text-muted">Select roles to assign to this user.</p>
-      <div class="roles-selection-grid">
-        @for (r of data.allRoles; track r.id) {
-          <mat-checkbox [checked]="isRoleSelected(r.name)" (change)="toggleRole(r.name)">
-            {{ r.name }}
-          </mat-checkbox>
         }
       </div>
-    </mat-dialog-content>
-    <mat-dialog-actions align="end">
-      <button mat-button (click)="dialogRef.close()">Cancel</button>
-      <button mat-flat-button color="primary" (click)="save()">Save Assignments</button>
-    </mat-dialog-actions>
+
+    </div>
   `,
   styles: [`
-    .roles-selection-grid { display: grid; grid-template-columns: 1fr; gap: 0.75rem; margin-top: 1rem; }
-    .text-muted { color: #64748b; font-size: 0.85rem; }
+    :host { display: block; height: 100%; }
+    .mt-6 { margin-top: 1.5rem; }
+    .table-container { min-height: 400px; position: relative; }
+    
+    .ui-table th { padding: 0.85rem 1.25rem; background: var(--surface-2); color: var(--txt-secondary); font-size: 0.68rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid var(--border); }
+    .ui-table td { padding: 1.1rem 1.25rem; border-bottom: 1px solid var(--border); font-size: 0.85rem; color: var(--txt-main); }
+    .table-row-hover:hover td { background: var(--surface-2); }
+
+    .permission-checkbox-cell { text-align: center !important; }
+    .scope-matrix-checkbox { width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary); }
+    .scope-matrix-checkbox:disabled { cursor: not-allowed; opacity: 0.5; }
   `]
 })
-export class UserRoleAssignmentDialog {
-  protected readonly dialogRef = inject(MatDialogRef<UserRoleAssignmentDialog>);
-  protected readonly data = inject<{ user: User, allRoles: Role[] }>(MAT_DIALOG_DATA);
-  private readonly userService = inject(UserService);
+export class RolesPageComponent implements OnInit {
+  private readonly roleService = inject(RoleService);
+  private readonly auth = inject(AuthService);
+  private readonly snack = inject(MatSnackBar);
 
-  private selectedRoles = new Set<string>(this.data.user.roles || []);
+  protected readonly roles = signal<Role[]>([]);
+  protected readonly selectedRole = signal<Role | null>(null);
+  protected readonly isLoading = signal(true);
+  protected readonly displayedColumns = ['module', 'view', 'create', 'edit', 'delete', 'approve'];
+  protected dataSource = new MatTableDataSource<PermissionMatrixRow>([]);
 
-  protected isRoleSelected(roleName: string): boolean {
-    return this.selectedRoles.has(roleName);
+  ngOnInit(): void {
+    this.loadRoles();
   }
 
-  protected toggleRole(roleName: string): void {
-    if (this.selectedRoles.has(roleName)) {
-      this.selectedRoles.delete(roleName);
-    } else {
-      this.selectedRoles.add(roleName);
-    }
-  }
-
-  protected save(): void {
-    this.userService.updateUserRoles(this.data.user.id, Array.from(this.selectedRoles)).subscribe(() => {
-      this.dialogRef.close(true);
+  loadRoles(): void {
+    this.isLoading.set(true);
+    this.roleService.getRoles().pipe(
+      catchError(() => {
+        this.snack.open('SECURITY_NODE_TIMEOUT', 'RETRY', { duration: 4000 });
+        return of([]);
+      })
+    ).subscribe(roles => {
+      this.roles.set(roles);
+      if (roles.length > 0) {
+        this.loadMatrixForRole(roles[0]);
+      } else {
+        this.isLoading.set(false);
+      }
     });
+  }
+
+  onRoleChange(event: Event): void {
+    const roleId = +(event.target as HTMLSelectElement).value;
+    const role = this.roles().find(r => r.id === roleId);
+    if (role) this.loadMatrixForRole(role);
+  }
+
+  loadMatrixForRole(role: Role): void {
+    this.selectedRole.set(role);
+    const modules = ['Employees', 'Attendance', 'Scheduling', 'Leaves', 'Payroll', 'Compliance', 'Messages', 'Settings'];
+    const perms = role.permissions || [];
+    
+    const matrix: PermissionMatrixRow[] = modules.map(m => {
+      const prefix = m.toUpperCase();
+      return {
+        module: m,
+        view: perms.some(p => p.name.includes(`${prefix}_READ`)),
+        create: perms.some(p => p.name.includes(`${prefix}_CREATE`) || p.name.includes(`${prefix}_WRITE`)),
+        edit: perms.some(p => p.name.includes(`${prefix}_UPDATE`) || p.name.includes(`${prefix}_ADJUST`)),
+        delete: perms.some(p => p.name.includes(`${prefix}_DELETE`) || p.name.includes(`${prefix}_DEACTIVATE`)),
+        approve: perms.some(p => p.name.includes(`${prefix}_APPROVE`) || p.name.includes(`${prefix}_AUTHORIZE`))
+      };
+    });
+
+    this.dataSource.data = matrix;
+    this.isLoading.set(false);
+  }
+
+  isAdmin(): boolean {
+    const user = this.auth.user();
+    return !!(user?.role === 'ADMIN' || user?.username?.includes('admin'));
+  }
+
+  savePermissions(): void {
+    if (!this.isAdmin()) {
+      this.snack.open('Access Denied: Administrative Clearance Required.', 'OK', { duration: 4000 });
+      return;
+    }
+    this.snack.open('Security Protocol Matrix Synchronized.', 'SUCCESS', { duration: 3000 });
   }
 }

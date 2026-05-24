@@ -174,19 +174,38 @@ export class MobileClockComponent implements OnInit, OnDestroy {
     const user = this.auth.user();
     if (user && !this.isClockInPending()) {
       this.isClockInPending.set(true);
-      const idempotencyKey = this.attendanceApi.generateClockInIdempotencyKey(user.id);
-      this.attendanceApi.clockIn(user.id, undefined, undefined, idempotencyKey).subscribe({
-        next: () => {
-          this.isClockInPending.set(false);
-          this.snack.open('Successfully clocked in!', 'OK', { duration: 3000 });
-          this.refreshStatus();
-        },
-        error: () => {
-          this.isClockInPending.set(false);
-          this.snack.open('Clock in failed. Please try again.', 'OK', { duration: 3000 });
-        }
-      });
+
+      // Attempt to get GPS coordinates
+      if ('geolocation' in navigator) {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => this.performClockIn(user.id, pos.coords.latitude, pos.coords.longitude),
+          (err) => {
+            console.error('Geolocation error:', err);
+            this.isClockInPending.set(false);
+            this.snack.open('Location access is required to clock in.', 'OK', { duration: 5000 });
+          },
+          { enableHighAccuracy: true, timeout: 10000 }
+        );
+      } else {
+        this.performClockIn(user.id);
+      }
     }
+  }
+
+  private performClockIn(userId: number, lat?: number, lng?: number) {
+    const idempotencyKey = this.attendanceApi.generateClockInIdempotencyKey(userId);
+    this.attendanceApi.clockIn(userId, lat, lng, idempotencyKey).subscribe({
+      next: () => {
+        this.isClockInPending.set(false);
+        this.snack.open('Successfully clocked in!', 'OK', { duration: 3000 });
+        this.refreshStatus();
+      },
+      error: (err) => {
+        this.isClockInPending.set(false);
+        const msg = err.error?.message || 'Clock in failed. Please try again.';
+        this.snack.open(msg, 'OK', { duration: 5000 });
+      }
+    });
   }
 
   clockOut() {

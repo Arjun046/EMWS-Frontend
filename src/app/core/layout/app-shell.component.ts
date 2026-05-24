@@ -1,31 +1,28 @@
-import { Component, computed, inject, signal } from '@angular/core';
-import { FormsModule } from '@angular/forms';
+import { Component, computed, inject, signal, OnInit, OnDestroy } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
-import { NgClass, CommonModule } from '@angular/common';
+import { CommonModule, DatePipe } from '@angular/common';
 import { MatBadgeModule } from '@angular/material/badge';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDividerModule } from '@angular/material/divider';
-import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
-import { MatInputModule } from '@angular/material/input';
-import { MatListModule } from '@angular/material/list';
 import { MatMenuModule } from '@angular/material/menu';
-import { MatSidenavModule } from '@angular/material/sidenav';
-import { MatToolbarModule } from '@angular/material/toolbar';
 import { AuthService } from '../services/auth.service';
 import { NotificationCenterService } from '../services/notification-center.service';
 import { ThemeService } from '../services/theme.service';
+import { ToastService } from '../services/toast.service';
+import { SearchService } from '../services/search.service';
 import { NavigationItem } from '../../shared/models/ui.models';
+import { AiAssistantComponent } from '../../shared/components/ai-assistant.component';
+import { GlobalSearchComponent } from '../../shared/components/global-search.component';
 
 interface NavigationItemExtended extends NavigationItem {
-  roles?: string[];
+  scopes?: string[];
 }
 
 @Component({
   selector: 'app-shell',
   standalone: true,
   imports: [
-    FormsModule,
     CommonModule,
     RouterOutlet,
     RouterLink,
@@ -33,253 +30,471 @@ interface NavigationItemExtended extends NavigationItem {
     MatBadgeModule,
     MatButtonModule,
     MatDividerModule,
-    MatFormFieldModule,
     MatIconModule,
-    MatInputModule,
-    MatListModule,
     MatMenuModule,
-    MatSidenavModule,
-    MatToolbarModule
+    AiAssistantComponent,
+    GlobalSearchComponent,
+    DatePipe
   ],
   template: `
-    <mat-sidenav-container class="shell-container">
-      <mat-sidenav #sidenav mode="side" [opened]="!isCollapsed()" class="shell__nav" [class.collapsed]="isCollapsed()">
-        <div class="brand">
-          <div class="brand__mark" *ngIf="!theme.currentTheme()?.logoUrl">EW</div>
-          <img *ngIf="theme.currentTheme()?.logoUrl" [src]="theme.currentTheme()?.logoUrl" class="brand__logo">
-          
-          @if (!isCollapsed()) {
-            <div class="brand__text">
-              <h2>EWMS</h2>
-              <p>Workforce Console</p>
-            </div>
-          }
-        </div>
+    <div class="app-viewport">
+      <div class="main-shell">
+        <!-- Sidebar Backdrop for Mobile -->
+        <div class="sidebar-backdrop" [class.active]="isSidebarOpen()" (click)="isSidebarOpen.set(false)"></div>
 
-        <div class="nav-content">
-          @for (section of sections(); track section) {
-            <div class="nav-section">
-              @if (!isCollapsed()) {
-                <span class="nav-section__title">{{ section }}</span>
-              } @else {
-                <mat-divider class="section-divider"></mat-divider>
+        <!-- APP SIDEBAR -->
+        <aside class="app-sidebar" [class.mobile-open]="isSidebarOpen()">
+          <div class="sidebar-header">
+            <div class="sidebar-logo">EW</div>
+            <div>
+              <div class="sidebar-brand-title">Enterprise OS</div>
+              <div class="sidebar-brand-subtitle">Workforce Platform</div>
+            </div>
+          </div>
+
+          <nav class="sidebar-nav custom-scrollbar">
+            @for (section of filteredSections(); track section) {
+              <span class="nav-sec-label">{{ section }}</span>
+              @for (item of itemsForSection(section); track item.route) {
+                <a class="nav-link"
+                   [routerLink]="item.route"
+                   routerLinkActive="active"
+                   (click)="isSidebarOpen.set(false)"
+                   [id]="'nav-' + item.label.toLowerCase()"
+                   [title]="item.label">
+                  <mat-icon>{{ item.icon }}</mat-icon>
+                  <span>{{ item.label }}</span>
+                  @if (item.badge) {
+                    <span class="nav-badge-count">{{ item.badge }}</span>
+                  }
+                </a>
               }
-              <mat-nav-list>
-                @for (item of itemsForSection(section); track item.route) {
-                  <a mat-list-item [routerLink]="item.route" routerLinkActive="active-link" [title]="item.label">
-                    <mat-icon matListItemIcon [class.active-icon]="isActive(item.route)">{{ item.icon }}</mat-icon>
-                    
-                    <ng-container matListItemTitle>
-                      @if (!isCollapsed()) {
-                        {{ item.label }}
-                      }
-                    </ng-container>
+            }
+          </nav>
 
-                    @if (!isCollapsed() && item.badge) {
-                      <span class="pill">{{ item.badge }}</span>
-                    }
-                  </a>
+          <div class="sidebar-footer-user">
+             <div class="user-profile-widget" [matMenuTriggerFor]="profileMenu">
+                <div class="user-avatar-circle">
+                  {{ getInitials(auth.user()?.name) }}
+                  <div class="avatar-status-dot"></div>
+                </div>
+                <div style="flex:1; min-width:0;">
+                   <div class="widget-username">{{ auth.user()?.name }}</div>
+                   <div class="widget-role">ROLE_{{ auth.user()?.role || 'ADMIN' }}</div>
+                </div>
+             </div>
+          </div>
+        </aside>
+
+        <!-- CONTENT VIEWPORT -->
+        <div class="app-content-area">
+          <header class="app-header">
+            <div class="breadcrumb-trail">
+              <button class="hamburger-btn" (click)="isSidebarOpen.set(!isSidebarOpen())">
+                <mat-icon style="font-size:1.1rem;">menu</mat-icon>
+              </button>
+              <span class="mut">SYSTEM</span>
+              <mat-icon style="font-size:16px; width:16px; height:16px; color:var(--txt-muted)">chevron_right</mat-icon>
+              <span id="headerBreadcrumbPage" style="font-weight: 800; text-transform: uppercase;">{{ currentRouteLabel() }}</span>
+            </div>
+
+            <div class="header-ctrls">
+              <div class="digital-clock-widget">{{ liveTime() | date:'h:mm:ss a' }}</div>
+              
+              <button class="header-action-btn" (click)="theme.toggleTheme()" [title]="theme.isDarkMode() ? 'Light Mode' : 'Dark Mode'">
+                 <mat-icon>{{ theme.isDarkMode() ? 'light_mode' : 'dark_mode' }}</mat-icon>
+              </button>
+
+              <button class="header-action-btn" (click)="search.open()" title="Search (Ctrl+K)">
+                <mat-icon>search</mat-icon>
+              </button>
+
+              <button class="header-action-btn" [matMenuTriggerFor]="notifMenu" title="Notifications">
+                <mat-icon [matBadge]="notifications.unreadCount() || null" matBadgeColor="primary">notifications_none</mat-icon>
+                @if (notifications.unreadCount() > 0) {
+                  <div class="btn-notif-ping"></div>
                 }
-              </mat-nav-list>
+              </button>
+              
+              <mat-menu #notifMenu="matMenu" class="notification-dropdown" xPosition="before">
+                <div class="notif-dropdown-container" (click)="$event.stopPropagation()">
+                  <div class="notif-header">
+                    <h3>Notifications</h3>
+                    <button mat-button class="mark-all-btn" (click)="notifications.markAllAsRead()">
+                      Mark all as read
+                    </button>
+                  </div>
+
+                  <div class="notif-list custom-scrollbar">
+                    @if (notifications.items().length > 0) {
+                      @for (item of notifications.items(); track item.id) {
+                        <div class="notif-item" [class.unread]="!item.isRead" (click)="notifications.markAsRead(item.id)">
+                          <div class="notif-icon-wrap" [class]="item.category?.toLowerCase() || 'system'">
+                            <mat-icon>{{ getNotifIcon(item.category) }}</mat-icon>
+                          </div>
+                          <div class="notif-content">
+                            <div class="notif-title-row">
+                              <span class="notif-title">{{ item.title }}</span>
+                              @if (!item.isRead) {
+                                <div class="unread-dot" title="Unread"></div>
+                              }
+                            </div>
+                            <p class="notif-message">{{ item.content }}</p>
+                            <span class="notif-time">
+                              <mat-icon style="font-size: 12px; width: 12px; height: 12px;">schedule</mat-icon>
+                              {{ item.when }}
+                            </span>
+                          </div>
+                        </div>
+                      }
+                    } @else {
+                      <div class="notif-empty-state">
+                        <mat-icon>notifications_off</mat-icon>
+                        <p>No new notifications</p>
+                        <span style="font-size: 0.75rem; color: var(--txt-muted); margin-top: 0.5rem; display: block;">We'll notify you when something happens.</span>
+                      </div>
+                    }
+                  </div>
+
+                  <div class="notif-footer">
+                    <button mat-button [routerLink]="'/notifications'" class="view-all-btn">
+                      View All Activity
+                    </button>
+                  </div>
+                </div>
+              </mat-menu>
+              
+              <button class="header-action-btn" [routerLink]="'/settings'" title="Settings">
+                 <mat-icon>settings</mat-icon>
+              </button>
             </div>
-          }
-        </div>
+          </header>
 
-        <div class="nav-footer">
-          <button mat-icon-button (click)="isCollapsed.set(!isCollapsed())">
-            <mat-icon>{{ isCollapsed() ? 'chevron_right' : 'chevron_left' }}</mat-icon>
-          </button>
-        </div>
-      </mat-sidenav>
-
-      <mat-sidenav-content class="shell__content">
-        <header class="main-header">
-          <div class="header-left">
-            <button mat-icon-button class="mobile-menu" (click)="sidenav.toggle()">
-              <mat-icon>menu</mat-icon>
-            </button>
-            <div class="search-wrapper">
-              <mat-icon>search</mat-icon>
-              <input type="text" [(ngModel)]="search" placeholder="Search across the enterprise...">
-              <span class="search-shortcut">⌘K</span>
+          <div class="page-scroll-container custom-scrollbar">
+            <div class="fade-up" style="display: flex; flex-direction: column; flex: 1;">
+              <router-outlet />
             </div>
           </div>
+        </div>
+      </div>
+    </div>
 
-          <div class="header-right">
-            <div class="connectivity-status">
-              <span class="status-dot online"></span>
-              <span class="status-text">Gateway Live</span>
-            </div>
-            
-            <button mat-icon-button [routerLink]="'/notifications'" [matBadge]="notifications.unreadCount()" matBadgeColor="warn">
-              <mat-icon>notifications</mat-icon>
-            </button>
-            
-            <div class="user-trigger" [matMenuTriggerFor]="profileMenu">
-              <div class="avatar">{{ auth.user()?.avatar ?? 'EW' }}</div>
-              <div class="user-meta">
-                <span class="user-name">{{ auth.user()?.name ?? 'Guest User' }}</span>
-                <span class="user-role">{{ auth.user()?.role ?? 'Administrator' }}</span>
-              </div>
-              <mat-icon>expand_more</mat-icon>
-            </div>
-          </div>
-        </header>
+    <!-- GLOBAL UI OVERLAYS -->
+    <app-ai-assistant />
+    <app-global-search />
 
-        <main class="page-content">
-          <router-outlet />
-        </main>
-      </mat-sidenav-content>
-    </mat-sidenav-container>
+    <!-- TOAST NOTIFICATIONS -->
+    <div class="toast-notifications-container">
+       @for (toast of toastService.toasts(); track toast.id) {
+         <div class="toast-card" [class]="toast.severity + '-toast'">
+            <mat-icon style="font-size: 18px; width:18px; height:18px;">{{ toast.icon }}</mat-icon>
+            <span>{{ toast.message }}</span>
+         </div>
+       }
+    </div>
 
-    <mat-menu #profileMenu="matMenu" class="enterprise-menu">
-      <div class="menu-header">
-        <strong>{{ auth.user()?.name }}</strong>
-        <p>{{ auth.user()?.email }}</p>
+    <mat-menu #profileMenu="matMenu" class="user-dropdown">
+      <div class="menu-header" style="padding: 1rem 1.5rem;">
+        <strong style="display: block;">{{ auth.user()?.name }}</strong>
+        <p style="font-size: 0.75rem; color: var(--txt-muted); margin: 0;">{{ auth.user()?.email }}</p>
       </div>
       <mat-divider></mat-divider>
       <button mat-menu-item [routerLink]="'/profile'">
-        <mat-icon>account_circle</mat-icon>
-        <span>My Profile</span>
+        <mat-icon>manage_accounts</mat-icon>
+        <span>Security & Identity</span>
       </button>
-      <button mat-menu-item [routerLink]="'/communication'">
-        <mat-icon>forum</mat-icon>
-        <span>Workforce Chat</span>
-      </button>
-      <button mat-menu-item>
-        <mat-icon>settings</mat-icon>
-        <span>Preferences</span>
-      </button>
-      <mat-divider></mat-divider>
-      <button mat-menu-item (click)="logout()" class="logout-item">
-        <mat-icon>logout</mat-icon>
-        <span>Sign out of Console</span>
+      <button mat-menu-item (click)="logout()" style="color: var(--danger);">
+        <mat-icon color="warn">logout</mat-icon>
+        <span>Sign Out</span>
       </button>
     </mat-menu>
   `,
   styles: [`
-    .shell-container { min-height: 100vh; background: #f8fafc; }
-    
-    /* Sidebar */
-    .shell__nav { width: 17rem; transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1); background: #0f172a; color: #f1f5f9; border: none; display: flex; flex-direction: column; }
-    .shell__nav.collapsed { width: 5rem; }
-    
-    .brand { height: 5rem; display: flex; align-items: center; gap: 1rem; padding: 0 1.25rem; }
-    .brand__mark { width: 2.5rem; height: 2.5rem; min-width: 2.5rem; border-radius: 0.75rem; background: linear-gradient(135deg, #3b82f6, #06b6d4); color: #fff; display: grid; place-items: center; font-weight: 800; font-size: 1rem; box-shadow: 0 8px 16px rgba(59, 130, 246, 0.3); }
-    .brand__logo { width: 2.5rem; height: 2.5rem; min-width: 2.5rem; border-radius: 0.75rem; object-fit: contain; }
-    .brand__text h2 { margin: 0; font-size: 1.1rem; letter-spacing: 0.05em; }
-    .brand__text p { margin: 0; font-size: 0.7rem; color: #94a3b8; text-transform: uppercase; font-weight: 600; }
-    
-    .nav-content { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 1rem 0.75rem; }
-    .nav-section { margin-bottom: 1.5rem; }
-    .nav-section__title { font-size: 0.65rem; font-weight: 800; text-transform: uppercase; color: #64748b; letter-spacing: 0.1em; padding: 0 0.75rem 0.5rem; display: block; }
-    .section-divider { background: rgba(255,255,255,0.1); margin: 0.5rem 0; }
-    
-    .active-link { background: rgba(59, 130, 246, 0.1) !important; color: #60a5fa !important; border-radius: 0.75rem; }
-    .active-icon { color: #60a5fa; }
-    .pill { margin-left: auto; font-size: 0.65rem; font-weight: 700; background: #334155; padding: 0.15rem 0.4rem; border-radius: 999px; }
-    
-    .nav-footer { padding: 1rem; border-top: 1px solid rgba(255,255,255,0.05); text-align: center; }
-    
-    /* Header */
-    .shell__content { display: flex; flex-direction: column; }
-    .main-header { height: 5rem; background: #fff; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; padding: 0 2rem; position: sticky; top: 0; z-index: 100; }
-    
-    .header-left { display: flex; align-items: center; gap: 1.5rem; flex: 1; }
-    .search-wrapper { position: relative; background: #f1f5f9; border-radius: 0.75rem; padding: 0 1rem; display: flex; align-items: center; gap: 0.75rem; width: min(30rem, 100%); height: 2.75rem; border: 1px solid transparent; transition: all 0.2s; }
-    .search-wrapper:focus-within { background: #fff; border-color: #3b82f6; box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1); }
-    .search-wrapper input { border: none; background: transparent; outline: none; flex: 1; font-size: 0.9rem; color: #1e293b; }
-    .search-wrapper mat-icon { color: #64748b; font-size: 1.25rem; width: 1.25rem; height: 1.25rem; }
-    .search-shortcut { font-size: 0.7rem; color: #94a3b8; border: 1px solid #cbd5e1; padding: 0.1rem 0.3rem; border-radius: 4px; }
-    
-    .header-right { display: flex; align-items: center; gap: 1.5rem; }
-    .connectivity-status { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0.75rem; background: #f0fdf4; border-radius: 999px; border: 1px solid #dcfce7; }
-    .status-dot { width: 0.5rem; height: 0.5rem; border-radius: 50%; }
-    .status-dot.online { background: #22c55e; box-shadow: 0 0 8px rgba(34,197,94,0.5); }
-    .status-text { font-size: 0.75rem; font-weight: 600; color: #166534; }
-    
-    .user-trigger { display: flex; align-items: center; gap: 0.75rem; padding: 0.4rem; border-radius: 0.75rem; cursor: pointer; transition: background 0.2s; }
-    .user-trigger:hover { background: #f1f5f9; }
-    .user-trigger .avatar { width: 2.25rem; height: 2.25rem; border-radius: 0.6rem; background: #3b82f6; color: #fff; display: grid; place-items: center; font-weight: 700; }
-    .user-meta { display: flex; flex-direction: column; }
-    .user-name { font-size: 0.85rem; font-weight: 700; color: #0f172a; line-height: 1.2; }
-    .user-role { font-size: 0.7rem; color: #64748b; font-weight: 500; }
-    
-    .page-content { flex: 1; padding: 2rem; max-width: 1600px; margin: 0 auto; width: 100%; box-sizing: border-box; }
-    
-    .mobile-menu { display: none; }
-    
-    @media (max-width: 1024px) {
-      .shell__nav { position: fixed; z-index: 1000; height: 100vh; }
-      .mobile-menu { display: block; }
-      .search-wrapper { display: none; }
-      .main-header { padding: 0 1rem; }
-      .page-content { padding: 1rem; }
-      .connectivity-status { display: none; }
+    :host { display: block; height: 100vh; overflow: hidden; }
+
+    .notification-dropdown {
+      max-width: none !important;
+      margin-top: 12px;
+      border-radius: var(--radius-lg) !important;
+      box-shadow: var(--shadow-lg) !important;
+      border: 1px solid var(--border) !important;
     }
 
-    @media (max-width: 640px) {
-      .user-meta { display: none; }
-      .main-header { height: 4rem; }
-      .brand { height: 4rem; }
+    .notif-dropdown-container {
+      width: 400px;
+      max-width: calc(100vw - 32px);
+      background: var(--surface);
+      display: flex;
+      flex-direction: column;
+      outline: none;
+    }
+
+    .notif-header {
+      padding: 1.25rem 1.5rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+    }
+
+    .notif-header h3 {
+      margin: 0;
+      font-size: 1.1rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: var(--txt-main);
+    }
+
+    .mark-all-btn {
+      font-size: 0.72rem !important;
+      font-weight: 800 !important;
+      text-transform: uppercase !important;
+      letter-spacing: 0.05em !important;
+      color: var(--primary) !important;
+    }
+
+    .notif-list {
+      max-height: 480px;
+      overflow-y: auto;
+      background: var(--bg);
+    }
+
+    .notif-item {
+      padding: 1.15rem 1.5rem;
+      display: flex;
+      gap: 1.15rem;
+      cursor: pointer;
+      transition: all 0.2s var(--ease);
+      border-bottom: 1px solid var(--border);
+      position: relative;
+      background: var(--surface);
+    }
+
+    .notif-item:hover {
+      background: var(--surface-2);
+      transform: translateX(4px);
+    }
+
+    .notif-item.unread {
+      background: var(--primary-soft);
+    }
+
+    .notif-icon-wrap {
+      width: 44px;
+      height: 44px;
+      border-radius: var(--radius-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      background: var(--surface-3);
+      color: var(--txt-secondary);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .notif-icon-wrap mat-icon {
+      font-size: 1.25rem;
+      width: 1.25rem;
+      height: 1.25rem;
+    }
+
+    .notif-icon-wrap.leave { background: var(--warning-soft); color: var(--warning); border: 1px solid rgba(245, 158, 11, 0.2); }
+    .notif-icon-wrap.attendance { background: var(--primary-soft); color: var(--primary); border: 1px solid rgba(47, 111, 235, 0.2); }
+    .notif-icon-wrap.payroll { background: var(--success-soft); color: var(--success); border: 1px solid rgba(16, 185, 129, 0.2); }
+    .notif-icon-wrap.message { background: var(--accent-soft); color: var(--accent); border: 1px solid rgba(139, 92, 246, 0.2); }
+    .notif-icon-wrap.compliance { background: var(--danger-soft); color: var(--danger); border: 1px solid rgba(239, 68, 68, 0.2); }
+
+    .notif-content {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .notif-title-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.35rem;
+    }
+
+    .notif-title {
+      font-size: 0.9rem;
+      font-weight: 800;
+      color: var(--txt-main);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      letter-spacing: -0.01em;
+    }
+
+    .unread-dot {
+      width: 10px;
+      height: 10px;
+      background: var(--primary);
+      border-radius: 50%;
+      flex-shrink: 0;
+      box-shadow: 0 0 8px var(--primary);
+      animation: pulseNotif 2s infinite;
+    }
+
+    @keyframes pulseNotif {
+      0% { box-shadow: 0 0 0 0 rgba(47, 111, 235, 0.6); }
+      70% { box-shadow: 0 0 0 6px rgba(47, 111, 235, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(47, 111, 235, 0); }
+    }
+
+    .notif-message {
+      margin: 0;
+      font-size: 0.82rem;
+      color: var(--txt-secondary);
+      line-height: 1.5;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      font-weight: 500;
+    }
+
+    .notif-time {
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+      margin-top: 0.6rem;
+      font-size: 0.72rem;
+      color: var(--txt-muted);
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+    }
+
+    .notif-empty-state {
+      padding: 4rem 2rem;
+      text-align: center;
+      background: var(--surface);
+    }
+
+    .notif-empty-state mat-icon {
+      font-size: 3.5rem;
+      width: 3.5rem;
+      height: 3.5rem;
+      margin-bottom: 1.25rem;
+      color: var(--txt-muted);
+      opacity: 0.3;
+    }
+
+    .notif-empty-state p {
+      margin: 0;
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--txt-secondary);
+    }
+
+    .notif-footer {
+      padding: 1rem;
+      border-top: 1px solid var(--border);
+      background: var(--surface);
+    }
+
+    .view-all-btn {
+      width: 100%;
+      height: 44px;
+      font-size: 0.85rem !important;
+      font-weight: 800 !important;
+      border-radius: var(--radius-md) !important;
+      background: var(--surface-2) !important;
+      color: var(--txt-main) !important;
+    }
+
+    .view-all-btn:hover {
+      background: var(--surface-3) !important;
+    }
+
+    @media (max-width: 480px) {
+      .notif-dropdown-container {
+        width: 100vw;
+        height: auto;
+      }
     }
   `]
 })
-export class AppShellComponent {
+export class AppShellComponent implements OnInit, OnDestroy {
   protected readonly auth = inject(AuthService);
   protected readonly notifications = inject(NotificationCenterService);
   protected readonly theme = inject(ThemeService);
-  private readonly router = inject(Router);
-  protected search = '';
-  protected readonly isCollapsed = signal(false);
+  protected readonly toastService = inject(ToastService);
+  protected readonly search = inject(SearchService);
+  protected readonly router = inject(Router);
+
+  protected readonly liveTime = signal(Date.now());
+  private timerHandle?: any;
+  protected readonly isSidebarOpen = signal(false);
 
   private readonly navItems: NavigationItemExtended[] = [
-    { label: 'Dashboard', icon: 'grid_view', route: '/dashboard', section: 'Overview' },
-    { label: 'Notifications', icon: 'notifications', route: '/notifications', section: 'Overview', badge: '5' },
-    
-    { label: 'Employees', icon: 'person_search', route: '/employees', section: 'Workforce', roles: ['ADMIN', 'MANAGER'] },
-    { label: 'Attendance', icon: 'fact_check', route: '/attendance', section: 'Workforce' },
-    { label: 'Leaves', icon: 'event_busy', route: '/leaves', section: 'Workforce' },
-    { label: 'Scheduling', icon: 'calendar_today', route: '/scheduling', section: 'Workforce' },
-    { label: 'Team Calendar', icon: 'date_range', route: '/team-calendar', section: 'Workforce' },
-    { label: 'Timesheet Reports', icon: 'summarize', route: '/reports', section: 'Workforce', roles: ['ADMIN', 'MANAGER'] },
-    { label: 'Organization', icon: 'lan', route: '/organization', section: 'Workforce', roles: ['ADMIN'] },
-    
-    { label: 'Payroll', icon: 'payments', route: '/payroll', section: 'Execution' },
-    { label: 'Performance', icon: 'insights', route: '/performance', section: 'Execution', roles: ['ADMIN', 'MANAGER'] },
-    { label: 'Compliance', icon: 'gavel', route: '/compliance', section: 'Execution', roles: ['ADMIN'] },
-    { label: 'Documents', icon: 'description', route: '/documents', section: 'Execution' },
-    
-    { label: 'Analytics', icon: 'bar_chart', route: '/analytics', section: 'Insights', roles: ['ADMIN', 'MANAGER'] },
-    { label: 'Communication', icon: 'chat', route: '/communication', section: 'Insights', badge: 'Live' },
-    { label: 'Tasks', icon: 'assignment_turned_in', route: '/tasks', section: 'Insights' },
-    { label: 'Announcements', icon: 'campaign', route: '/announcements', section: 'Insights' },
-    { label: 'Help Desk', icon: 'support_agent', route: '/helpdesk', section: 'Insights' },
-    
-    { label: 'Roles & Permissions', icon: 'security', route: '/roles', section: 'Administration', roles: ['ADMIN'] },
-    { label: 'Company Branding', icon: 'palette', route: '/organization/branding', section: 'Administration', roles: ['ADMIN'] },
-    { label: 'Settings', icon: 'settings', route: '/settings', section: 'Administration' }
+    { label: 'Dashboard', icon: 'dashboard', route: '/dashboard', section: 'Workspace' },
+    { label: 'Messages', icon: 'chat', route: '/communication', section: 'Workspace', scopes: ['CHAT_DM_READ', 'CHAT_CHANNEL_READ', 'CHAT_DM_WRITE', 'CHAT_CHANNEL_CREATE'] },
+
+    { label: 'Employees', icon: 'people', route: '/employees', section: 'Workforce', scopes: ['USER_ORG_READ', 'USER_TEAM_READ'] },
+    { label: 'Scheduling', icon: 'calendar_today', route: '/scheduling', section: 'Workforce', scopes: ['SCHEDULE_ORG_READ', 'SCHEDULE_TEAM_READ'] },
+    { label: 'Attendance', icon: 'timer', route: '/attendance', section: 'Workforce', scopes: ['ATTENDANCE_SELF_READ', 'ATTENDANCE_TEAM_READ', 'ATTENDANCE_ORG_READ'] },
+    { label: 'Leaves', icon: 'event_busy', route: '/leaves', section: 'Workforce', scopes: ['LEAVE_SELF_READ', 'LEAVE_TEAM_READ', 'LEAVE_ORG_READ'] },
+
+    { label: 'Payroll Hub', icon: 'payments', route: '/payroll', section: 'Administration', scopes: ['PAYROLL_ORG_READ'] },
+    { label: 'Compliance Ledger', icon: 'gavel', route: '/compliance', section: 'Administration', scopes: ['AUDIT_ORG_READ'] },
+    { label: 'Permissions', icon: 'admin_panel_settings', route: '/roles', section: 'Administration', scopes: ['ROLE_ORG_READ'] },
+
+    { label: 'My Profile', icon: 'account_circle', route: '/profile', section: 'Account' },
+    { label: 'Settings', icon: 'settings', route: '/settings', section: 'Account' }
   ];
 
-  protected readonly sections = computed(() => {
-    const userRole = this.auth.user()?.role || 'EMPLOYEE';
-    const items = this.navItems.filter(item => !item.roles || item.roles.includes(userRole));
-    return [...new Set(items.map((item) => item.section))];
+  protected readonly filteredSections = computed(() => {
+    const items = this.navItems.filter(item => this.canAccess(item));
+    return [...new Set(items.map(item => item.section))];
   });
 
-  protected itemsForSection(section: string): NavigationItem[] {
-    const userRole = this.auth.user()?.role || 'EMPLOYEE';
-    return this.navItems.filter((item) => 
-      item.section === section && (!item.roles || item.roles.includes(userRole))
-    );
+  protected readonly currentRouteLabel = computed(() => {
+    const url = this.router.url;
+    const item = this.navItems.find(i => url.includes(i.route));
+    return item?.label || 'Dashboard';
+  });
+
+  ngOnInit(): void {
+    this.timerHandle = setInterval(() => this.liveTime.set(Date.now()), 1000);
   }
 
-  protected isActive(route: string): boolean {
-    return this.router.url.startsWith(route);
+  ngOnDestroy(): void {
+    if (this.timerHandle) {
+      clearInterval(this.timerHandle);
+    }
+  }
+
+  protected itemsForSection(section: string): NavigationItem[] {
+    return this.navItems.filter((item) => item.section === section && this.canAccess(item));
+  }
+
+  private canAccess(item: NavigationItemExtended): boolean {
+    if (!item.scopes || item.scopes.length === 0) return true;
+    return this.auth.hasAnyScope(item.scopes);
+  }
+
+  protected getInitials(name?: string) {
+    if (!name) return 'OA';
+    return name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
   }
 
   protected logout(): void {
     this.auth.logout();
     void this.router.navigateByUrl('/auth/login');
+  }
+
+  protected getNotifIcon(category?: string): string {
+    switch (category?.toLowerCase()) {
+      case 'leave': return 'event_busy';
+      case 'attendance': return 'timer';
+      case 'payroll': return 'payments';
+      case 'message': return 'chat';
+      case 'permission': return 'admin_panel_settings';
+      case 'compliance': return 'gavel';
+      default: return 'notifications';
+    }
   }
 }

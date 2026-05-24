@@ -1,534 +1,435 @@
-import { Component, effect, inject, signal, computed, OnInit } from '@angular/core';
+import { Component, effect, inject, signal, computed, OnInit, ViewChild } from '@angular/core';
 import { CommonModule, DatePipe } from '@angular/common';
-import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
-import { MatTableModule } from '@angular/material/table';
-import { MatDialogModule, MatDialog, MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
-import { MatSelectModule } from '@angular/material/select';
+import { MatTableModule, MatTableDataSource } from '@angular/material/table';
+import { MatMenuModule } from '@angular/material/menu';
 import { MatSnackBarModule, MatSnackBar } from '@angular/material/snack-bar';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatDividerModule } from '@angular/material/divider';
-import { MatChipsModule } from '@angular/material/chips';
-import { MatButtonToggleModule } from '@angular/material/button-toggle';
-import { CdkDragDrop, DragDropModule, moveItemInArray, transferArrayItem } from '@angular/cdk/drag-drop';
-import { FormsModule, ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
-import { SchedulingService, Shift, ShiftConflictRecord, ShiftConflictResponse } from '../../core/services/scheduling.service';
-import { EmployeeDataService } from '../../core/services/employee-data.service';
-import { OrganizationService } from '../../core/services/organization.service';
+import { MatPaginatorModule, MatPaginator } from '@angular/material/paginator';
+import { MatSortModule, MatSort } from '@angular/material/sort';
+import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { SchedulingService, Shift } from '../../core/services/scheduling.service';
+import { EmployeeDataService, Employee } from '../../core/services/employee-data.service';
 import { WidgetSocketService } from '../../core/services/widget-socket.service';
-import { PageHeaderComponent } from '../../shared/components/page-header.component';
-import { StatusBadgeComponent } from '../../shared/components/status-badge.component';
+import { AuthService } from '../../core/services/auth.service';
 import { toSignal } from '@angular/core/rxjs-interop';
+import { HasScopeDirective } from '../../shared/directives/has-scope.directive';
+import { SideSheetDrawerComponent } from '../../shared/components/side-sheet-drawer/side-sheet-drawer.component';
+import { catchError, of } from 'rxjs';
 
 @Component({
   selector: 'app-scheduling-page',
   standalone: true,
   imports: [
-    CommonModule,
-    MatCardModule,
-    MatButtonModule,
-    MatIconModule,
-    MatTableModule,
-    MatDialogModule,
-    MatSnackBarModule,
-    MatDividerModule,
-    MatChipsModule,
-    MatButtonToggleModule,
-    DragDropModule,
-    PageHeaderComponent,
-    StatusBadgeComponent,
-    DatePipe
+    CommonModule, MatButtonModule, MatIconModule, MatTableModule, MatMenuModule,
+    MatSnackBarModule, MatProgressSpinnerModule, MatDividerModule, MatPaginatorModule,
+    MatSortModule, ReactiveFormsModule, HasScopeDirective, SideSheetDrawerComponent, DatePipe
   ],
   template: `
-    <app-page-header 
-      title="Scheduling & Rosters" 
-      subtitle="Optimize workforce coverage, manage shift swaps, and publish weekly schedules." 
-      actionLabel="Create Shift"
-      (action)="openShiftDialog()"
-    />
-
-    <section class="scheduling-shell">
-      <!-- Summary Ribbon -->
-      <div class="summary-ribbon">
-        <mat-card class="summary-box good">
-          <label>Published Coverage</label>
-          <div class="value">{{ coveragePercentage() }}%</div>
-          <p class="delta">Goal: 95%</p>
-        </mat-card>
-        <mat-card class="summary-box warn">
-          <label>Coverage Gaps</label>
-          <div class="value">{{ shiftsWithoutStaff().length }}</div>
-          <p class="delta">Unassigned shifts</p>
-        </mat-card>
-        <mat-card class="summary-box alert" [class.danger]="conflicts().length > 0">
-          <label>Schedule Conflicts</label>
-          <div class="value">{{ conflicts().length }}</div>
-          <p class="delta">{{ conflicts().length > 0 ? 'Resolution required' : 'All clear' }}</p>
-        </mat-card>
-      </div>
-
-      <div class="roster-view mt-6">
-        <mat-card class="data-card overflow-hidden">
-          <div class="card-header bg-slate-50 border-b">
-            <div class="flex items-center gap-4">
-              <h3 class="font-bold m-0">Shift Registry</h3>
-              <mat-button-toggle-group [value]="viewMode()" (change)="viewMode.set($event.value)">
-                <mat-button-toggle value="list"><mat-icon>list</mat-icon></mat-button-toggle>
-                <mat-button-toggle value="week"><mat-icon>view_week</mat-icon></mat-button-toggle>
-              </mat-button-toggle-group>
-            </div>
-            
-            <div class="header-actions">
-              <button mat-stroked-button class="mr-2">Previous Week</button>
-              <button mat-stroked-button class="mr-2">Next Week</button>
-              <button mat-flat-button color="primary">Publish All</button>
-            </div>
+    <div class="module-page active-page fade-up" id="page-scheduling">
+      
+      <!-- PAGE HEADER -->
+      <div class="filter-action-row">
+        <div class="filter-ctrls-group">
+          <div class="input-icon-wrap" style="width:320px;">
+            <mat-icon style="font-size:18px; width:18px; height:18px; left:0.75rem; color:var(--txt-muted)">search</mat-icon>
+            <input type="text" class="f-input" style="padding-left:2.5rem; height:42px; border-radius:10px;" 
+                   (keyup)="applyFilter($event)" placeholder="Search rosters (name, area, status)..." #filterInput>
           </div>
-          
-          @if (viewMode() === 'list') {
-            <table mat-table [dataSource]="shifts()" class="w-full">
-              <ng-container matColumnDef="employee">
-                <th mat-header-cell *matHeaderCellDef>Employee</th>
-                <td mat-cell *matCellDef="let row">
-                  <div class="user-cell">
-                    <div class="mini-avatar" [style.background-color]="row.employeeId ? '#eff6ff' : '#fef2f2'">
-                      {{row.employeeId || '?'}}
-                    </div>
-                    <div class="flex flex-col">
-                      <strong>{{ row.employeeId ? 'Staff #' + row.employeeId : 'Unassigned' }}</strong>
-                      <span class="text-xs text-slate-400">Main Location</span>
-                    </div>
-                  </div>
-                </td>
-              </ng-container>
-
-              <ng-container matColumnDef="time">
-                <th mat-header-cell *matHeaderCellDef>Shift Interval</th>
-                <td mat-cell *matCellDef="let row">
-                  <div class="time-block">
-                    <span class="font-bold text-slate-900">{{row.startTime | date:'shortTime'}} - {{row.endTime | date:'shortTime'}}</span>
-                    <p class="date-sub">{{row.startTime | date:'EEEE, MMM d'}}</p>
-                  </div>
-                </td>
-              </ng-container>
-
-              <ng-container matColumnDef="status">
-                <th mat-header-cell *matHeaderCellDef>Audit</th>
-                <td mat-cell *matCellDef="let row">
-                  <div class="flex items-center gap-2">
-                    <app-status-badge [value]="row.status" />
-                    @if (hasConflict(row)) {
-                      <mat-icon class="text-red-500" title="Overlapping Shift Detected">warning</mat-icon>
-                    }
-                  </div>
-                </td>
-              </ng-container>
-
-              <ng-container matColumnDef="actions">
-                <th mat-header-cell *matHeaderCellDef></th>
-                <td mat-cell *matCellDef="let row" class="text-right">
-                  <button mat-icon-button (click)="openShiftDialog(row)"><mat-icon>edit</mat-icon></button>
-                  <button mat-icon-button color="warn"><mat-icon>delete</mat-icon></button>
-                </td>
-              </ng-container>
-
-              <tr mat-header-row *matHeaderRowDef="['employee', 'time', 'status', 'actions']"></tr>
-              <tr mat-row *matRowDef="let row; columns: ['employee', 'time', 'status', 'actions'];" [class.row-conflict]="hasConflict(row)"></tr>
-            </table>
-          } @else {
-            <div class="week-grid-container p-4" cdkDropListGroup>
-              <div class="week-row">
-                @for (day of weekDays(); track day.date) {
-                  <div class="day-column">
-                    <div class="day-header">
-                      <span class="day-name">{{ day.name }}</span>
-                      <span class="day-date">{{ day.date | date:'MMM d' }}</span>
-                    </div>
-                    <div class="shift-list" 
-                         cdkDropList 
-                         [cdkDropListData]="getShiftsForDay(day.date)"
-                         (cdkDropListDropped)="onShiftDropped($event, day.date)">
-                      @for (shift of getShiftsForDay(day.date); track shift.id) {
-                        <div class="shift-card" cdkDrag [cdkDragData]="shift" [class.is-conflict]="hasConflict(shift)">
-                          <div class="shift-time">{{ shift.startTime | date:'shortTime' }} - {{ shift.endTime | date:'shortTime' }}</div>
-                          <div class="shift-staff">Staff #{{ shift.employeeId || '?' }}</div>
-                          @if (hasConflict(shift)) {
-                            <mat-icon class="conflict-icon">warning</mat-icon>
-                          }
-                          <div class="shift-placeholder" *cdkDragPlaceholder></div>
-                        </div>
-                      }
-                      @if (getShiftsForDay(day.date).length === 0) {
-                        <div class="day-empty">No shifts</div>
-                      }
-                    </div>
-                  </div>
-                }
-              </div>
-            </div>
-          }
-
-          @if (shifts().length === 0) {
-            <div class="empty-state">No shifts found for the current period.</div>
-          }
-        </mat-card>
+          <div class="ui-card" style="margin-bottom:0; padding:0 1rem; background:var(--surface-2); display:flex; align-items:center; gap:0.5rem; height:42px; border-radius:10px;">
+            <span style="font-size:0.7rem; font-weight:800; color:var(--txt-muted); text-transform:uppercase;">Epoch:</span>
+            <strong style="font-size:0.8rem;">W24 - MAY 2026</strong>
+          </div>
+        </div>
+        <button class="ui-btn ui-btn-primary" (click)="openAddDrawer()" *appHasScope="'SCHEDULE_WRITE'">
+          <mat-icon style="font-size:1.1rem; width:1.1rem; height:1.1rem;">add</mat-icon>
+          Deploy Shift
+        </button>
       </div>
-    </section>
+
+      <div class="ui-card" style="padding:0; overflow:visible; border-radius:14px;">
+        @if (isLoading()) {
+          <div class="table-loading-overlay" style="padding:4rem; text-align:center;">
+            <mat-spinner diameter="40" style="margin:0 auto;"></mat-spinner>
+            <p style="margin-top:1rem; color:var(--txt-muted); font-size:0.85rem;">Synchronizing shift telemetry...</p>
+          </div>
+        } @else {
+          <div class="table-container custom-scrollbar">
+            <table mat-table [dataSource]="dataSource" matSort class="ui-table">
+              
+              <!-- Employee Column -->
+              <ng-container matColumnDef="employee">
+                <th mat-header-cell *matHeaderCellDef mat-sort-header>Assigned Node</th>
+                <td mat-cell *matCellDef="let shift">
+                  <div style="display:flex; align-items:center; gap:0.75rem;">
+                    <div class="avatar-sm">{{ getInitials(shift.employeeId) }}</div>
+                    <span style="font-weight:700;">{{ getEmployeeName(shift.employeeId) }}</span>
+                  </div>
+                </td>
+              </ng-container>
+
+              <!-- Time Column -->
+              <ng-container matColumnDef="time">
+                <th mat-header-cell *matHeaderCellDef mat-sort-header>Epoch Interval</th>
+                <td mat-cell *matCellDef="let shift">
+                  <div style="display:flex; flex-direction:column; gap:2px;">
+                    <span style="font-weight:700; font-size:0.85rem;">{{ shift.startTime | date:'MMM d, HH:mm' }}</span>
+                    <span style="color:var(--txt-muted); font-size:0.7rem; font-family:'JetBrains Mono';">UNTIL {{ shift.endTime | date:'HH:mm' }}</span>
+                  </div>
+                </td>
+              </ng-container>
+
+              <!-- Area Column -->
+              <ng-container matColumnDef="area">
+                <th mat-header-cell *matHeaderCellDef mat-sort-header>Sector / Area</th>
+                <td mat-cell *matCellDef="let shift">
+                  <span class="ui-badge" style="background:var(--surface-2); color:var(--txt-secondary);">{{ shift.area || 'GENERAL' }}</span>
+                </td>
+              </ng-container>
+
+              <!-- Status Column -->
+              <ng-container matColumnDef="status">
+                <th mat-header-cell *matHeaderCellDef mat-sort-header>Deployment Status</th>
+                <td mat-cell *matCellDef="let shift">
+                  <span class="ui-badge" [class.ui-badge-success]="shift.status === 'PUBLISHED'" 
+                                        [class.ui-badge-warning]="shift.status === 'ASSIGNED'"
+                                        [class.ui-badge-danger]="shift.status === 'CANCELLED'">
+                    {{ shift.status }}
+                  </span>
+                </td>
+              </ng-container>
+
+              <!-- Actions Column -->
+              <ng-container matColumnDef="actions">
+                <th mat-header-cell *matHeaderCellDef style="text-align:right;"></th>
+                <td mat-cell *matCellDef="let shift" style="text-align:right;">
+                  <button mat-icon-button [matMenuTriggerFor]="menu" class="action-trigger">
+                    <mat-icon style="color:var(--txt-muted); font-size:18px;">more_vert</mat-icon>
+                  </button>
+                  <mat-menu #menu="matMenu" xPosition="before" class="ui-menu">
+                    <button mat-menu-item (click)="openViewDrawer(shift)">
+                      <mat-icon>visibility</mat-icon>
+                      <span>Inspect Packet</span>
+                    </button>
+                    <button mat-menu-item (click)="openEditDrawer(shift)" *appHasScope="'SCHEDULE_WRITE'">
+                      <mat-icon>edit</mat-icon>
+                      <span>Modify Roster</span>
+                    </button>
+                    <mat-divider *appHasScope="'SCHEDULE_WRITE'"></mat-divider>
+                    <button mat-menu-item (click)="confirmDelete(shift)" style="color:var(--danger);" *appHasScope="'SCHEDULE_WRITE'">
+                      <mat-icon style="color:var(--danger);">delete_forever</mat-icon>
+                      <span>Purge Deployment</span>
+                    </button>
+                  </mat-menu>
+                </td>
+              </ng-container>
+
+              <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+              <tr mat-row *matRowDef="let row; columns: displayedColumns;" class="table-row-hover"></tr>
+            </table>
+          </div>
+
+          <div class="table-pag-row" style="padding: 1rem 1.5rem; border-top:1px solid var(--border);">
+            <span class="pag-counter-label">
+              Total Active Deployments: {{ dataSource.filteredData.length }}
+            </span>
+            <mat-paginator [pageSizeOptions]="[10, 25, 100]" hidePageSize="true" style="background:transparent;"></mat-paginator>
+          </div>
+        }
+      </div>
+
+    </div>
+
+    <!-- CRUD SIDE SHEET DRAWER -->
+    <app-side-sheet-drawer
+      [isOpen]="isDrawerOpen"
+      [title]="drawerTitle"
+      [subtitle]="drawerSubtitle"
+      [saveText]="drawerSaveText"
+      [saveDisabled]="shiftForm.invalid"
+      [showFooter]="currentMode !== 'view'"
+      (close)="closeDrawer()"
+      (save)="saveShift()"
+    >
+      <form [formGroup]="shiftForm" class="drawer-crud-form">
+        
+        <div class="form-section">Target Assignment</div>
+        <div class="f-group">
+          <label>Personnel Node</label>
+          <select class="f-input" formControlName="employeeId">
+            <option [value]="null">UNASSIGNED_SLOT</option>
+            @for (emp of employees(); track emp.id) {
+              <option [value]="emp.id">{{ emp.firstName }} {{ emp.lastName }} ({{ emp.employeeNumber }})</option>
+            }
+          </select>
+        </div>
+
+        <div class="form-section">Epoch Configuration</div>
+        <div class="f-grid">
+          <div class="f-group">
+            <label>Start Interval</label>
+            <input class="f-input" type="datetime-local" formControlName="startTime">
+          </div>
+          <div class="f-group">
+            <label>Termination Interval</label>
+            <input class="f-input" type="datetime-local" formControlName="endTime">
+          </div>
+        </div>
+
+        <div class="form-section">Deployment Metadata</div>
+        <div class="f-grid">
+          <div class="f-group">
+            <label>Sector / Area</label>
+            <input class="f-input" formControlName="area" placeholder="e.g. Sector-A, HQ">
+          </div>
+          <div class="f-group">
+            <label>Operational Status</label>
+            <select class="f-input" formControlName="status">
+              <option value="OPEN">Open (Unassigned)</option>
+              <option value="ASSIGNED">Assigned</option>
+              <option value="PUBLISHED">Published (Locked)</option>
+              <option value="CANCELLED">Cancelled</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="f-group">
+          <label>Administrative Notes</label>
+          <textarea class="f-input" formControlName="notes" style="height:100px; padding:0.75rem;" placeholder="Special instructions for the deployment node..."></textarea>
+        </div>
+
+      </form>
+    </app-side-sheet-drawer>
+
+    <!-- CONFIRM PURGE MODAL -->
+    <div class="confirm-modal-overlay" [class.open]="showDeleteConfirm">
+      <div class="confirm-modal-box">
+        <mat-icon style="font-size:3rem; width:3rem; height:3rem; color:var(--danger); margin-bottom:1rem;">auto_delete</mat-icon>
+        <h3>Confirm Deployment Purge?</h3>
+        <p>This will permanently remove the shift packet from the operational roster. This action is irreversible.</p>
+        <div style="display:flex; gap:0.75rem; margin-top:2rem; justify-content:center;">
+          <button class="ui-btn ui-btn-secondary" (click)="showDeleteConfirm = false">Abort Purge</button>
+          <button class="ui-btn ui-btn-danger" (click)="executeDelete()">Confirm Purge</button>
+        </div>
+      </div>
+    </div>
   `,
   styles: [`
-    .scheduling-shell { margin-top: 1.5rem; }
-    .summary-ribbon { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem; }
-    .summary-box { padding: 1.5rem; border-radius: 1.5rem; border: 1px solid #e2e8f0; box-shadow: none !important; }
-    .summary-box label { font-size: 0.75rem; font-weight: 800; text-transform: uppercase; color: #94a3b8; letter-spacing: 0.1em; }
-    .summary-box .value { font-size: 2.25rem; font-weight: 900; margin: 0.25rem 0; color: #1e293b; }
-    .summary-box.good { border-left: 4px solid #10b981; }
-    .summary-box.warn { border-left: 4px solid #f59e0b; }
-    .summary-box.alert { border-left: 4px solid #cbd5e1; }
-    .summary-box.alert.danger { border-left-color: #ef4444; background: #fef2f2; }
-    .summary-box.alert.danger .value { color: #ef4444; }
-    .summary-box .delta { margin: 0; font-size: 0.8rem; font-weight: 600; color: #64748b; }
-
-    .mt-6 { margin-top: 1.5rem; }
-    .w-full { width: 100%; }
-    .text-right { text-align: right; }
-    .mr-2 { margin-right: 0.5rem; }
-
-    .data-card { border-radius: 1.5rem; border: 1px solid #e2e8f0; box-shadow: none !important; }
-    .card-header { padding: 1.25rem 1.5rem; display: flex; justify-content: space-between; align-items: center; }
-    .card-header h3 { font-size: 1.1rem; font-weight: 800; color: #0f172a; }
+    :host { display: block; height: 100%; }
+    .table-container { min-height: 400px; position: relative; }
+    .text-mono { font-family: 'JetBrains Mono', monospace; }
+    .action-trigger:hover { background: var(--surface-2); }
     
-    th { background: #f8fafc; text-transform: uppercase; font-size: 0.7rem; letter-spacing: 0.1em; font-weight: 800; color: #64748b; }
-    td { border-bottom: 1px solid #f1f5f9; padding: 1rem !important; }
+    .form-section { font-size: 0.7rem; font-weight: 800; color: var(--primary); text-transform: uppercase; letter-spacing: 0.08em; margin: 1.5rem 0 1rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; }
+    .f-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    .f-group { display: flex; flex-direction: column; gap: 0.4rem; margin-bottom: 1rem; }
+    .f-group label { font-size: 0.75rem; font-weight: 700; color: var(--txt-secondary); text-transform: uppercase; letter-spacing: 0.03em; }
+    .f-input { height: 42px; border-radius: 8px; border: 1.5px solid var(--border); padding: 0 0.85rem; font-family: inherit; font-size: 0.85rem; background: var(--surface); color: var(--txt-main); width: 100%; outline: none; transition: border-color 0.2s; }
+    .f-input:focus { border-color: var(--primary); }
 
-    .user-cell { display: flex; align-items: center; gap: 1rem; }
-    .mini-avatar { width: 2.5rem; height: 2.5rem; border-radius: 0.75rem; color: #1e40af; display: grid; place-items: center; font-weight: 900; font-size: 0.9rem; }
+    .confirm-modal-overlay { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.7); z-index: 9999; display: none; align-items: center; justify-content: center; backdrop-filter: blur(4px); transition: all 0.3s; }
+    .confirm-modal-overlay.open { display: flex; }
+    .confirm-modal-box { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 2.5rem; width: 440px; max-width: 95vw; box-shadow: var(--shadow-lg); text-align: center; }
     
-    .time-block { display: flex; flex-direction: column; }
-    .date-sub { margin: 0; font-size: 0.75rem; color: #64748b; font-weight: 500; }
-    .empty-state { padding: 4rem 1rem; text-align: center; color: #94a3b8; font-weight: 600; }
+    .ui-btn { padding: 0.6rem 1.2rem; border-radius: 10px; font-size: 0.85rem; font-weight: 700; cursor: pointer; border: none; display: inline-flex; align-items: center; gap: 0.5rem; transition: all 0.2s; }
+    .ui-btn-primary { background: var(--primary); color: #fff; box-shadow: 0 4px 12px rgba(47, 111, 235, 0.2); }
+    .ui-btn-danger { background: var(--danger); color: #fff; }
+    .ui-btn-secondary { background: var(--surface-2); color: var(--txt-secondary); }
 
-    .row-conflict { background-color: #fff1f2; }
-    .row-conflict:hover { background-color: #ffe4e6 !important; }
+    .ui-table th { padding: 0.85rem 1.25rem; background: var(--surface-2); color: var(--txt-secondary); font-size: 0.68rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid var(--border); }
+    .ui-table td { padding: 1.1rem 1.25rem; border-bottom: 1px solid var(--border); font-size: 0.85rem; color: var(--txt-main); }
+    .table-row-hover:hover td { background: var(--surface-2); }
 
-    @media (max-width: 768px) {
-      .card-header { flex-direction: column; align-items: flex-start; gap: 1rem; }
-      .header-actions { width: 100%; display: flex; gap: 0.5rem; }
-      .header-actions button { flex: 1; font-size: 0.7rem; padding: 0 0.5rem; }
-    }
-
-    /* Week Grid Styles */
-    .week-grid-container { min-height: 500px; overflow-x: auto; }
-    .week-row { display: flex; gap: 1rem; min-width: 1200px; height: 100%; }
-    .day-column { flex: 1; min-width: 160px; background: #f8fafc; border-radius: 1rem; display: flex; flex-direction: column; border: 1px solid #e2e8f0; }
-    .day-header { padding: 1rem; border-bottom: 1px solid #e2e8f0; display: flex; flex-direction: column; align-items: center; background: #fff; border-radius: 1rem 1rem 0 0; }
-    .day-name { font-weight: 800; font-size: 0.75rem; color: #64748b; text-transform: uppercase; }
-    .day-date { font-weight: 900; font-size: 1.1rem; color: #1e293b; }
-    
-    .shift-list { flex: 1; padding: 0.75rem; display: flex; flex-direction: column; gap: 0.75rem; min-height: 200px; }
-    .shift-card { background: #fff; padding: 1rem; border-radius: 0.75rem; border: 1px solid #e2e8f0; box-shadow: 0 2px 4px rgba(0,0,0,0.02); cursor: grab; position: relative; transition: transform 0.2s, box-shadow 0.2s; }
-    .shift-card:active { cursor: grabbing; }
-    .shift-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
-    .shift-time { font-weight: 800; font-size: 0.8rem; color: #1e40af; }
-    .shift-staff { font-size: 0.75rem; color: #64748b; margin-top: 0.25rem; font-weight: 600; }
-    
-    .is-conflict { border-left: 4px solid #ef4444; background: #fef2f2; }
-    .conflict-icon { position: absolute; top: 0.5rem; right: 0.5rem; font-size: 1rem; width: 1rem; height: 1rem; color: #ef4444; }
-
-    .day-empty { padding: 2rem 0; text-align: center; color: #cbd5e1; font-size: 0.75rem; font-weight: 600; font-style: italic; }
-    
-    .cdk-drag-preview { box-sizing: border-box; border-radius: 0.75rem; box-shadow: 0 10px 20px rgba(0,0,0,0.1); }
-    .cdk-drag-placeholder { opacity: 0.3; }
-    .cdk-drag-animating { transition: transform 250ms cubic-bezier(0, 0, 0.2, 1); }
-    .shift-list.cdk-drop-list-dragging .shift-card:not(.cdk-drag-placeholder) { transition: transform 250ms cubic-bezier(0, 0, 0.2, 1); }
+    .avatar-sm { width: 28px; height: 28px; border-radius: 50%; background: var(--primary-soft); color: var(--primary); display: grid; place-items: center; font-size: 0.65rem; font-weight: 800; }
   `]
 })
 export class SchedulingPageComponent implements OnInit {
-  private readonly scheduleApi = inject(SchedulingService);
-  private readonly dialog = inject(MatDialog);
+  private readonly schedulingService = inject(SchedulingService);
+  private readonly employeeDataService = inject(EmployeeDataService);
+  private readonly fb = inject(FormBuilder);
   private readonly snack = inject(MatSnackBar);
   private readonly socket = inject(WidgetSocketService);
 
-  protected readonly viewMode = signal<'list' | 'week'>('list');
-  protected readonly shifts = signal<Shift[]>([]);
+  protected dataSource = new MatTableDataSource<Shift>([]);
+  protected isLoading = signal(true);
+  protected employees = toSignal(this.employeeDataService.getEmployees(), { initialValue: [] });
+  protected readonly displayedColumns = ['employee', 'time', 'area', 'status', 'actions'];
+
+  @ViewChild(MatPaginator) paginator!: MatPaginator;
+  @ViewChild(MatSort) sort!: MatSort;
+
+  // Drawer State
+  isDrawerOpen = false;
+  drawerTitle = 'Deploy Shift';
+  drawerSubtitle = 'Initializing new operational roster node.';
+  drawerSaveText = 'Lock Deployment';
+  currentMode: 'add' | 'edit' | 'view' = 'add';
+  selectedShift: Shift | null = null;
+
+  // Modal State
+  showDeleteConfirm = false;
+
+  shiftForm: FormGroup = this.fb.group({
+    employeeId: [null, [Validators.required]],
+    startTime: ['', [Validators.required]],
+    endTime: ['', [Validators.required]],
+    area: ['GENERAL'],
+    status: ['PUBLISHED', [Validators.required]],
+    notes: ['']
+  });
 
   constructor() {
     effect(() => {
       const latestEvent = this.socket.events()[0];
-      if (latestEvent?.topic === '/topic/widgets/scheduling') {
+      if (latestEvent?.topic?.includes('scheduling')) {
         this.loadShifts();
       }
     });
   }
 
-  protected readonly weekDays = computed(() => {
-    const days = [];
-    const startOfWeek = new Date();
-    startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay()); // Sunday
-    
-    for (let i = 0; i < 7; i++) {
-      const d = new Date(startOfWeek);
-      d.setDate(d.getDate() + i);
-      days.push({
-        name: d.toLocaleDateString('en-US', { weekday: 'short' }),
-        date: d.toISOString().split('T')[0]
-      });
-    }
-    return days;
-  });
-
-  protected getShiftsForDay(date: string): Shift[] {
-    return this.shifts().filter(s => s.startTime.startsWith(date));
-  }
-
-  protected onShiftDropped(event: CdkDragDrop<Shift[]>, newDate: string): void {
-    const shift = event.item.data as Shift;
-    const oldDate = shift.startTime.split('T')[0];
-    
-    if (oldDate === newDate) return;
-
-    // Update shift date while keeping time
-    const startTimeObj = new Date(shift.startTime);
-    const endTimeObj = new Date(shift.endTime);
-    
-    const [year, month, day] = newDate.split('-').map(Number);
-    
-    startTimeObj.setFullYear(year, month - 1, day);
-    endTimeObj.setFullYear(year, month - 1, day);
-
-    const updatedShift = {
-      ...shift,
-      startTime: startTimeObj.toISOString(),
-      endTime: endTimeObj.toISOString()
-    };
-
-    this.scheduleApi.updateShift(shift.id, updatedShift).subscribe({
-      next: () => {
-        this.snack.open(`Shift moved to ${newDate}`, 'OK', { duration: 3000 });
-        this.loadShifts();
-      },
-      error: (error) => this.handleShiftError(error, 'Unable to move shift right now.')
-    });
-  }
-
-  protected readonly coveragePercentage = computed(() => {
-    const total = this.shifts().length;
-    if (total === 0) return 0;
-    const assigned = this.shifts().filter(s => s.employeeId).length;
-    return Math.round((assigned / total) * 100);
-  });
-
-  protected readonly shiftsWithoutStaff = computed(() => 
-    this.shifts().filter(s => !s.employeeId)
-  );
-
-  protected readonly conflicts = computed(() => {
-    const list = this.shifts();
-    const conflictIds = new Set<number>();
-    
-    for (let i = 0; i < list.length; i++) {
-      for (let j = i + 1; j < list.length; j++) {
-        const s1 = list[i];
-        const s2 = list[j];
-        
-        if (s1.employeeId && s1.employeeId === s2.employeeId) {
-          const start1 = new Date(s1.startTime).getTime();
-          const end1 = new Date(s1.endTime).getTime();
-          const start2 = new Date(s2.startTime).getTime();
-          const end2 = new Date(s2.endTime).getTime();
-          
-          if (start1 < end2 && start2 < end1) {
-            conflictIds.add(s1.id);
-            conflictIds.add(s2.id);
-          }
-        }
-      }
-    }
-    return Array.from(conflictIds);
-  });
-
-  ngOnInit() {
-    this.socket.connect();
+  ngOnInit(): void {
     this.loadShifts();
   }
 
-  protected hasConflict(shift: Shift): boolean {
-    return this.conflicts().includes(shift.id);
-  }
-
-  protected openShiftDialog(shift?: Shift): void {
-    const dialogRef = this.dialog.open(ShiftEditDialog, {
-      width: '500px',
-      data: { shift }
-    });
-
-    dialogRef.afterClosed().subscribe(res => {
-      if (res) {
-        this.snack.open('Shift saved successfully', 'OK', { duration: 3000 });
-        this.loadShifts();
-      }
+  loadShifts(): void {
+    this.isLoading.set(true);
+    this.schedulingService.getShifts().pipe(
+      catchError(() => {
+        this.snack.open('Roster synchronization failed.', 'OK', { duration: 4000 });
+        return of([]);
+      })
+    ).subscribe(shifts => {
+      this.dataSource.data = shifts;
+      this.dataSource.paginator = this.paginator;
+      this.dataSource.sort = this.sort;
+      this.isLoading.set(false);
     });
   }
 
-  private loadShifts(): void {
-    this.scheduleApi.getShifts().subscribe((shifts) => this.shifts.set(shifts));
+  applyFilter(event: Event): void {
+    const filterValue = (event.target as HTMLInputElement).value;
+    this.dataSource.filter = filterValue.trim().toLowerCase();
   }
 
-  private handleShiftError(error: unknown, fallbackMessage: string): void {
-    const conflict = this.scheduleApi.extractShiftConflict(error);
-    if (conflict) {
-      const details = conflict.data.conflicts.slice(0, 2).map((entry) => formatConflict(entry)).join(' | ');
-      this.snack.open(details ? `${conflict.message} ${details}` : conflict.message, 'OK', { duration: 7000 });
-      return;
-    }
+  // --- CRUD ACTIONS ---
 
-    this.snack.open(fallbackMessage, 'OK', { duration: 3000 });
-  }
-}
-
-@Component({
-  selector: 'app-shift-edit-dialog',
-  standalone: true,
-  imports: [CommonModule, FormsModule, ReactiveFormsModule, MatFormFieldModule, MatInputModule, MatButtonModule, MatSelectModule, MatDialogModule, MatSnackBarModule],
-  template: `
-    <h2 mat-dialog-title>{{ data.shift ? 'Edit Shift' : 'Create New Shift' }}</h2>
-    <mat-dialog-content>
-      @if (conflictResponse(); as conflict) {
-        <div class="conflict-banner">
-          <strong>{{ conflict.message }}</strong>
-          <ul class="conflict-list">
-            @for (item of conflict.data.conflicts; track item.type + '-' + item.recordId) {
-              <li>{{ formatConflict(item) }}</li>
-            }
-          </ul>
-        </div>
-      }
-      <form [formGroup]="form" class="flex flex-col gap-4 mt-2">
-        <mat-form-field appearance="outline">
-          <mat-label>Employee</mat-label>
-          <mat-select formControlName="employeeId">
-            @for (emp of employees(); track emp.id) {
-              <mat-option [value]="emp.id">{{emp.firstName}} {{emp.lastName}}</mat-option>
-            }
-          </mat-select>
-        </mat-form-field>
-
-        <div class="flex gap-4">
-          <mat-form-field appearance="outline" class="flex-1">
-            <mat-label>Start Time</mat-label>
-            <input matInput type="datetime-local" formControlName="startTime">
-          </mat-form-field>
-          <mat-form-field appearance="outline" class="flex-1">
-            <mat-label>End Time</mat-label>
-            <input matInput type="datetime-local" formControlName="endTime">
-          </mat-form-field>
-        </div>
-
-        <div class="flex gap-4">
-          <mat-form-field appearance="outline" class="flex-1">
-            <mat-label>Location</mat-label>
-            <mat-select formControlName="locationId">
-              @for (loc of locations(); track loc.id) {
-                <mat-option [value]="loc.id">{{loc.name}}</mat-option>
-              }
-            </mat-select>
-          </mat-form-field>
-          <mat-form-field appearance="outline" class="flex-1">
-            <mat-label>Status</mat-label>
-            <mat-select formControlName="status">
-              <mat-option value="DRAFT">Draft</mat-option>
-              <mat-option value="PUBLISHED">Published</mat-option>
-            </mat-select>
-          </mat-form-field>
-        </div>
-
-        <mat-form-field appearance="outline">
-          <mat-label>Notes</mat-label>
-          <textarea matInput formControlName="notes" rows="2"></textarea>
-        </mat-form-field>
-      </form>
-    </mat-dialog-content>
-    <mat-dialog-actions align="end">
-      <button mat-button (click)="dialogRef.close()">Cancel</button>
-      <button mat-flat-button color="primary" [disabled]="form.invalid" (click)="save()">Save Shift</button>
-    </mat-dialog-actions>
-  `,
-  styles: [`
-    .flex { display: flex; }
-    .flex-col { flex-direction: column; }
-    .gap-4 { gap: 1rem; }
-    .flex-1 { flex: 1; }
-    .conflict-banner { margin-bottom: 1rem; padding: 0.75rem 1rem; border-radius: 0.75rem; background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; }
-    .conflict-list { margin: 0.5rem 0 0; padding-left: 1rem; }
-  `]
-})
-export class ShiftEditDialog {
-  private readonly fb = inject(FormBuilder);
-  protected readonly dialogRef = inject(MatDialogRef<ShiftEditDialog>);
-  private readonly scheduleApi = inject(SchedulingService);
-  private readonly snack = inject(MatSnackBar);
-  private readonly empApi = inject(EmployeeDataService);
-  private readonly orgApi = inject(OrganizationService);
-  protected readonly data = inject<{ shift?: Shift }>(MAT_DIALOG_DATA);
-
-  protected readonly employees = toSignal(this.empApi.getEmployees(), { initialValue: [] });
-  protected readonly locations = toSignal(this.orgApi.getLocations(), { initialValue: [] });
-  protected readonly conflictResponse = signal<ShiftConflictResponse | null>(null);
-
-  protected readonly form = this.fb.group({
-    employeeId: [this.data.shift?.employeeId || null, Validators.required],
-    startTime: [this.data.shift?.startTime ? this.formatDate(this.data.shift.startTime) : '', Validators.required],
-    endTime: [this.data.shift?.endTime ? this.formatDate(this.data.shift.endTime) : '', Validators.required],
-    locationId: [this.data.shift?.locationId || null, Validators.required],
-    departmentId: [this.data.shift?.departmentId || 1],
-    status: [this.data.shift?.status || 'DRAFT', Validators.required],
-    notes: [this.data.shift?.notes || '']
-  });
-
-  private formatDate(dateStr: string): string {
-    return new Date(dateStr).toISOString().slice(0, 16);
+  openAddDrawer() {
+    this.currentMode = 'add';
+    this.drawerTitle = 'Deploy Shift Packet';
+    this.drawerSubtitle = 'Provisioning a new operational interval.';
+    this.drawerSaveText = 'Lock Deployment';
+    this.shiftForm.reset({
+      status: 'PUBLISHED',
+      area: 'GENERAL'
+    });
+    this.shiftForm.enable();
+    this.isDrawerOpen = true;
   }
 
-  save() {
-    this.conflictResponse.set(null);
-    const raw = this.form.getRawValue();
-    // Convert local time to ISO Instant
-    const shiftData = {
-      ...raw,
-      startTime: new Date(raw.startTime!).toISOString(),
-      endTime: new Date(raw.endTime!).toISOString()
+  openEditDrawer(shift: Shift) {
+    this.currentMode = 'edit';
+    this.selectedShift = shift;
+    this.drawerTitle = 'Modify Roster Packet';
+    this.drawerSubtitle = `Altering deployment parameters for ID: ${shift.id}.`;
+    this.drawerSaveText = 'Sync Changes';
+    this.shiftForm.patchValue({
+      ...shift,
+      startTime: this.formatDateForInput(shift.startTime),
+      endTime: this.formatDateForInput(shift.endTime)
+    });
+    this.shiftForm.enable();
+    this.isDrawerOpen = true;
+  }
+
+  openViewDrawer(shift: Shift) {
+    this.currentMode = 'view';
+    this.selectedShift = shift;
+    this.drawerTitle = 'Shift Packet Inspection';
+    this.drawerSubtitle = 'Viewing high-fidelity roster metadata.';
+    this.shiftForm.patchValue({
+      ...shift,
+      startTime: this.formatDateForInput(shift.startTime),
+      endTime: this.formatDateForInput(shift.endTime)
+    });
+    this.shiftForm.disable();
+    this.isDrawerOpen = true;
+  }
+
+  closeDrawer() {
+    this.isDrawerOpen = false;
+    this.selectedShift = null;
+  }
+
+  saveShift() {
+    if (this.shiftForm.invalid) return;
+    this.isLoading.set(true);
+    const data = {
+        ...this.shiftForm.value,
+        startTime: new Date(this.shiftForm.value.startTime).toISOString(),
+        endTime: new Date(this.shiftForm.value.endTime).toISOString()
     };
 
-    const obs = this.data.shift 
-      ? this.scheduleApi.updateShift(this.data.shift.id, shiftData as any)
-      : this.scheduleApi.createShift(shiftData as any);
-
-    obs.subscribe({
-      next: () => this.dialogRef.close(true),
-      error: (error) => {
-        const conflict = this.scheduleApi.extractShiftConflict(error);
-        if (conflict) {
-          this.conflictResponse.set(conflict);
-          return;
+    if (this.currentMode === 'add') {
+      this.schedulingService.createShift(data).subscribe({
+        next: () => {
+          this.snack.open('Shift Deployment Locked.', 'OK', { duration: 3000 });
+          this.loadShifts();
+          this.closeDrawer();
+        },
+        error: () => {
+          this.snack.open('Deployment Failure.', 'OK', { duration: 4000 });
+          this.isLoading.set(false);
         }
-        this.snack.open('Unable to save shift right now.', 'OK', { duration: 3000 });
+      });
+    } else if (this.currentMode === 'edit' && this.selectedShift) {
+      this.schedulingService.updateShift(this.selectedShift.id, data).subscribe({
+        next: () => {
+          this.snack.open('Roster Packet Synchronized.', 'OK', { duration: 3000 });
+          this.loadShifts();
+          this.closeDrawer();
+        },
+        error: () => {
+          this.snack.open('Synchronization Failure.', 'OK', { duration: 4000 });
+          this.isLoading.set(false);
+        }
+      });
+    }
+  }
+
+  confirmDelete(shift: Shift) {
+    this.selectedShift = shift;
+    this.showDeleteConfirm = true;
+  }
+
+  executeDelete() {
+    if (!this.selectedShift) return;
+    this.isLoading.set(true);
+    this.schedulingService.deleteShift(this.selectedShift.id).subscribe({
+      next: () => {
+        this.snack.open('Shift Packet Purged.', 'OK', { duration: 3000 });
+        this.showDeleteConfirm = false;
+        this.loadShifts();
+      },
+      error: () => {
+        this.snack.open('Purge Protocol Failed.', 'OK', { duration: 4000 });
+        this.isLoading.set(false);
       }
     });
   }
 
-  protected formatConflict(conflict: ShiftConflictRecord): string {
-    return formatConflict(conflict);
+  // --- HELPERS ---
+  getInitials(empId: number): string {
+    const emp = this.employees().find(e => e.id === empId);
+    return emp ? (emp.firstName[0] + emp.lastName[0]).toUpperCase() : '??';
   }
-}
-
-function formatConflict(conflict: ShiftConflictRecord): string {
-  const start = new Date(conflict.startTime);
-  const end = new Date(conflict.endTime);
-
-  if (conflict.type === 'LEAVE') {
-    return `Approved leave #${conflict.recordId} blocks this assignment from ${start.toLocaleDateString()} to ${end.toLocaleDateString()}.`;
+  getEmployeeName(empId: number): string {
+    const emp = this.employees().find(e => e.id === empId);
+    return emp ? `${emp.firstName} ${emp.lastName}` : 'UNASSIGNED';
   }
-
-  return `Shift #${conflict.recordId} already runs from ${start.toLocaleString()} to ${end.toLocaleString()}.`;
+  private formatDateForInput(dateStr: string): string {
+    const d = new Date(dateStr);
+    return d.toISOString().slice(0, 16);
+  }
 }

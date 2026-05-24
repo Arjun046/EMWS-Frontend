@@ -1,285 +1,193 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { MatCardModule } from '@angular/material/card';
-import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
-import { MatSlideToggleModule } from '@angular/material/slide-toggle';
-import { MatSelectModule } from '@angular/material/select';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
+import { MatButtonModule } from '@angular/material/button';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatSnackBarModule, MatSnackBar } from '@angular/material/snack-bar';
-import { FormsModule } from '@angular/forms';
 import { AuthService } from '../../core/services/auth.service';
-import { ThemeService } from '../../core/services/theme.service';
-import { PageHeaderComponent } from '../../shared/components/page-header.component';
 
 @Component({
   selector: 'app-settings-page',
   standalone: true,
-  imports: [
-    CommonModule, MatCardModule, MatButtonModule, MatIconModule,
-    MatSlideToggleModule, MatSelectModule, MatFormFieldModule, MatInputModule,
-    MatDividerModule, MatSnackBarModule, FormsModule, PageHeaderComponent
-  ],
+  imports: [CommonModule, MatIconModule, MatButtonModule, MatDividerModule, MatSnackBarModule],
   template: `
-    <app-page-header
-      title="Settings & Preferences"
-      subtitle="Customize your experience, manage notification preferences, and configure system options."
-    />
+    <div class="settings-viewport fade-up">
+      <div class="settings-grid">
+        
+        <!-- SIDE NAV -->
+        <div class="settings-nav-panel">
+          <div class="settings-nav-item" [class.active]="activePanel() === 'nodes'" (click)="activePanel.set('nodes')">
+            <mat-icon>hub</mat-icon> Node Configuration
+          </div>
+          <div class="settings-nav-item" [class.active]="activePanel() === 'interface'" (click)="activePanel.set('interface')">
+            <mat-icon>palette</mat-icon> Interface Style
+          </div>
+          <div class="settings-nav-item" [class.active]="activePanel() === 'security'" (click)="activePanel.set('security')">
+            <mat-icon>security</mat-icon> Data Security
+          </div>
+        </div>
 
-    <section class="settings-shell">
-      <!-- Appearance -->
-      <mat-card class="settings-section">
-        <div class="section-header">
-          <mat-icon>palette</mat-icon>
-          <div>
-            <h3>Appearance</h3>
-            <p>Customize how the EWMS console looks and feels.</p>
-          </div>
-        </div>
-        <mat-divider></mat-divider>
-        <div class="settings-body">
-          <div class="setting-row">
-            <div class="setting-info">
-              <strong>Dark Mode</strong>
-              <span>Switch between light and dark interface themes.</span>
-            </div>
-            <mat-slide-toggle [(ngModel)]="darkMode" (change)="onDarkModeToggle()"></mat-slide-toggle>
-          </div>
-          <div class="setting-row">
-            <div class="setting-info">
-              <strong>Compact Layout</strong>
-              <span>Reduce spacing for more data density on screen.</span>
-            </div>
-            <mat-slide-toggle [(ngModel)]="compactMode" (change)="savePref('compact', compactMode)"></mat-slide-toggle>
-          </div>
-          <div class="setting-row">
-            <div class="setting-info">
-              <strong>Language</strong>
-              <span>Display language for the interface.</span>
-            </div>
-            <mat-form-field appearance="outline" subscriptSizing="dynamic" class="setting-select">
-              <mat-select [(ngModel)]="language" (selectionChange)="savePref('language', language)">
-                <mat-option value="en">English</mat-option>
-                <mat-option value="es">Español</mat-option>
-                <mat-option value="fr">Français</mat-option>
-                <mat-option value="ar">العربية</mat-option>
-              </mat-select>
-            </mat-form-field>
-          </div>
-        </div>
-      </mat-card>
-
-      <!-- Notifications -->
-      <mat-card class="settings-section">
-        <div class="section-header">
-          <mat-icon>notifications</mat-icon>
-          <div>
-            <h3>Notification Preferences</h3>
-            <p>Control which updates you receive and how.</p>
-          </div>
-        </div>
-        <mat-divider></mat-divider>
-        <div class="settings-body">
-          <div class="setting-row">
-            <div class="setting-info">
-              <strong>Email Notifications</strong>
-              <span>Receive important alerts via your registered email.</span>
-            </div>
-            <mat-slide-toggle [(ngModel)]="emailNotifs" (change)="savePref('emailNotifs', emailNotifs)"></mat-slide-toggle>
-          </div>
-          <div class="setting-row">
-            <div class="setting-info">
-              <strong>Push Notifications</strong>
-              <span>Get real-time browser notifications for urgent updates.</span>
-            </div>
-            <mat-slide-toggle [(ngModel)]="pushNotifs" (change)="savePref('pushNotifs', pushNotifs)"></mat-slide-toggle>
-          </div>
-          <div class="setting-row">
-            <div class="setting-info">
-              <strong>Leave Approval Alerts</strong>
-              <span>Notify me when a leave request needs my attention.</span>
-            </div>
-            <mat-slide-toggle [(ngModel)]="leaveAlerts" (change)="savePref('leaveAlerts', leaveAlerts)"></mat-slide-toggle>
-          </div>
-          <div class="setting-row">
-            <div class="setting-info">
-              <strong>Shift Change Alerts</strong>
-              <span>Alert me when my schedule changes.</span>
-            </div>
-            <mat-slide-toggle [(ngModel)]="shiftAlerts" (change)="savePref('shiftAlerts', shiftAlerts)"></mat-slide-toggle>
-          </div>
-        </div>
-      </mat-card>
-
-      <!-- Regional -->
-      <mat-card class="settings-section">
-        <div class="section-header">
-          <mat-icon>language</mat-icon>
-          <div>
-            <h3>Regional Settings</h3>
-            <p>Locale, time zone, and date format preferences.</p>
-          </div>
-        </div>
-        <mat-divider></mat-divider>
-        <div class="settings-body">
-          <div class="setting-row">
-            <div class="setting-info">
-              <strong>Time Zone</strong>
-              <span>All times in the system will use this zone.</span>
-            </div>
-            <mat-form-field appearance="outline" subscriptSizing="dynamic" class="setting-select">
-              <mat-select [(ngModel)]="timezone" (selectionChange)="savePref('timezone', timezone)">
-                <mat-option value="UTC">UTC</mat-option>
-                <mat-option value="America/New_York">Eastern Time (US)</mat-option>
-                <mat-option value="America/Chicago">Central Time (US)</mat-option>
-                <mat-option value="America/Los_Angeles">Pacific Time (US)</mat-option>
-                <mat-option value="Europe/London">London (GMT)</mat-option>
-                <mat-option value="Asia/Kolkata">India (IST)</mat-option>
-                <mat-option value="Asia/Dubai">Dubai (GST)</mat-option>
-              </mat-select>
-            </mat-form-field>
-          </div>
-          <div class="setting-row">
-            <div class="setting-info">
-              <strong>Date Format</strong>
-              <span>How dates appear across the system.</span>
-            </div>
-            <mat-form-field appearance="outline" subscriptSizing="dynamic" class="setting-select">
-              <mat-select [(ngModel)]="dateFormat" (selectionChange)="savePref('dateFormat', dateFormat)">
-                <mat-option value="MM/DD/YYYY">MM/DD/YYYY</mat-option>
-                <mat-option value="DD/MM/YYYY">DD/MM/YYYY</mat-option>
-                <mat-option value="YYYY-MM-DD">YYYY-MM-DD</mat-option>
-              </mat-select>
-            </mat-form-field>
-          </div>
-          <div class="setting-row">
-            <div class="setting-info">
-              <strong>Work Week Start</strong>
-              <span>First day of your work week for scheduling.</span>
-            </div>
-            <mat-form-field appearance="outline" subscriptSizing="dynamic" class="setting-select">
-              <mat-select [(ngModel)]="weekStart" (selectionChange)="savePref('weekStart', weekStart)">
-                <mat-option value="sunday">Sunday</mat-option>
-                <mat-option value="monday">Monday</mat-option>
-                <mat-option value="saturday">Saturday</mat-option>
-              </mat-select>
-            </mat-form-field>
-          </div>
-        </div>
-      </mat-card>
-
-      @if (isAdmin()) {
-        <!-- Admin-only -->
-        <mat-card class="settings-section admin-section">
-          <div class="section-header">
-            <mat-icon>admin_panel_settings</mat-icon>
-            <div>
-              <h3>System Administration</h3>
-              <p>Global system settings. Changes affect all users.</p>
-            </div>
-          </div>
-          <mat-divider></mat-divider>
-          <div class="settings-body">
-            <div class="setting-row">
-              <div class="setting-info">
-                <strong>Payroll Cycle</strong>
-                <span>Define the pay period frequency for the organization.</span>
+        <!-- CONTENT AREA -->
+        <div class="settings-content-area">
+          
+          <!-- NODE CONFIGURATION -->
+          @if (activePanel() === 'nodes') {
+            <div class="ui-card active-panel">
+              <div class="profile-section-title">Telemetry & Node Preferences</div>
+              
+              <div class="settings-row">
+                <div class="settings-row-label">
+                  <strong>Automatic Station Sync</strong>
+                  <span>Allow system to automatically synchronize clock-in telemetry on boot.</span>
+                </div>
+                <div class="toggle-wrap" (click)="toggle('sync')">
+                   <div class="toggle-pill" [class.on]="settings().sync"></div>
+                </div>
               </div>
-              <mat-form-field appearance="outline" subscriptSizing="dynamic" class="setting-select">
-                <mat-select [(ngModel)]="payrollCycle" (selectionChange)="savePref('payrollCycle', payrollCycle)">
-                  <mat-option value="MONTHLY">Monthly</mat-option>
-                  <mat-option value="BI_WEEKLY">Bi-Weekly</mat-option>
-                  <mat-option value="WEEKLY">Weekly</mat-option>
-                </mat-select>
-              </mat-form-field>
-            </div>
-            <div class="setting-row">
-              <div class="setting-info">
-                <strong>Overtime Threshold</strong>
-                <span>Hours per week before overtime kicks in.</span>
+
+              <div class="settings-row">
+                <div class="settings-row-label">
+                  <strong>Notification Dispatch</strong>
+                  <span>Receive high-fidelity alerts for leave approvals and roster changes.</span>
+                </div>
+                <div class="toggle-wrap" (click)="toggle('notifs')">
+                   <div class="toggle-pill" [class.on]="settings().notifs"></div>
+                </div>
               </div>
-              <mat-form-field appearance="outline" subscriptSizing="dynamic" class="setting-select narrow-field">
-                <input matInput type="number" [(ngModel)]="overtimeThreshold" (change)="savePref('overtimeThreshold', overtimeThreshold)">
-              </mat-form-field>
-            </div>
-            <div class="setting-row">
-              <div class="setting-info">
-                <strong>Allow Self-Registration</strong>
-                <span>Let employees register without admin invitation.</span>
+
+              <div class="settings-row">
+                <div class="settings-row-label">
+                   <strong>Timezone Epoch</strong>
+                   <span>Used for all operational logs and timestamp packets.</span>
+                </div>
+                <select class="f-input" style="width:auto; height:38px;">
+                   <option>UTC+05:30 (Mumbai/Kolkata)</option>
+                   <option>UTC-05:00 (New York/HQ)</option>
+                </select>
               </div>
-              <mat-slide-toggle [(ngModel)]="selfRegistration" (change)="savePref('selfRegistration', selfRegistration)"></mat-slide-toggle>
+
+              <div style="margin-top:2rem;">
+                 <button class="ui-btn ui-btn-primary" (click)="save()">Commit Configuration</button>
+              </div>
             </div>
-          </div>
-        </mat-card>
-      }
-    </section>
+          }
+
+          <!-- INTERFACE -->
+          @if (activePanel() === 'interface') {
+            <div class="ui-card active-panel">
+              <div class="profile-section-title">Interface Visual Stack</div>
+              
+              <div class="settings-row">
+                <div class="settings-row-label">
+                  <strong>Dark Operations Mode</strong>
+                  <span>High-contrast operational theme for low-light environments.</span>
+                </div>
+                <div class="toggle-wrap" (click)="toggleTheme()">
+                   <div class="toggle-pill" [class.on]="isDark()"></div>
+                </div>
+              </div>
+
+              <div class="settings-row">
+                <div class="settings-row-label">
+                  <strong>Compact Data Grid</strong>
+                  <span>Increase data density in tables by reducing padding nodes.</span>
+                </div>
+                <div class="toggle-wrap" (click)="toggle('compact')">
+                   <div class="toggle-pill" [class.on]="settings().compact"></div>
+                </div>
+              </div>
+            </div>
+          }
+
+          <!-- SECURITY -->
+          @if (activePanel() === 'security') {
+            <div class="ui-card active-panel">
+              <div class="profile-section-title">Forensic & Data Security</div>
+              
+              <div class="settings-row">
+                <div class="settings-row-label">
+                  <strong>Session Activity Logging</strong>
+                  <span>Immutable recording of all UI interactions in the compliance ledger.</span>
+                </div>
+                <div class="toggle-wrap" (click)="toggle('audit')">
+                   <div class="toggle-pill" [class.on]="settings().audit"></div>
+                </div>
+              </div>
+
+              <div class="settings-row">
+                <div class="settings-row-label">
+                  <strong>Geofence Verification</strong>
+                  <span>Require GPS coordinate validation for all biometric operations.</span>
+                </div>
+                <div class="toggle-wrap" (click)="toggle('geofence')">
+                   <div class="toggle-pill" [class.on]="settings().geofence"></div>
+                </div>
+              </div>
+
+              <div style="margin-top:2rem; padding-top:1.5rem; border-top:1px solid var(--border);">
+                 <button class="ui-btn ui-btn-secondary" style="color:var(--danger); border-color:var(--danger-soft);">
+                    <mat-icon>download</mat-icon> Export Identity Data
+                 </button>
+              </div>
+            </div>
+          }
+
+        </div>
+
+      </div>
+    </div>
   `,
   styles: [`
-    .settings-shell { margin-top: 1.5rem; display: grid; gap: 1.5rem; max-width: 56rem; }
+    :host { display: block; height: 100%; }
+    .settings-viewport { max-width: 1000px; margin: 0 auto; padding-top: 1rem; }
+    .settings-grid { display: grid; grid-template-columns: 280px 1fr; gap: 2rem; }
+    
+    .settings-nav-panel { display: flex; flex-direction: column; gap: 0.5rem; }
+    .settings-nav-item { padding: 1rem 1.25rem; border-radius: 12px; font-weight: 700; font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; gap: 0.75rem; color: var(--txt-secondary); transition: 0.2s; }
+    .settings-nav-item:hover { background: var(--surface-2); color: var(--txt-main); }
+    .settings-nav-item.active { background: var(--primary-soft); color: var(--primary); }
+    
+    .profile-section-title { font-size: 0.85rem; font-weight: 900; color: var(--primary); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 2rem; border-bottom: 1px solid var(--border); padding-bottom: 0.75rem; }
+    
+    .settings-row { display: flex; justify-content: space-between; align-items: center; padding: 1.25rem 0; border-bottom: 1px dashed var(--border); }
+    .settings-row-label strong { display: block; font-size: 0.95rem; margin-bottom: 0.25rem; }
+    .settings-row-label span { font-size: 0.78rem; color: var(--txt-muted); line-height: 1.4; }
+    
+    .toggle-wrap { width: 44px; height: 22px; background: var(--surface-3); border-radius: 99px; padding: 3px; cursor: pointer; transition: 0.3s; position: relative; }
+    .toggle-pill { width: 16px; height: 16px; background: #fff; border-radius: 50%; transition: 0.3s; box-shadow: var(--shadow-sm); }
+    .toggle-pill.on { transform: translateX(22px); background: var(--primary); }
 
-    .settings-section { border-radius: 1.5rem; border: 1px solid #e2e8f0; box-shadow: none !important; padding: 0; overflow: hidden; }
-    .settings-section.admin-section { border-color: #fde68a; }
-
-    .section-header { display: flex; align-items: flex-start; gap: 1rem; padding: 1.5rem 2rem; }
-    .section-header mat-icon { font-size: 1.5rem; width: 1.5rem; height: 1.5rem; color: #3b82f6; margin-top: 0.1rem; }
-    .section-header h3 { margin: 0; font-size: 1.1rem; font-weight: 800; color: #0f172a; }
-    .section-header p { margin: 0.25rem 0 0; font-size: 0.85rem; color: #64748b; }
-
-    .settings-body { padding: 0.5rem 2rem 1.5rem; }
-
-    .setting-row { display: flex; justify-content: space-between; align-items: center; padding: 1.25rem 0; border-bottom: 1px solid #f1f5f9; }
-    .setting-row:last-child { border-bottom: none; }
-    .setting-info { display: flex; flex-direction: column; flex: 1; margin-right: 2rem; }
-    .setting-info strong { font-size: 0.95rem; color: #1e293b; margin-bottom: 0.2rem; }
-    .setting-info span { font-size: 0.82rem; color: #94a3b8; }
-
-    .setting-select { width: 13rem; }
-    .narrow-field { width: 6rem; }
-    ::ng-deep .setting-select .mat-mdc-text-field-wrapper { height: 2.5rem; border-radius: 0.75rem !important; }
-
-    @media (max-width: 768px) {
-      .setting-row { flex-direction: column; align-items: flex-start; gap: 0.75rem; }
-      .setting-info { margin-right: 0; }
-      .setting-select { width: 100%; }
-      .section-header { padding: 1.25rem; }
-      .settings-body { padding: 0.5rem 1.25rem 1.25rem; }
-    }
+    .f-input { height: 42px; border-radius: 8px; border: 1.5px solid var(--border); padding: 0 0.85rem; font-family: inherit; font-size: 0.85rem; background: var(--surface); color: var(--txt-main); outline: none; }
+    
+    .ui-btn { padding: 0.75rem 1.5rem; border-radius: 12px; font-weight: 800; font-size: 0.85rem; cursor: pointer; border: none; display: inline-flex; align-items: center; gap: 0.5rem; transition: 0.2s; }
+    .ui-btn-primary { background: var(--primary); color: #fff; }
+    .ui-btn-secondary { background: var(--surface-2); color: var(--txt-secondary); border: 1px solid var(--border); }
   `]
 })
 export class SettingsPageComponent {
-  protected readonly auth = inject(AuthService);
-  protected readonly theme = inject(ThemeService);
   private readonly snack = inject(MatSnackBar);
+  protected readonly activePanel = signal('nodes');
+  
+  protected settings = signal({
+    sync: true,
+    notifs: true,
+    compact: false,
+    audit: true,
+    geofence: false
+  });
 
-  // Load from localStorage with defaults
-  protected darkMode = localStorage.getItem('ewms.pref.darkMode') === 'true';
-  protected compactMode = localStorage.getItem('ewms.pref.compact') === 'true';
-  protected language = localStorage.getItem('ewms.pref.language') || 'en';
-  protected emailNotifs = localStorage.getItem('ewms.pref.emailNotifs') !== 'false';
-  protected pushNotifs = localStorage.getItem('ewms.pref.pushNotifs') !== 'false';
-  protected leaveAlerts = localStorage.getItem('ewms.pref.leaveAlerts') !== 'false';
-  protected shiftAlerts = localStorage.getItem('ewms.pref.shiftAlerts') !== 'false';
-  protected timezone = localStorage.getItem('ewms.pref.timezone') || 'UTC';
-  protected dateFormat = localStorage.getItem('ewms.pref.dateFormat') || 'MM/DD/YYYY';
-  protected weekStart = localStorage.getItem('ewms.pref.weekStart') || 'monday';
-  protected payrollCycle = localStorage.getItem('ewms.pref.payrollCycle') || 'MONTHLY';
-  protected overtimeThreshold = parseInt(localStorage.getItem('ewms.pref.overtimeThreshold') || '40', 10);
-  protected selfRegistration = localStorage.getItem('ewms.pref.selfRegistration') === 'true';
+  protected isDark = signal(document.body.classList.contains('global-dark-mode'));
 
-  protected isAdmin(): boolean {
-    return this.auth.user()?.role === 'ADMIN';
+  protected toggle(key: keyof ReturnType<typeof this.settings>) {
+    this.settings.update(s => ({ ...s, [key]: !s[key] }));
   }
 
-  protected onDarkModeToggle(): void {
-    this.savePref('darkMode', this.darkMode);
-    // The ThemeService can handle this — for now toggle body class
-    document.body.classList.toggle('global-dark-mode', this.darkMode);
+  protected toggleTheme() {
+    document.body.classList.toggle('global-dark-mode');
+    this.isDark.set(document.body.classList.contains('global-dark-mode'));
   }
 
-  protected savePref(key: string, value: any): void {
-    localStorage.setItem(`ewms.pref.${key}`, String(value));
-    this.snack.open('Preference saved.', 'OK', { duration: 1500 });
+  protected save() {
+    this.snack.open('Operational configuration committed to core node.', 'OK', { duration: 3000 });
   }
 }

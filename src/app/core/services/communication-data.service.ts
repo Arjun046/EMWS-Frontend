@@ -7,6 +7,7 @@ import {
   StatusStory
 } from '../../shared/models/ui.models';
 import { ApiService } from './api.service';
+import { environment } from '../../../environments/environment';
 
 const DEFAULT_CONTACTS: ConversationContact[] = [
   { id: 2, name: 'Priya Shah', role: 'Operations Lead', status: 'Online', avatar: 'PS' },
@@ -22,19 +23,32 @@ export const DEFAULT_GROUPS: ConversationGroup[] = [
 
 @Injectable({ providedIn: 'root' })
 export class CommunicationDataService {
-  private readonly commsUrl = 'http://localhost:8080';
-  private readonly empUrl = 'http://localhost:8080';
+  private readonly commsUrl = environment.apiBaseUrl;
+  private readonly empUrl = environment.apiBaseUrl;
   
   constructor(private readonly api: ApiService) {}
 
-  loadChatSummaries(userId: number, companyId: number): Observable<any[]> {
-    return this.api.get<any[]>(`/api/communication/chat/summary?userId=${userId}&companyId=${companyId}`, [], this.commsUrl);
+  loadChatSummaries(): Observable<any[]> {
+    return this.api.get<any[]>('/api/communication/chat/summary', [], this.commsUrl);
   }
 
-  loadAllEmployees(companyId?: number): Observable<ConversationContact[]> {
-    let url = '/api/employees';
-    if (companyId) url += `?companyId=${companyId}`;
-    return this.api.get<any[]>(url, [], this.empUrl).pipe(
+  getChatSummaries(): Observable<any[]> {
+    return this.loadChatSummaries();
+  }
+
+  getMessages(chatId: number, isGroup: boolean, beforeId?: number): Observable<ChatMessage[]> {
+    let url = isGroup 
+      ? `/api/communication/chat/group/${chatId}`
+      : `/api/communication/chat/private/thread?peerId=${chatId}`;
+    
+    if (beforeId) {
+      url += isGroup ? `?beforeMessageId=${beforeId}` : `&beforeMessageId=${beforeId}`;
+    }
+    return this.api.get<ChatMessage[]>(url, [], this.commsUrl);
+  }
+
+  loadAllEmployees(): Observable<ConversationContact[]> {
+    return this.api.get<any[]>('/api/employees', [], this.empUrl).pipe(
       map((employees) => {
         return employees.map((emp) => ({
           id: emp.id,
@@ -66,10 +80,8 @@ export class CommunicationDataService {
     );
   }
 
-  loadGroups(companyId?: number): Observable<ConversationGroup[]> {
-    let url = '/api/communication/groups';
-    if (companyId) url += `?companyId=${companyId}`;
-    return this.api.get<any[]>(url, [], this.commsUrl).pipe(
+  loadGroups(): Observable<ConversationGroup[]> {
+    return this.api.get<any[]>('/api/communication/groups', [], this.commsUrl).pipe(
       map((groups) => {
         if (!groups.length) {
           return DEFAULT_GROUPS;
@@ -87,48 +99,28 @@ export class CommunicationDataService {
     );
   }
 
-  loadPrivateThread(userId: number, peerId: number): Observable<ChatMessage[]> {
-    return this.api.get<ChatMessage[]>(`/api/communication/chat/private/thread?userId=${userId}&peerId=${peerId}`, [], this.commsUrl);
-  }
-
-  loadGroupThread(groupId: number): Observable<ChatMessage[]> {
-    return this.api.get<ChatMessage[]>(`/api/communication/chat/group/${groupId}`, [], this.commsUrl);
-  }
-
   createGroup(group: Partial<ConversationGroup>): Observable<ConversationGroup> {
     return this.api.post<ConversationGroup>('/api/communication/groups', group, undefined, this.commsUrl);
   }
 
-  publishPublicKey(userId: number, companyId: number, publicKey: string): Observable<any> {
-    return this.api.post<any>('/api/communication/keys', { userId, companyId, publicKey }, undefined, this.commsUrl);
-  }
-
-  getPublicKey(userId: number): Observable<{ userId: number; publicKey: string }> {
-    return this.api.get<{ userId: number; publicKey: string }>(`/api/communication/keys/${userId}`, undefined, this.commsUrl);
-  }
-
-  markThreadAsRead(userId: number, companyId: number, peerId?: number, groupId?: number): Observable<void> {
-    let url = `/api/communication/chat/mark-read?userId=${userId}&companyId=${companyId}`;
-    if (peerId) url += `&peerId=${peerId}`;
-    if (groupId) url += `&groupId=${groupId}`;
+  markThreadAsRead(peerId?: number, groupId?: number): Observable<void> {
+    let url = '/api/communication/chat/mark-read';
+    const params = [];
+    if (peerId) params.push(`peerId=${peerId}`);
+    if (groupId) params.push(`groupId=${groupId}`);
+    if (params.length) url += `?${params.join('&')}`;
     return this.api.post<void>(url, {}, undefined, this.commsUrl);
   }
 
-  editMessage(messageId: number, content: string, userId: number): Observable<ChatMessage> {
-    return this.api.put<ChatMessage>(`/api/communication/chat/messages/${messageId}?userId=${userId}`, { content }, undefined, this.commsUrl);
+  editMessage(messageId: number, content: string): Observable<ChatMessage> {
+    return this.api.put<ChatMessage>(`/api/communication/chat/messages/${messageId}`, { content }, undefined, this.commsUrl);
   }
 
-  deleteMessage(messageId: number, userId: number): Observable<void> {
-    return this.api.delete<void>(`/api/communication/chat/messages/${messageId}?userId=${userId}`, undefined, this.commsUrl);
-  }
-
-  pinMessage(messageId: number, status: boolean): Observable<void> {
-    return this.api.post<void>(`/api/communication/chat/messages/${messageId}/pin?status=${status}`, {}, undefined, this.commsUrl);
+  deleteMessage(messageId: number): Observable<void> {
+    return this.api.delete<void>(`/api/communication/chat/messages/${messageId}`, undefined, this.commsUrl);
   }
 
   updateConversationPreference(payload: {
-    userId: number;
-    companyId: number;
     conversationType: 'PRIVATE' | 'GROUP';
     conversationId: number;
     archived: boolean;
@@ -137,34 +129,20 @@ export class CommunicationDataService {
     return this.api.put<any>('/api/communication/preferences', payload, undefined, this.commsUrl);
   }
 
-  addReaction(messageId: number, userId: number, companyId: number, emoji: string): Observable<ChatMessage> {
+  addReaction(messageId: number, emoji: string): Observable<ChatMessage> {
     return this.api.post<ChatMessage>(
       `/api/communication/chat/messages/${messageId}/reactions`,
-      { userId, companyId, emoji },
+      { emoji },
       undefined,
       this.commsUrl
     );
   }
 
-  removeReaction(messageId: number, userId: number): Observable<ChatMessage> {
-    return this.api.delete<ChatMessage>(
-      `/api/communication/chat/messages/${messageId}/reactions?userId=${userId}`,
-      undefined,
-      this.commsUrl
-    );
-  }
-
-  loadStatuses(companyId: number, requesterId?: number): Observable<StatusStory[]> {
-    let url = `/api/communication/status?companyId=${companyId}`;
-    if (requesterId != null) {
-      url += `&requesterId=${requesterId}`;
-    }
-    return this.api.get<StatusStory[]>(url, [], this.commsUrl);
+  loadStatuses(): Observable<StatusStory[]> {
+    return this.api.get<StatusStory[]>('/api/communication/status', [], this.commsUrl);
   }
 
   createStatus(payload: {
-    userId: number;
-    companyId: number;
     content?: string;
     mediaUrl?: string;
     backgroundStyle?: string;
@@ -174,16 +152,16 @@ export class CommunicationDataService {
     return this.api.post<StatusStory>('/api/communication/status', payload, undefined, this.commsUrl);
   }
 
-  markStatusViewed(statusId: number, viewerId: number): Observable<void> {
+  markStatusViewed(statusId: number): Observable<void> {
     return this.api.post<void>(
-      `/api/communication/status/${statusId}/view?viewerId=${viewerId}`,
+      `/api/communication/status/${statusId}/view`,
       {},
       undefined,
       this.commsUrl
     );
   }
 
-  deleteStatus(statusId: number, userId: number): Observable<void> {
-    return this.api.delete<void>(`/api/communication/status/${statusId}?userId=${userId}`, undefined, this.commsUrl);
+  deleteStatus(statusId: number): Observable<void> {
+    return this.api.delete<void>(`/api/communication/status/${statusId}`, undefined, this.commsUrl);
   }
 }

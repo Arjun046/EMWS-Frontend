@@ -1,160 +1,99 @@
-import { Component, inject, signal, computed } from '@angular/core';
-import { CommonModule, DatePipe } from '@angular/common';
-import { MatCardModule } from '@angular/material/card';
-import { MatButtonModule } from '@angular/material/button';
+import { Component, inject, signal, computed, OnInit } from '@angular/core';
+import { CommonModule } from '@angular/common';
 import { MatIconModule } from '@angular/material/icon';
-import { MatTableModule } from '@angular/material/table';
-import { MatTabsModule } from '@angular/material/tabs';
-import { MatProgressBarModule } from '@angular/material/progress-bar';
-import { MatDividerModule } from '@angular/material/divider';
-import { PerformanceService, Goal, PerformanceReview } from '../../core/services/performance.service';
-import { PageHeaderComponent } from '../../shared/components/page-header.component';
-import { StatusBadgeComponent } from '../../shared/components/status-badge.component';
+import { MatButtonModule } from '@angular/material/button';
+import { AnalyticsService } from '../../core/services/analytics.service';
 import { toSignal } from '@angular/core/rxjs-interop';
+import { TrendChartComponent } from '../../shared/components/trend-chart.component';
 
 @Component({
   selector: 'app-performance-page',
   standalone: true,
-  imports: [
-    CommonModule,
-    MatCardModule,
-    MatButtonModule,
-    MatIconModule,
-    MatTableModule,
-    MatTabsModule,
-    MatProgressBarModule,
-    MatDividerModule,
-    PageHeaderComponent,
-    StatusBadgeComponent,
-    DatePipe
-  ],
+  imports: [CommonModule, MatIconModule, MatButtonModule, TrendChartComponent],
   template: `
-    <app-page-header 
-      title="Performance & Talent" 
-      subtitle="Track career objectives, review performance milestones, and manage professional growth." 
-      actionLabel="Set New Goal"
-      (action)="onAddGoal()"
-    />
-
-    <section class="performance-shell">
-      <div class="perf-grid">
-        <!-- Growth Goals -->
-        <div class="goals-column">
-          <div class="section-header">
-            <h3>Active Growth Objectives</h3>
-            <button mat-button color="primary">View Archive</button>
-          </div>
-
-          <div class="goals-stack">
-            @for (goal of goals(); track goal.id) {
-              <mat-card class="goal-card">
-                <div class="goal-header">
-                  <strong>{{ goal.title }}</strong>
-                  <app-status-badge [value]="goal.status" />
-                </div>
-                <p class="goal-desc">{{ goal.description }}</p>
-                <div class="goal-progress">
-                  <div class="progress-meta">
-                    <span>Progress</span>
-                    <span>{{ goal.progress }}%</span>
-                  </div>
-                  <mat-progress-bar mode="determinate" [value]="goal.progress"></mat-progress-bar>
-                </div>
-                <div class="goal-footer">
-                  <mat-icon>calendar_today</mat-icon>
-                  <span>Target: {{ goal.targetDate | date:'mediumDate' }}</span>
-                </div>
-              </mat-card>
-            }
-            @if (goals().length === 0) {
-              <mat-card class="empty-card">
-                <p>No active goals found. Start by setting your first objective.</p>
-              </mat-card>
-            }
-          </div>
+    <div class="module-page active-page fade-up" id="page-performance">
+      
+      <div class="filter-action-row">
+        <div>
+           <h2 style="margin:0; font-size:1.5rem; font-weight:800; letter-spacing:-0.02em;">Analytical Yield Matrix</h2>
+           <p style="margin:0.25rem 0 0; font-size:0.85rem; color:var(--txt-muted);">Quantitative operational telemetry and workforce efficiency mapping.</p>
         </div>
+        <button class="ui-btn ui-btn-primary" (click)="export()">
+          <mat-icon style="font-size:1.1rem; width:1.1rem; height:1.1rem;">file_download</mat-icon>
+          Export Packet
+        </button>
+      </div>
 
-        <!-- Performance Reviews -->
-        <div class="reviews-column">
-          <div class="section-header">
-            <h3>Historical Reviews</h3>
-          </div>
-
-          <div class="reviews-stack">
-            @for (rev of reviews(); track rev.id) {
-              <mat-card class="review-card">
-                <div class="review-score">
-                  <div class="score-value">{{ rev.rating }}</div>
-                  <span class="score-label">Rating</span>
-                </div>
-                <div class="review-content">
-                  <div class="review-meta">
-                    <strong>Annual Review</strong>
-                    <span>{{ rev.reviewDate | date:'longDate' }}</span>
-                  </div>
-                  <p class="review-comment">"{{ rev.comments }}"</p>
-                  <div class="review-footer">
-                    <button mat-stroked-button size="small">
-                      <mat-icon>description</mat-icon> View Full Report
-                    </button>
-                  </div>
-                </div>
-              </mat-card>
-            }
-            @if (reviews().length === 0) {
-              <mat-card class="empty-card">
-                <p>No historical reviews available.</p>
-              </mat-card>
-            }
-          </div>
+      <div class="dashboard-kpi-row mt-6">
+        <div class="ui-card kpi-card">
+           <div class="kpi-meta-row">
+              <span class="kpi-metric-title">Avg Efficiency</span>
+              <span class="ui-badge ui-badge-success">+2.1%</span>
+           </div>
+           <div class="kpi-metric-value">92.4%</div>
+        </div>
+        <div class="ui-card kpi-card">
+           <div class="kpi-meta-row">
+              <span class="kpi-metric-title">Cost/Hour Ratio</span>
+              <span class="ui-badge ui-badge-warning">Nominal</span>
+           </div>
+           <div class="kpi-metric-value">$42.50</div>
+        </div>
+        <div class="ui-card kpi-card">
+           <div class="kpi-meta-row">
+              <span class="kpi-metric-title">System Yield</span>
+              <span class="ui-badge ui-badge-success">Optimal</span>
+           </div>
+           <div class="kpi-metric-value" style="color:var(--success)">NOMINAL</div>
         </div>
       </div>
-    </section>
+
+      <div class="ui-card mt-6" style="padding:0; overflow:hidden;">
+        <div class="ui-card-header" style="padding:1.5rem 1.5rem 0;">
+           <h3>Sector Performance Vectors</h3>
+           <span class="ui-badge ui-badge-success">Live_Updated</span>
+        </div>
+        
+        <div class="chart-viewport" style="padding: 2.5rem; display: flex; flex-direction: column; gap: 2rem;">
+           <div class="chart-row" style="display:flex; align-items:center; gap:2rem;">
+              <div style="width: 180px; font-size: 0.85rem; font-weight: 800; color: var(--txt-secondary);">CORE_ENGINEERING</div>
+              <div style="flex: 1; height: 12px; background: var(--surface-3); border-radius: 6px; overflow: hidden;">
+                 <div style="height: 100%; background: var(--primary); border-radius: 6px; width: 98%;"></div>
+              </div>
+              <div style="width: 60px; font-family: 'JetBrains Mono', monospace; font-weight: 900; font-size: 0.9rem; text-align: right;">98.2%</div>
+           </div>
+
+           <div class="chart-row" style="display:flex; align-items:center; gap:2rem;">
+              <div style="width: 180px; font-size: 0.85rem; font-weight: 800; color: var(--txt-secondary);">LOGISTICS_COMMAND</div>
+              <div style="flex: 1; height: 12px; background: var(--surface-3); border-radius: 6px; overflow: hidden;">
+                 <div style="height: 100%; background: var(--warning); border-radius: 6px; width: 82%;"></div>
+              </div>
+              <div style="width: 60px; font-family: 'JetBrains Mono', monospace; font-weight: 900; font-size: 0.9rem; text-align: right;">82.5%</div>
+           </div>
+
+           <div class="chart-row" style="display:flex; align-items:center; gap:2rem;">
+              <div style="width: 180px; font-size: 0.85rem; font-weight: 800; color: var(--txt-secondary);">FISCAL_OPERATIONS</div>
+              <div style="flex: 1; height: 12px; background: var(--surface-3); border-radius: 6px; overflow: hidden;">
+                 <div style="height: 100%; background: var(--success); border-radius: 6px; width: 100%;"></div>
+              </div>
+              <div style="width: 60px; font-family: 'JetBrains Mono', monospace; font-weight: 900; font-size: 0.9rem; text-align: right;">100%</div>
+           </div>
+        </div>
+
+        <div style="height: 200px; padding: 0 1.5rem 1.5rem;">
+           <app-trend-chart [data]="[50, 60, 45, 70, 65, 80, 75, 90, 85, 95]" color="var(--primary)" />
+        </div>
+      </div>
+
+    </div>
   `,
   styles: [`
-    .performance-shell { margin-top: 1.5rem; }
-    .perf-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; }
-    
-    .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; }
-    .section-header h3 { margin: 0; font-size: 1.1rem; font-weight: 700; color: #1e293b; }
-    
-    .goals-stack, .reviews-stack { display: grid; gap: 1.25rem; }
-    
-    .goal-card { padding: 1.5rem; border-radius: 1.2rem; border: 1px solid #e2e8f0; }
-    .goal-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.75rem; }
-    .goal-header strong { font-size: 1rem; color: #0f172a; }
-    .goal-desc { margin: 0 0 1.25rem; font-size: 0.9rem; color: #64748b; line-height: 1.5; }
-    .goal-progress { margin-bottom: 1rem; }
-    .progress-meta { display: flex; justify-content: space-between; font-size: 0.75rem; font-weight: 700; color: #64748b; margin-bottom: 0.5rem; text-transform: uppercase; }
-    .goal-footer { display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; color: #94a3b8; }
-    .goal-footer mat-icon { font-size: 1rem; width: 1rem; height: 1rem; }
-
-    .review-card { padding: 1.5rem; border-radius: 1.2rem; border: 1px solid #e2e8f0; display: flex; gap: 1.5rem; align-items: flex-start; }
-    .review-score { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 1rem; padding: 1rem; text-align: center; min-width: 4.5rem; }
-    .score-value { font-size: 1.75rem; font-weight: 800; color: #3b82f6; line-height: 1; }
-    .score-label { font-size: 0.65rem; font-weight: 700; text-transform: uppercase; color: #64748b; }
-    .review-content { flex: 1; }
-    .review-meta { display: flex; justify-content: space-between; margin-bottom: 0.5rem; }
-    .review-meta strong { font-size: 0.95rem; }
-    .review-meta span { font-size: 0.8rem; color: #94a3b8; }
-    .review-comment { margin: 0 0 1rem; font-size: 0.9rem; color: #475569; font-style: italic; }
-    
-    .empty-card { padding: 2rem; text-align: center; color: #94a3b8; border: 1px dashed #e2e8f0; background: transparent; box-shadow: none; }
-
-    @media (max-width: 1024px) {
-      .perf-grid { grid-template-columns: 1fr; }
-    }
+    :host { display: block; height: 100%; }
+    .mt-6 { margin-top: 1.5rem; }
   `]
 })
 export class PerformancePageComponent {
-  private readonly perfApi = inject(PerformanceService);
-  
-  private readonly currentUserId = 1;
-
-  protected readonly goals = toSignal(this.perfApi.getGoals(this.currentUserId), { initialValue: [] });
-  protected readonly reviews = toSignal(this.perfApi.getReviews(this.currentUserId), { initialValue: [] });
-
-  protected onAddGoal(): void {
-    // Implement add goal dialog
+  export() {
+    alert('Generating Forensic Matrix PDF...');
   }
 }

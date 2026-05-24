@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { ApiService } from './api.service';
 import { Observable } from 'rxjs';
+import { environment } from '../../../environments/environment';
 
 export interface Report {
   id: number;
@@ -20,7 +21,7 @@ export interface DashboardWidget {
 
 @Injectable({ providedIn: 'root' })
 export class AnalyticsService {
-  private readonly baseUrl = 'http://localhost:8080';
+  private readonly baseUrl = environment.apiBaseUrl;
   constructor(private readonly api: ApiService) {}
 
   getReports(): Observable<Report[]> {
@@ -32,6 +33,10 @@ export class AnalyticsService {
   }
 
   getWidgets(): Observable<DashboardWidget[]> {
-    return this.api.get<DashboardWidget[]>('/api/analytics/dashboard/widgets', [], this.baseUrl);
+    return this.api.get<DashboardWidget[]>('/api/analytics/dashboard/widgets/ADMIN', [], this.baseUrl);
+  }
+
+  updateWidgetOrder(widgets: DashboardWidget[]): Observable<any> {
+    return this.api.patch<any>('/api/analytics/dashboard/widgets', widgets, undefined, this.baseUrl);
   }
 }
