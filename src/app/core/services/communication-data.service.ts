@@ -121,6 +121,8 @@ export class CommunicationDataService {
   }
 
   updateConversationPreference(payload: {
+    userId: number;
+    companyId: number;
     conversationType: 'PRIVATE' | 'GROUP';
     conversationId: number;
     archived: boolean;
@@ -129,20 +131,50 @@ export class CommunicationDataService {
     return this.api.put<any>('/api/communication/preferences', payload, undefined, this.commsUrl);
   }
 
-  addReaction(messageId: number, emoji: string): Observable<ChatMessage> {
+  // --- Block User APIs ---
+  blockUser(userId: number, blockedUserId: number, companyId: number): Observable<any> {
+    return this.api.post<any>('/api/communication/blocks', { userId, blockedUserId, companyId }, undefined, this.commsUrl);
+  }
+
+  unblockUser(userId: number, blockedUserId: number): Observable<any> {
+    return this.api.delete<any>(`/api/communication/blocks/${userId}/${blockedUserId}`, undefined, this.commsUrl);
+  }
+
+  isBlocked(userId: number, peerId: number): Observable<boolean> {
+    return this.api.get<boolean>(`/api/communication/blocks/is-blocked?userId=${userId}&peerId=${peerId}`, false, this.commsUrl);
+  }
+
+  getBlockedUsers(userId: number, companyId: number): Observable<any[]> {
+    return this.api.get<any[]>(`/api/communication/blocks/${userId}?companyId=${companyId}`, [], this.commsUrl);
+  }
+
+  addReaction(messageId: number, emoji: string, userId: number, companyId: number): Observable<ChatMessage> {
+    const payload = { emoji, userId, companyId };
     return this.api.post<ChatMessage>(
       `/api/communication/chat/messages/${messageId}/reactions`,
-      { emoji },
+      payload,
       undefined,
       this.commsUrl
     );
   }
 
-  loadStatuses(): Observable<StatusStory[]> {
-    return this.api.get<StatusStory[]>('/api/communication/status', [], this.commsUrl);
+  removeReaction(messageId: number, userId: number): Observable<ChatMessage> {
+    return this.api.delete<ChatMessage>(
+      `/api/communication/chat/messages/${messageId}/reactions?userId=${userId}`,
+      undefined,
+      this.commsUrl
+    );
+  }
+
+  // --- Status Story APIs (companyId & requesterId dynamic mappings) ---
+
+  loadStatuses(companyId: number, requesterId: number): Observable<StatusStory[]> {
+    return this.api.get<StatusStory[]>(`/api/communication/status?companyId=${companyId}&requesterId=${requesterId}`, [], this.commsUrl);
   }
 
   createStatus(payload: {
+    userId: number;
+    companyId: number;
     content?: string;
     mediaUrl?: string;
     backgroundStyle?: string;
@@ -152,16 +184,16 @@ export class CommunicationDataService {
     return this.api.post<StatusStory>('/api/communication/status', payload, undefined, this.commsUrl);
   }
 
-  markStatusViewed(statusId: number): Observable<void> {
+  markStatusViewed(statusId: number, viewerId: number): Observable<void> {
     return this.api.post<void>(
-      `/api/communication/status/${statusId}/view`,
+      `/api/communication/status/${statusId}/view?viewerId=${viewerId}`,
       {},
       undefined,
       this.commsUrl
     );
   }
 
-  deleteStatus(statusId: number): Observable<void> {
-    return this.api.delete<void>(`/api/communication/status/${statusId}`, undefined, this.commsUrl);
+  deleteStatus(statusId: number, userId: number): Observable<void> {
+    return this.api.delete<void>(`/api/communication/status/${statusId}?userId=${userId}`, undefined, this.commsUrl);
   }
 }

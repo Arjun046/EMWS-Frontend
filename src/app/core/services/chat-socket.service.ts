@@ -10,6 +10,7 @@ export class ChatSocketService {
   private readonly statusState = signal<'disconnected' | 'connecting' | 'connected'>('disconnected');
   private readonly presenceState = signal<Map<number, string>>(new Map());
   private readonly typingState = signal<Map<string, boolean>>(new Map());
+  private readonly newGroupEventState = signal<any>(null);
   private currentUserId: number | null = null;
   private currentCompanyId: number | null = null;
   private currentGroupId: number | null = null;
@@ -18,6 +19,7 @@ export class ChatSocketService {
   readonly status = this.statusState.asReadonly();
   readonly presence = this.presenceState.asReadonly();
   readonly typing = this.typingState.asReadonly();
+  readonly newGroupEvent = this.newGroupEventState.asReadonly();
 
   connect(userId: number, companyId: number): void {
     if (this.currentUserId === userId && this.currentCompanyId === companyId && this.client?.active) {
@@ -74,6 +76,22 @@ export class ChatSocketService {
     });
 
     this.client.activate();
+  }
+
+  disconnect(): void {
+    if (this.client?.active) {
+      try {
+        this.sendPresence('OFFLINE');
+      } catch (e) {
+        console.error('[ChatSocket] Offline broadcast failed', e);
+      }
+      void this.client.deactivate();
+      this.currentUserId = null;
+      this.currentCompanyId = null;
+      this.currentGroupId = null;
+      this.statusState.set('disconnected');
+      console.log('[ChatSocket] Disconnected successfully');
+    }
   }
 
   subscribeToGroup(groupId: number, companyId: number): void {
@@ -183,6 +201,12 @@ export class ChatSocketService {
 
       if (payload.messageType === 'UPDATE') {
         this.messagesState.update(msgs => msgs.map(m => m.id === payload.id ? payload : m));
+        return;
+      }
+
+      if (payload.messageType === 'GROUP_CREATED') {
+        console.log('[ChatSocket] New group created event:', payload);
+        this.newGroupEventState.set(payload);
         return;
       }
 

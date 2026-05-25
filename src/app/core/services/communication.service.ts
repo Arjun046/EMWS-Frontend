@@ -39,6 +39,10 @@ export class CommunicationService {
     return this.api.get<ChatSummary[]>('/api/communication/chat/summary', [], this.baseUrl);
   }
 
+  getContacts(): Observable<ChatSummary[]> {
+    return this.api.get<ChatSummary[]>('/api/communication/chat/contacts', [], this.baseUrl);
+  }
+
   sendMessage(msg: Partial<ChatMessage>): Observable<ChatMessage> {
     return this.api.post<ChatMessage>('/api/communication/chat/send', msg, undefined, this.baseUrl);
   }
@@ -51,9 +55,24 @@ export class CommunicationService {
     return this.api.delete<void>(`/api/communication/chat/messages/${id}`, undefined, this.baseUrl);
   }
 
-  applyReaction(messageId: number, emoji: string): Observable<ChatMessage> {
-    const payload = { emoji, userId: 0, companyId: 0 }; 
+  applyReaction(messageId: number, emoji: string, userId: number, companyId: number): Observable<ChatMessage> {
+    const payload = { emoji, userId, companyId }; 
     return this.api.post<ChatMessage>(`/api/communication/chat/messages/${messageId}/reactions`, payload, undefined, this.baseUrl);
+  }
+
+  removeReaction(messageId: number, userId: number): Observable<ChatMessage> {
+    return this.api.delete<ChatMessage>(`/api/communication/chat/messages/${messageId}/reactions?userId=${userId}`, undefined, this.baseUrl);
+  }
+
+  // --- WhatsApp Security & E2E Keys ---
+
+  publishPublicKey(userId: number, companyId: number, publicKey: string): Observable<any> {
+    const payload = { userId, companyId, publicKey };
+    return this.api.post<any>('/api/communication/keys', payload, undefined, this.baseUrl);
+  }
+
+  getPublicKey(userId: number): Observable<any> {
+    return this.api.get<any>(`/api/communication/keys/${userId}`, [], this.baseUrl);
   }
 
   // --- Group Management ---
@@ -71,8 +90,8 @@ export class CommunicationService {
     return this.api.get<any[]>(`/api/communication/groups/${groupId}/members`, [], this.baseUrl);
   }
 
-  addGroupMember(groupId: number, userId: number): Observable<any> {
-    return this.api.post<any>(`/api/communication/groups/${groupId}/members`, { userId }, undefined, this.baseUrl);
+  addGroupMember(groupId: number, userId: number, actorUserId: number): Observable<any> {
+    return this.api.post<any>(`/api/communication/groups/${groupId}/members`, { userId, actorUserId }, undefined, this.baseUrl);
   }
 
   removeGroupMember(groupId: number, userId: number): Observable<any> {

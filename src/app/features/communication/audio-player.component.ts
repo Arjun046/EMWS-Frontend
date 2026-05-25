@@ -80,7 +80,20 @@ import { FormsModule } from '@angular/forms';
   `]
 })
 export class AudioPlayerComponent implements OnInit {
-  @Input() src!: string;
+  private _src = '';
+
+  @Input() set src(val: string) {
+    if (val && val !== this._src) {
+      this._src = val;
+      this.audio.src = val;
+      this.audio.load();
+      this.currentTime.set(0);
+      this.isPlaying.set(false);
+    }
+  }
+  get src(): string {
+    return this._src;
+  }
   
   protected readonly isPlaying = signal(false);
   protected readonly hasPlayed = signal(false);
@@ -93,8 +106,7 @@ export class AudioPlayerComponent implements OnInit {
   private audio = new Audio();
 
   ngOnInit() {
-    this.audio.src = this.src;
-    this.audio.onloadedmetadata = () => this.duration.set(this.audio.duration);
+    this.audio.onloadedmetadata = () => this.duration.set(this.audio.duration || 0);
     this.audio.ontimeupdate = () => this.currentTime.set(this.audio.currentTime);
     this.audio.onended = () => {
       this.isPlaying.set(false);
