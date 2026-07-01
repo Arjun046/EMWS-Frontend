@@ -108,16 +108,24 @@ export interface ChatMessage {
   groupId: number | null;
   companyId: number;
   messageType?: string; // TEXT, IMAGE, DOCUMENT, AUDIO, VIDEO, EMOJI, TYPING
+  parentMessageId?: number;
+  deliveryStatus?: string; // SENT, DELIVERED, READ, FAILED
+  priority?: string; // INFO, ACTION_REQUIRED, URGENT
   content: string;
   fileUrl?: string;
   timestamp?: string;
   isRead: boolean;
   replyToId?: number;
   replyToContent?: string;
+  transcription?: string;
+  sentiment?: string;
+  intelligenceTags?: string;
   isEdited?: boolean;
   isDeleted?: boolean;
   isPinned?: boolean;
   reactions?: ChatReactionSummary[];
+  translatedContent?: string;
+  poll?: any;
 }
 
 export interface ChatReactionSummary {

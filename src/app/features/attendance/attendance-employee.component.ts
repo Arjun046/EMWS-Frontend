@@ -387,8 +387,8 @@ export class AttendanceEmployeeComponent implements OnInit, OnDestroy {
   private refreshStatus() {
     const user = this.auth.user();
     if (user) {
-      this.attendanceApi.getAttendanceStatus(user.id).subscribe((status: string) => {
-        this.status.set(status);
+      this.attendanceApi.getAttendanceStatus(user.id).subscribe((data: {status: string}) => {
+        this.status.set(data.status);
         this.attendanceApi.getTodayAttendance(user.id).subscribe((records: Attendance[]) => {
           this.todayRecords.set(records);
           this.currentAttendance = records.find((r: Attendance) => r.clockOut === null) || null;

@@ -1,5 +1,5 @@
 import { Component, inject, signal, computed, OnInit, ViewChild } from '@angular/core';
-import { CommonModule, CurrencyPipe, DatePipe, DecimalPipe } from '@angular/common';
+import { CommonModule, CurrencyPipe, DatePipe } from '@angular/common';
 import { MatTableModule, MatTableDataSource } from '@angular/material/table';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
@@ -24,7 +24,7 @@ import { catchError, of } from 'rxjs';
   imports: [
     CommonModule, MatTableModule, MatIconModule, MatButtonModule, MatMenuModule,
     MatSnackBarModule, MatProgressSpinnerModule, MatPaginatorModule, MatSortModule,
-    MatDividerModule, ReactiveFormsModule, DatePipe, CurrencyPipe, DecimalPipe,
+    MatDividerModule, ReactiveFormsModule, DatePipe, CurrencyPipe,
     HasScopeDirective, SideSheetDrawerComponent
   ],
   template: `
@@ -304,8 +304,12 @@ export class PayrollPageComponent implements OnInit {
   protected readonly salaryStructure = toSignal(this.payrollApi.getMySalaryStructure());
   protected readonly displayedColumns = ['personnel', 'period', 'gross', 'net', 'status', 'actions'];
 
-  @ViewChild(MatPaginator) paginator!: MatPaginator;
-  @ViewChild(MatSort) sort!: MatSort;
+  @ViewChild(MatPaginator) set matPaginator(mp: MatPaginator) {
+    if (mp) this.dataSource.paginator = mp;
+  }
+  @ViewChild(MatSort) set matSort(ms: MatSort) {
+    if (ms) this.dataSource.sort = ms;
+  }
 
   // Self-Service State
   protected readonly selectedRecord = signal<PayrollRecord | null>(null);
@@ -341,8 +345,6 @@ export class PayrollPageComponent implements OnInit {
       })
     ).subscribe(data => {
       this.dataSource.data = data;
-      this.dataSource.paginator = this.paginator;
-      this.dataSource.sort = this.sort;
       this.isLoading.set(false);
     });
   }

@@ -257,8 +257,12 @@ export class SchedulingPageComponent implements OnInit {
   protected employees = toSignal(this.employeeDataService.getEmployees(), { initialValue: [] });
   protected readonly displayedColumns = ['employee', 'time', 'area', 'status', 'actions'];
 
-  @ViewChild(MatPaginator) paginator!: MatPaginator;
-  @ViewChild(MatSort) sort!: MatSort;
+  @ViewChild(MatPaginator) set matPaginator(mp: MatPaginator) {
+    if (mp) this.dataSource.paginator = mp;
+  }
+  @ViewChild(MatSort) set matSort(ms: MatSort) {
+    if (ms) this.dataSource.sort = ms;
+  }
 
   // Drawer State
   isDrawerOpen = false;
@@ -302,8 +306,6 @@ export class SchedulingPageComponent implements OnInit {
       })
     ).subscribe(shifts => {
       this.dataSource.data = shifts;
-      this.dataSource.paginator = this.paginator;
-      this.dataSource.sort = this.sort;
       this.isLoading.set(false);
     });
   }

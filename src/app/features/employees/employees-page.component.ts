@@ -166,8 +166,12 @@ export class EmployeesPageComponent implements OnInit, AfterViewInit {
   protected isLoading = signal(true);
   protected readonly displayedColumns = ['name', 'salary', 'status', 'actions'];
 
-  @ViewChild(MatPaginator) paginator!: MatPaginator;
-  @ViewChild(MatSort) sort!: MatSort;
+  @ViewChild(MatPaginator) set matPaginator(mp: MatPaginator) {
+    if(mp) this.dataSource.paginator = mp;
+  }
+  @ViewChild(MatSort) set matSort(ms: MatSort) {
+    if(ms) this.dataSource.sort = ms;
+  }
 
   showDeleteConfirm = false;
   selectedEmployee: Employee | null = null;
@@ -177,8 +181,6 @@ export class EmployeesPageComponent implements OnInit, AfterViewInit {
   }
 
   ngAfterViewInit(): void {
-    this.dataSource.paginator = this.paginator;
-    this.dataSource.sort = this.sort;
   }
 
   loadEmployees(): void {

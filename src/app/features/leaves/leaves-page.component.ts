@@ -244,8 +244,12 @@ export class LeavesPageComponent implements OnInit {
   protected readonly employees = toSignal(this.empApi.getEmployees(), { initialValue: [] });
   protected readonly displayedColumns = ['personnel', 'category', 'interval', 'status', 'actions'];
 
-  @ViewChild(MatPaginator) paginator!: MatPaginator;
-  @ViewChild(MatSort) sort!: MatSort;
+  @ViewChild(MatPaginator) set matPaginator(mp: MatPaginator) {
+    if (mp) this.dataSource.paginator = mp;
+  }
+  @ViewChild(MatSort) set matSort(ms: MatSort) {
+    if (ms) this.dataSource.sort = ms;
+  }
 
   // Balances
   protected readonly balances = signal<LeaveBalance[]>([]);
@@ -293,8 +297,6 @@ export class LeavesPageComponent implements OnInit {
       })
     ).subscribe((data: LeaveRequest[]) => {
       this.dataSource.data = data;
-      this.dataSource.paginator = this.paginator;
-      this.dataSource.sort = this.sort;
       this.isLoading.set(false);
     });
   }

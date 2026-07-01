@@ -9,7 +9,6 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatPaginatorModule, MatPaginator } from '@angular/material/paginator';
 import { MatSortModule, MatSort } from '@angular/material/sort';
 import { ComplianceService, AuditTrail } from '../../core/services/compliance.service';
-import { HasScopeDirective } from '../../shared/directives/has-scope.directive';
 import { SideSheetDrawerComponent } from '../../shared/components/side-sheet-drawer/side-sheet-drawer.component';
 import { catchError, of } from 'rxjs';
 
@@ -19,7 +18,7 @@ import { catchError, of } from 'rxjs';
   imports: [
     CommonModule, MatTableModule, MatIconModule, MatButtonModule, MatMenuModule,
     MatSnackBarModule, MatProgressSpinnerModule, MatPaginatorModule, MatSortModule,
-    DatePipe, HasScopeDirective, SideSheetDrawerComponent
+    DatePipe, SideSheetDrawerComponent
   ],
   template: `
     <div class="module-page active-page fade-up" id="page-compliance">

@@ -63,6 +63,10 @@ export class AttendanceService {
     return this.api.post<Attendance>(`/api/attendance/clock-out?attendanceId=${attendanceId}`, {}, undefined, this.baseUrl);
   }
 
+  manualEntry(payload: any): Observable<Attendance> {
+    return this.api.post<Attendance>('/api/attendance/manual', payload, undefined, this.baseUrl);
+  }
+
   startBreak(attendanceId: number): Observable<Attendance> {
     return this.api.post<Attendance>(`/api/attendance/start-break?attendanceId=${attendanceId}`, {}, undefined, this.baseUrl);
   }
@@ -71,8 +75,8 @@ export class AttendanceService {
     return this.api.post<Attendance>(`/api/attendance/end-break?attendanceId=${attendanceId}`, {}, undefined, this.baseUrl);
   }
 
-  getAttendanceStatus(employeeId: number): Observable<string> {
-    return this.api.get<any>(`/api/attendance/employee/${employeeId}/status`, 'CLOCKED_OUT', this.baseUrl);
+  getAttendanceStatus(employeeId: number): Observable<{status: string}> {
+    return this.api.get<{status: string}>(`/api/attendance/employee/${employeeId}/status`, {status: 'CLOCKED_OUT'}, this.baseUrl);
   }
 
   getTodayAttendance(employeeId: number): Observable<Attendance[]> {

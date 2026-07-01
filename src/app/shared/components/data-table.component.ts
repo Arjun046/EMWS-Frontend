@@ -52,7 +52,7 @@ import { DatePipe } from '@angular/common';
         <ng-container matColumnDef="actions">
           <th mat-header-cell *matHeaderCellDef class="header-cell"></th>
           <td mat-cell *matCellDef="let row" class="body-cell actions-cell">
-            <button mat-icon-button [matMenuTriggerFor]="rowMenu">
+            <button mat-icon-button [matMenuTriggerFor]="rowMenu" aria-label="Action Menu">
               <mat-icon>more_vert</mat-icon>
             </button>
           </td>

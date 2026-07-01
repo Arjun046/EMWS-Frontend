@@ -60,6 +60,30 @@ import { toSignal } from '@angular/core/rxjs-interop';
             <div class="trend stable">No change</div>
           </mat-card>
         </div>
+
+        <!-- 🟢 NEW: COMMUNICATION INTELLIGENCE METRICS -->
+        <div class="metrics-grid mt-6">
+          <mat-card class="metric-card comms-card">
+            <label>Total Dispatch Volume</label>
+            <div class="value">4,821</div>
+            <div class="trend up">+8% this week</div>
+          </mat-card>
+          <mat-card class="metric-card comms-card">
+            <label>Avg. Response Latency</label>
+            <div class="value">4.2m</div>
+            <div class="trend down">-1.5m improvement</div>
+          </mat-card>
+          <mat-card class="metric-card comms-card">
+            <label>Team Sentiment Index</label>
+            <div class="value">8.4</div>
+            <div class="trend up">Stable Positive</div>
+          </mat-card>
+          <mat-card class="metric-card comms-card">
+            <label>Policy Compliance Rate</label>
+            <div class="value">99.9%</div>
+            <div class="trend stable">1 flagged today</div>
+          </mat-card>
+        </div>
       }
 
       <div class="insights-grid mt-6">
@@ -128,6 +152,7 @@ import { toSignal } from '@angular/core/rxjs-interop';
     .metric-card { padding: 1.5rem; border-radius: 1.2rem; border: 1px solid #e2e8f0; }
     .metric-card label { font-size: 0.75rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; }
     .metric-card .value { font-size: 2.25rem; font-weight: 800; color: #1e293b; margin: 0.5rem 0; }
+    .comms-card { border-left: 4px solid var(--accent); background: rgba(0,168,132,0.02); }
     .trend { font-size: 0.8rem; font-weight: 600; }
     .trend.up { color: #10b981; }
     .trend.down { color: #ef4444; }

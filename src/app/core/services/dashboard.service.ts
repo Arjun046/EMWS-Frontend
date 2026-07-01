@@ -36,11 +36,13 @@ export class DashboardService {
     const tomorrowStart = new Date(Date.now() + 86400000).toISOString().split('T')[0] + 'T00:00:00Z';
 
     forkJoin([
-      this.api.get<any[]>('/api/employees', [], this.empUrl).pipe(catchError(() => of([]))),
+      this.api.get<any>('/api/employees', { content: [] }, this.empUrl).pipe(catchError(() => of({ content: [] }))),
       this.api.get<any[]>(`/api/attendance/range?start=${todayStart}&end=${tomorrowStart}`, [], this.attUrl).pipe(catchError(() => of([]))),
       this.api.get<any[]>('/api/leaves/status/APPROVED', [], this.leaveUrl).pipe(catchError(() => of([]))),
       this.api.get<any>('/api/analytics/dashboard/admin', null, this.analyticsUrl).pipe(catchError(() => of(null)))
-    ]).subscribe(([employees, attendance, approvedLeaves, admin]) => {
+    ]).subscribe(([employeesResponse, attendance, approvedLeaves, admin]) => {
+      
+      const employees = Array.isArray(employeesResponse) ? employeesResponse : (employeesResponse.content ?? []);
       
       // Extraction from real backend aggregation logic
       const presentCount = admin?.currentlyClockedIn ?? attendance.filter(a => a.clockOut === null).length;

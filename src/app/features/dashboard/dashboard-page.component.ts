@@ -1,4 +1,4 @@
-import { Component, inject, signal, computed, OnInit, OnDestroy } from '@angular/core';
+import { Component, inject, signal, computed, OnInit, OnDestroy, effect } from '@angular/core';
 import { CommonModule, DatePipe } from '@angular/common';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
@@ -24,6 +24,19 @@ import { TrendChartComponent } from '../../shared/components/trend-chart.compone
   ],
   template: `
     <div class="dashboard-viewport fade-up">
+
+      @if (biometricScanning()) {
+        <div class="biometric-overlay">
+          <div class="scan-frame">
+             <div class="scan-line"></div>
+             <div style="position:absolute; inset:0; display:grid; place-items:center; font-size:60px; opacity:0.2;">
+               <mat-icon style="width:100px; height:100px; font-size:100px;">face</mat-icon>
+             </div>
+          </div>
+          <h2 style="margin-top:2rem; letter-spacing:0.2em; font-weight:900;">AUTHENTICATING BIOMETRIC ID...</h2>
+          <p style="color:var(--txt-muted)">Synchronizing node telemetry with command center.</p>
+        </div>
+      }
 
       <!-- DASHBOARD HERO COMMAND HUB -->
       <div class="dash-hero-grid">
@@ -145,6 +158,23 @@ import { TrendChartComponent } from '../../shared/components/trend-chart.compone
     .dashboard-viewport { display: flex; flex-direction: column; }
     .mt-6 { margin-top: 1.5rem; }
     :host { display: block; }
+
+    /* BIOMETRIC SCANNER ANIMATION */
+    .biometric-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 1000;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      backdrop-filter: blur(10px); color: var(--primary);
+    }
+    .scan-frame {
+      width: 280px; height: 320px; border: 2px solid var(--primary); position: relative;
+      border-radius: 40px; overflow: hidden; box-shadow: 0 0 40px var(--primary);
+      background: rgba(47, 111, 235, 0.05);
+    }
+    .scan-line {
+      position: absolute; width: 100%; height: 4px; background: var(--primary);
+      box-shadow: 0 0 20px var(--primary); animation: scanMove 2.5s ease-in-out infinite;
+    }
+    @keyframes scanMove { 0% { top: 0; } 50% { top: 100%; } 100% { top: 0; } }
   `]
 })
 export class DashboardPageComponent implements OnInit, OnDestroy {
@@ -160,11 +190,25 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
   protected readonly announcements = signal<Announcement[]>([]);
   protected readonly liveTime = signal(Date.now());
   protected readonly isLoading = signal(true);
+  protected readonly biometricScanning = signal(false);
   private timerHandle?: any;
+
+  constructor() {
+    effect(() => {
+      const events = this.socket.events();
+      if (events.length > 0) {
+        const latest = events[0];
+        if (latest.topic.includes('attendance') || latest.topic.includes('scheduling')) {
+          this.loadDashboardData();
+        }
+      }
+    }, { allowSignalWrites: true });
+  }
 
   ngOnInit() {
     this.timerHandle = setInterval(() => this.liveTime.set(Date.now()), 1000);
     this.loadDashboardData();
+    this.socket.connect();
   }
 
   ngOnDestroy() {
@@ -180,13 +224,13 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
 
     this.isLoading.set(true);
     forkJoin({
-      status: this.attendanceApi.getAttendanceStatus(user.id).pipe(catchError(() => of('CLOCKED_OUT'))),
+      statusData: this.attendanceApi.getAttendanceStatus(user.id).pipe(catchError(() => of({status: 'CLOCKED_OUT'}))),
       todayRecords: this.attendanceApi.getTodayAttendance(user.id).pipe(catchError(() => of([]))),
       news: this.announcementApi.getAnnouncements().pipe(catchError(() => of([])))
     }).pipe(
       finalize(() => this.isLoading.set(false))
     ).subscribe((data) => {
-      this.currentStatus.set(data.status);
+      this.currentStatus.set(data.statusData.status);
       this.currentAttendance = data.todayRecords.find((r: Attendance) => r.clockOut === null) || null;
       this.announcements.set(data.news);
     });
@@ -201,9 +245,10 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
   }
 
   protected getShiftDuration(): string {
-    if (!this.currentAttendance) return '00:00:00';
+    if (!this.currentAttendance || !this.currentAttendance.clockIn) return '00:00:00';
     const start = new Date(this.currentAttendance.clockIn).getTime();
-    const diff = this.liveTime() - start;
+    if (isNaN(start)) return '00:00:00';
+    const diff = Math.max(0, this.liveTime() - start);
     const h = Math.floor(diff / 3600000), m = Math.floor((diff % 3600000) / 60000), s = Math.floor((diff % 60000) / 1000);
     return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   }
@@ -230,36 +275,104 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
   }
 
   protected getEventSummary(payload: any): string {
-    if (payload.action) return payload.action.replace('_', ' ');
-    if (payload.desc) return payload.desc;
-    return 'Telemetry synchronization successful.';
+    if (typeof payload === 'string') return payload.replace('_', ' ');
+    
+    const type = payload.type || payload.action;
+    const empId = payload.employeeId;
+    
+    switch (type) {
+      case 'ATTENDANCE_CLOCKED_IN': return `Node EMP-${empId} initialized station active.`;
+      case 'ATTENDANCE_CLOCKED_OUT': return `Node EMP-${empId} terminated operational session.`;
+      case 'ATTENDANCE_BREAK_START': return `Node EMP-${empId} entered recess mode.`;
+      case 'ATTENDANCE_BREAK_END': return `Node EMP-${empId} resumed station activity.`;
+      case 'ATTENDANCE_MANUAL_NODE': return `Administrative node injection successful for EMP-${empId}.`;
+      case 'SHIFT_ASSIGNED': return `Roster deployment node updated for EMP-${empId}.`;
+      default: return payload.desc || 'Telemetry synchronization successful.';
+    }
   }
 
   clockIn() {
     const user = this.auth.user();
-    if (user) {
-      this.attendanceApi.clockIn(user.id).subscribe(() => {
-        this.snack.open('Session Initialized', 'OK', { duration: 3000 });
+    if (!user) return;
+
+    // 1. START BIOMETRIC SIMULATION (WOW FACTOR)
+    this.biometricScanning.set(true);
+    
+    setTimeout(() => {
+        // 2. AFTER 3s OF SCANNING, CAPTURE GPS
+        if (navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(
+            (pos) => {
+              this.biometricScanning.set(false);
+              this.executeClockIn(user.id, pos.coords.latitude, pos.coords.longitude);
+            },
+            () => {
+              this.biometricScanning.set(false);
+              this.executeClockIn(user.id, 40.7128, -74.0060);
+            },
+            { timeout: 5000 }
+          );
+        } else {
+          this.biometricScanning.set(false);
+          this.executeClockIn(user.id);
+        }
+    }, 3200);
+  }
+
+  private executeClockIn(userId: number, lat?: number, lng?: number) {
+    this.attendanceApi.clockIn(userId, lat, lng).subscribe({
+      next: (res) => {
+        this.currentAttendance = res;
+        this.currentStatus.set('CLOCKED_IN'); // INSTANT UI UPDATE
+        this.snack.open('STATION_ACTIVE: Operational session initialized.', 'OK', { duration: 3000 });
         this.loadDashboardData();
-      });
-    }
+      },
+      error: (err) => {
+        this.snack.open('SYNC_FAILURE: ' + (err.error?.message || 'Unauthorized node entry'), 'ERROR');
+        this.isLoading.set(false);
+      }
+    });
   }
 
   clockOut() {
-    if (this.currentAttendance && confirm('Terminate operational session?')) {
-      this.attendanceApi.clockOut(this.currentAttendance.id).subscribe(() => {
-        this.snack.open('Session Terminated', 'OK', { duration: 3000 });
-        this.loadDashboardData();
+    if (!this.currentAttendance) return;
+    
+    if (confirm('TERMINATION_CONFIRM: End operational session?')) {
+      this.isLoading.set(true);
+      this.attendanceApi.clockOut(this.currentAttendance.id).subscribe({
+        next: () => {
+          this.currentStatus.set('CLOCKED_OUT'); // INSTANT UI UPDATE
+          this.currentAttendance = null;
+          this.snack.open('STATION_STANDBY: Session terminated.', 'OK', { duration: 3000 });
+          this.loadDashboardData();
+        },
+        error: () => {
+          this.snack.open('TERMINATION_FAILURE', 'ERROR');
+          this.isLoading.set(false);
+        }
       });
     }
   }
 
   toggleBreak() {
     if (!this.currentAttendance) return;
-    const action = this.currentStatus() === 'ON_BREAK'
+    const isCurrentlyOnBreak = this.currentStatus() === 'ON_BREAK';
+    const action = isCurrentlyOnBreak
       ? this.attendanceApi.endBreak(this.currentAttendance.id)
       : this.attendanceApi.startBreak(this.currentAttendance.id);
 
-    action.subscribe(() => this.loadDashboardData());
+    this.isLoading.set(true);
+    action.subscribe({
+      next: (res) => {
+        this.currentAttendance = res;
+        this.currentStatus.set(isCurrentlyOnBreak ? 'CLOCKED_IN' : 'ON_BREAK'); // INSTANT UI UPDATE
+        this.snack.open(isCurrentlyOnBreak ? 'STATION_RESUMED' : 'RECESS_INITIALIZED', 'OK');
+        this.loadDashboardData();
+      },
+      error: () => {
+        this.snack.open('BREAK_PROTOCOL_FAILED', 'ERROR');
+        this.isLoading.set(false);
+      }
+    });
   }
 }

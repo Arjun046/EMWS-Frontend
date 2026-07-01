@@ -29,21 +29,28 @@ import { VoiceRecorderService } from '../../core/services/voice-recorder.service
         <!-- 1. Side Rail -->
         <div class="nav-rail">
           <div class="rail-top">
-            <div class="rail-item" [class.active]="activeTab() === 'chats'" (click)="activeTab.set('chats')">
+            <div class="rail-item" [class.active]="activeTab() === 'chats'" (click)="activeTab.set('chats')" aria-label="Chats" title="Chats">
               <mat-icon>chat</mat-icon>
             </div>
-            <div class="rail-item" [class.active]="activeTab() === 'channels'" (click)="activeTab.set('channels')">
+            <div class="rail-item" [class.active]="activeTab() === 'channels'" (click)="activeTab.set('channels')" aria-label="Channels" title="Channels">
               <mat-icon>groups</mat-icon>
             </div>
-            <div class="rail-item meta-ai-orb" [class.active]="activeTab() === 'ai'" (click)="activeTab.set('ai')">
+            <div class="rail-item" [class.active]="smartInboxActive()" (click)="showSmartInbox()" title="Smart Inbox" aria-label="Smart Inbox">
+              <mat-icon>inbox</mat-icon>
+              <div class="rail-badge" *ngIf="smartInbox()?.pendingAcknowledgements > 0"></div>
+            </div>
+            <div class="rail-item" [class.active]="auditActive()" (click)="showAuditLog()" title="Security Audit Log" aria-label="Audit Log">
+              <mat-icon>security</mat-icon>
+            </div>
+            <div class="rail-item meta-ai-orb" [class.active]="activeTab() === 'ai'" (click)="activeTab.set('ai')" aria-label="AI Assistant" title="AI Assistant">
               <div class="ai-glowing-ring"></div>
             </div>
           </div>
           <div class="rail-bottom">
-            <div class="rail-item"><mat-icon>star_outline</mat-icon></div>
-            <div class="rail-item"><mat-icon>archive</mat-icon></div>
+            <div class="rail-item" aria-label="Starred" title="Starred"><mat-icon>star_outline</mat-icon></div>
+            <div class="rail-item" aria-label="Archived" title="Archived"><mat-icon>archive</mat-icon></div>
             <mat-divider style="width: 20px; background: rgba(255,255,255,0.08); margin: 0.5rem 0; border-top: 1px solid rgba(255,255,255,0.08);"></mat-divider>
-            <div class="rail-profile-avatar">{{ getInitials(auth.user()?.name) }}</div>
+            <div class="rail-profile-avatar" [title]="auth.user()?.name">{{ getInitials(auth.user()?.name) }}</div>
           </div>
         </div>
 
@@ -136,6 +143,91 @@ import { VoiceRecorderService } from '../../core/services/voice-recorder.service
             </div>
           </div>
 
+          <!-- 🟢 SIDEBAR OVERLAY: SMART INBOX -->
+          <div class="sidebar-overlay-pane animate-slide" *ngIf="smartInboxActive()">
+            <div class="overlay-header">
+              <div style="display:flex; align-items:center; gap:0.5rem;">
+                <mat-icon style="color:var(--accent);">inbox</mat-icon>
+                <strong>Smart Inbox</strong>
+              </div>
+              <button class="header-action-btn" (click)="smartInboxActive.set(false)"><mat-icon>close</mat-icon></button>
+            </div>
+            <div class="overlay-list custom-scrollbar">
+              @if (!smartInbox() || smartInbox().items.length === 0) {
+                <div class="empty-state">No pending actions.</div>
+              } @else {
+                @for (item of smartInbox().items; track item.messageId) {
+                  <div class="inbox-item" [class]="item.priority.toLowerCase()">
+                    <div class="inbox-item-header">
+                      <span class="type-tag">{{ item.type }}</span>
+                      <span class="time-tag">{{ item.timestamp | date:'shortTime' }}</span>
+                    </div>
+                    <strong>{{ item.title }}</strong>
+                    <p>{{ item.preview }}</p>
+                    <div class="inbox-actions" *ngIf="item.type === 'ACKNOWLEDGEMENT_REQUIRED'">
+                      <button (click)="acknowledge(item.messageId)">Acknowledge</button>
+                    </div>
+                  </div>
+                }
+              }
+            </div>
+          </div>
+
+          <!-- 🟢 SIDEBAR OVERLAY: SECURITY AUDIT LOG -->
+          <div class="sidebar-overlay-pane animate-slide" *ngIf="auditActive()">
+            <div class="overlay-header">
+              <div style="display:flex; align-items:center; gap:0.5rem;">
+                <mat-icon style="color:var(--danger);">security</mat-icon>
+                <strong>Security Audit Log</strong>
+              </div>
+              <button class="header-action-btn" (click)="auditActive.set(false)"><mat-icon>close</mat-icon></button>
+            </div>
+            <div class="overlay-list custom-scrollbar">
+              @if (!auditEvents() || auditEvents().length === 0) {
+                <div class="empty-state">No audit logs found.</div>
+              } @else {
+                @for (event of auditEvents(); track event.id) {
+                  <div class="audit-item">
+                    <div class="audit-header">
+                       <span class="audit-type">{{ event.eventType }}</span>
+                       <span class="audit-time">{{ event.createdAt | date:'short' }}</span>
+                    </div>
+                    <div class="audit-actor">Actor: User_{{ event.actorUserId }}</div>
+                    <p class="audit-details">{{ event.details }}</p>
+                  </div>
+                }
+              }
+            </div>
+          </div>
+
+          <!-- 🟢 SIDEBAR OVERLAY: POLL CREATOR -->
+          <div class="sidebar-overlay-pane animate-slide" *ngIf="pollCreatorActive()">
+            <div class="overlay-header">
+              <div style="display:flex; align-items:center; gap:0.5rem;">
+                <mat-icon style="color:var(--accent);">poll</mat-icon>
+                <strong>Operational Poll</strong>
+              </div>
+              <button class="header-action-btn" (click)="pollCreatorActive.set(false)"><mat-icon>close</mat-icon></button>
+            </div>
+            <div class="overlay-content custom-scrollbar" style="padding: 1.5rem;">
+               <div class="form-group">
+                 <label>Decision Question</label>
+                 <input type="text" [(ngModel)]="pollQuestion" placeholder="e.g. Who can take the extra night shift?">
+               </div>
+               <div class="form-group mt-4">
+                 <label>Options</label>
+                 @for (opt of pollOptions; track $index; let i = $index) {
+                    <div style="display:flex; gap:0.5rem; margin-bottom:0.5rem;">
+                       <input type="text" [(ngModel)]="pollOptions[i]" [placeholder]="'Option ' + (i+1)">
+                       <button *ngIf="pollOptions.length > 2" (click)="removePollOption(i)" class="header-action-btn"><mat-icon>remove_circle_outline</mat-icon></button>
+                    </div>
+                 }
+                 <button class="add-opt-btn" (click)="addPollOption()">+ Add Logic Branch</button>
+               </div>
+               <button class="dispatch-btn mt-6" (click)="submitPoll()">Dispatch to Field</button>
+            </div>
+          </div>
+
           <!-- 🟢 SIDEBAR OVERLAY: STATUS STORY CREATION FORM -->
           <div class="sidebar-overlay-pane animate-slide" *ngIf="statusSyncActive()">
             <div class="overlay-header">
@@ -181,7 +273,7 @@ import { VoiceRecorderService } from '../../core/services/voice-recorder.service
           </div>
 
           <div class="threads-feed custom-scrollbar" *ngIf="!directSyncActive() && !groupSyncActive() && !statusSyncActive() && !groupMembersActive()">
-            @if (filteredThreads().length === 0) {
+            @if (!filteredThreads() || filteredThreads().length === 0) {
               <div class="empty-threads-panel animate-fade">
                  <mat-icon style="font-size: 2.5rem; width: 40px; height: 40px; color: var(--txt-muted); margin-bottom: 0.5rem; opacity: 0.4;">chat_bubble_outline</mat-icon>
                  <p style="font-size: 0.82rem; color: var(--txt-muted); margin: 0; line-height: 1.4;">No secure transmissions found.<br>Click '+' to start a direct thread or operational channel.</p>
@@ -225,7 +317,7 @@ import { VoiceRecorderService } from '../../core/services/voice-recorder.service
             <div class="overlay-header">
               <div style="display:flex; align-items:center; gap:0.5rem;">
                 <mat-icon style="color:var(--accent);">groups</mat-icon>
-                <strong>Group Members ({{ groupMembers().length }})</strong>
+                <strong>Group Members ({{ groupMembers() ? groupMembers().length : 0 }})</strong>
               </div>
               <button class="header-action-btn" (click)="groupMembersActive.set(false)"><mat-icon>close</mat-icon></button>
             </div>
@@ -285,7 +377,7 @@ import { VoiceRecorderService } from '../../core/services/voice-recorder.service
               </header>
 
               <div class="chat-feed custom-scrollbar ai-background" #scrollContainer>
-                 @if (aiMessages().length === 0) {
+                 @if (!aiMessages() || aiMessages().length === 0) {
                    <div class="ai-welcome-nudge">
                       <mat-icon>psychology</mat-icon>
                       <p>How can I assist with your workforce operations today?</p>
@@ -296,7 +388,7 @@ import { VoiceRecorderService } from '../../core/services/voice-recorder.service
                       </div>
                    </div>
                  }
-                 @for (msg of aiMessages(); track $index) {
+                 @for (msg of aiMessages(); track msg.clientMsgId || $index) {
                    <div class="message-row" [class.out]="msg.senderId === currentUserId()">
                      <div class="message-bubble" [class.in]="msg.senderId !== currentUserId()" [class.out]="msg.senderId === currentUserId()">
                         <div class="message-text-content">{{ msg.content }}</div>
@@ -344,25 +436,49 @@ import { VoiceRecorderService } from '../../core/services/voice-recorder.service
                   </div>
                 </div>
                 <div style="display:flex; gap:0.5rem;">
+                  <button class="header-action-btn" *ngIf="thread.type === 'GROUP'" (click)="generateHandover()" title="AI Shift Handover">
+                    <mat-icon [class.spin]="handoverLoading()">auto_awesome</mat-icon>
+                  </button>
                   <button class="header-action-btn"><mat-icon>videocam</mat-icon></button>
-                  <button class="header-action-btn"><mat-icon>search</mat-icon></button>
+                  <button class="header-action-btn" (click)="searchActive.set(!searchActive())"><mat-icon>search</mat-icon></button>
                   <button class="header-action-btn" [matMenuTriggerFor]="threadMenu"><mat-icon>more_vert</mat-icon></button>
                 </div>
               </header>
 
+              <!-- 🟢 SHIFT HANDOVER SUMMARY OVERLAY -->
+              <div class="handover-summary-panel animate-fade" *ngIf="handoverSummary()">
+                <div class="handover-header">
+                  <strong>AI Shift Handover Summary</strong>
+                  <button (click)="handoverSummary.set(null)"><mat-icon>close</mat-icon></button>
+                </div>
+                <div class="handover-content">{{ handoverSummary() }}</div>
+              </div>
+
               <div class="chat-feed custom-scrollbar" #scrollContainer>
-                 @for (msg of messages(); track msg.clientMsgId || msg.id; let i = $index) {
+                 @for (msg of (searchActive() ? searchResults() : messages()); track msg.clientMsgId || msg.id; let i = $index) {
                    <div class="message-row" [class.out]="msg.senderId === currentUserId()">
                      <div class="message-bubble" [class.in]="msg.senderId !== currentUserId()" [class.out]="msg.senderId === currentUserId()"
-                          [matMenuTriggerFor]="msgMenu" [matMenuTriggerData]="{msg: msg}">
+                          [matMenuTriggerFor]="msgMenu" [matMenuTriggerData]="{msg: msg}"
+                          [class.priority-urgent]="msg.priority === 'URGENT'">
                         
                         @if (thread.type === 'GROUP' && msg.senderId !== currentUserId()) {
                           <span class="bubble-sender-name" style="color: #53bdeb;">User_{{ msg.senderId }}</span>
                         }
                         
+                        <!-- AI INTELLIGENCE TAGS -->
+                        <div class="intelligence-chips" *ngIf="msg.intelligenceTags">
+                           @for (tag of msg.intelligenceTags.split(','); track tag) {
+                             <span class="intel-tag">#{{ tag.trim() }}</span>
+                           }
+                        </div>
+
                         <!-- Rendering attachments dynamically by messageType -->
                         @if (msg.messageType === 'AUDIO') {
                           <app-audio-player [src]="msg.fileUrl || msg.content"></app-audio-player>
+                          <div class="ai-transcription" *ngIf="msg.transcription">
+                             <mat-icon>translate</mat-icon>
+                             <p>{{ msg.transcription }}</p>
+                          </div>
                         } @else if (msg.messageType === 'IMAGE') {
                           <div class="image-attachment-wrap">
                             <img [src]="msg.fileUrl || msg.content" alt="Attachment Image">
@@ -376,8 +492,22 @@ import { VoiceRecorderService } from '../../core/services/voice-recorder.service
                               <a [href]="msg.fileUrl || '#'" target="_blank">Download Secure Packet</a>
                             </div>
                           </div>
+                        } @else if (msg.messageType === 'SYSTEM') {
+                          <div class="system-operational-result">
+                             <div class="result-header">
+                                <mat-icon>terminal</mat-icon>
+                                <span>EWMS OPS DISPATCH</span>
+                             </div>
+                             <pre class="ops-pre">{{ msg.content }}</pre>
+                          </div>
                         } @else {
                           <div class="message-text-content" style="font-size: 0.88rem;">{{ msg.content }}</div>
+                          
+                          <!-- TRANSLATED CONTENT -->
+                          <div class="translated-panel animate-fade" *ngIf="msg.translatedContent">
+                             <div class="trans-header"><mat-icon>g_translate</mat-icon> AI TRANSLATION</div>
+                             <p>{{ msg.translatedContent }}</p>
+                          </div>
                         }
 
                         <div class="reactions-row" *ngIf="msg.reactions?.length">
@@ -386,10 +516,42 @@ import { VoiceRecorderService } from '../../core/services/voice-recorder.service
                            }
                         </div>
 
+                        <!-- THREAD INDICATOR -->
+                        <div class="thread-indicator" *ngIf="!msg.parentMessageId && msg.id" (click)="openThread(msg); $event.stopPropagation()">
+                           <mat-icon>forum</mat-icon>
+                           <span>Replies</span>
+                        </div>
+
+                        <!-- POLL DISPLAY -->
+                        <div class="chat-poll-container" *ngIf="msg.poll">
+                           <div class="poll-question">{{ msg.poll.question }}</div>
+                           <div class="poll-options">
+                              @for (opt of msg.poll.options; track opt) {
+                                <div class="poll-option-row" (click)="!msg.poll.hasVoted && voteInPoll(msg.poll.id, opt)">
+                                   <div class="option-label">
+                                      <span>{{ opt }}</span>
+                                      <span class="vote-count">{{ msg.poll.results[opt] || 0 }}</span>
+                                   </div>
+                                   <div class="option-bar-bg">
+                                      <div class="option-bar-fill" [style.width.%]="(msg.poll.results[opt] || 0) * 10"></div>
+                                   </div>
+                                </div>
+                              }
+                           </div>
+                           <div class="poll-footer" *ngIf="msg.poll.hasVoted">You have already transmitted your vote.</div>
+                        </div>
+
                         <span class="bubble-meta">
                           {{ msg.timestamp | date:'HH:mm' }}
-                          <mat-icon *ngIf="msg.senderId === currentUserId() && msg.id" class="double-check-icon">done_all</mat-icon>
-                          <mat-icon *ngIf="msg.senderId === currentUserId() && !msg.id" style="font-size: 11px; width: 11px; height: 11px; color: var(--txt-muted);">done</mat-icon>
+                          @if (msg.senderId === currentUserId()) {
+                            <div class="delivery-status-ticks">
+                               <mat-icon *ngIf="msg.deliveryStatus === 'SENT' || !msg.deliveryStatus">done</mat-icon>
+                               <mat-icon *ngIf="msg.deliveryStatus === 'DELIVERED'" class="delivered">done_all</mat-icon>
+                               <mat-icon *ngIf="msg.deliveryStatus === 'READ'" class="read">done_all</mat-icon>
+                               <mat-icon *ngIf="msg.deliveryStatus === 'ESCALATED'" class="escalated" title="Escalated to Manager">priority_high</mat-icon>
+                               <mat-icon *ngIf="msg.deliveryStatus === 'FAILED' || msg.deliveryStatus === 'FAILED_COMPLIANCE'" class="failed">error_outline</mat-icon>
+                            </div>
+                          }
                         </span>
                      </div>
                    </div>
@@ -404,7 +566,7 @@ import { VoiceRecorderService } from '../../core/services/voice-recorder.service
               </div>
 
               <!-- 🟢 AI SUGGESTED QUICK REPLIES -->
-              <div class="quick-replies-reel" *ngIf="messages().length > 0 && messages()[messages().length - 1].senderId !== currentUserId()">
+              <div class="quick-replies-reel" *ngIf="messages() && messages().length > 0 && messages()[messages().length - 1]?.senderId !== currentUserId()">
                 <div class="quick-reply-chip" (click)="sendQuickReply('Acknowledged.')">
                   <mat-icon style="font-size: 0.95rem; color: #00a884; width: 14px; height: 14px; margin-right: 4px;">check_circle</mat-icon>
                   <span>Acknowledged</span>
@@ -428,6 +590,12 @@ import { VoiceRecorderService } from '../../core/services/voice-recorder.service
                      <button mat-icon-button (click)="react(msg, '🔥')">🔥</button>
                   </div>
                   <mat-divider style="background: rgba(255,255,255,0.05);"></mat-divider>
+                  <button mat-menu-item (click)="openThread(msg)">
+                    <mat-icon>forum</mat-icon><span>Reply in Thread</span>
+                  </button>
+                  <button mat-menu-item (click)="translateMessage(msg)">
+                    <mat-icon>translate</mat-icon><span>{{ msg.translatedContent ? 'Show Original' : 'Translate to English' }}</span>
+                  </button>
                   <button mat-menu-item (click)="copyText(msg)">
                     <mat-icon>content_copy</mat-icon><span>Copy Transmission</span>
                   </button>
@@ -501,6 +669,7 @@ import { VoiceRecorderService } from '../../core/services/voice-recorder.service
                    </div>
                    <div class="composer-input-wrap">
                       <button class="composer-icon-btn" (click)="emojiDrawerOpen = !emojiDrawerOpen"><mat-icon>mood</mat-icon></button>
+                      <button class="composer-icon-btn" (click)="pollCreatorActive.set(true)" title="Operational Poll"><mat-icon>poll</mat-icon></button>
                       <input type="text" [placeholder]="editingMessage() ? 'MODIFYING_TRANSIMISSION...' : 'Type message...'" 
                              [(ngModel)]="currentInput" (keyup)="onTyping()" (keyup.enter)="onInputEnter()" (keyup.escape)="cancelEdit()">
                    </div>
@@ -544,6 +713,51 @@ import { VoiceRecorderService } from '../../core/services/voice-recorder.service
             </div>
           }
         </div>
+
+        <!-- 🟢 THREAD SIDEBAR -->
+        <aside class="thread-sidebar" [class.animate-slide]="activeThreadParent()" *ngIf="activeThreadParent()">
+          <header class="thread-sidebar-header">
+            <div class="thread-header-info">
+               <strong>Thread</strong>
+               <span>Replied to User_{{ activeThreadParent()?.senderId }}</span>
+            </div>
+            <button class="header-action-btn" (click)="activeThreadParent.set(null)"><mat-icon>close</mat-icon></button>
+          </header>
+
+          <div class="thread-body custom-scrollbar">
+             <!-- Parent Message -->
+             <div class="thread-parent-msg">
+                <div class="message-bubble in">
+                  <div class="bubble-sender-name" style="color: #53bdeb;">User_{{ activeThreadParent()?.senderId }}</div>
+                  <p>{{ activeThreadParent()?.content }}</p>
+                  <span class="bubble-meta">{{ activeThreadParent()?.timestamp | date:'HH:mm' }}</span>
+                </div>
+             </div>
+             
+             <mat-divider style="background: rgba(255,255,255,0.05); margin: 1.5rem 0;"></mat-divider>
+
+             <div class="thread-replies">
+                @for (reply of threadMessages(); track reply.id) {
+                  <div class="thread-reply-row" [class.out]="reply.senderId === currentUserId()">
+                     <div class="message-bubble" [class.in]="reply.senderId !== currentUserId()" [class.out]="reply.senderId === currentUserId()">
+                        <div class="message-text-content">{{ reply.content }}</div>
+                        <span class="bubble-meta">{{ reply.timestamp | date:'HH:mm' }}</span>
+                     </div>
+                  </div>
+                }
+                @if (threadLoading()) {
+                  <div class="thread-loading">Syncing sequence...</div>
+                }
+             </div>
+          </div>
+
+          <footer class="thread-footer">
+             <div class="composer-input-wrap">
+                <input type="text" #threadInput placeholder="Reply to thread..." (keyup.enter)="sendThreadReply(threadInput.value); threadInput.value=''">
+             </div>
+             <button class="chat-send-btn" (click)="sendThreadReply(threadInput.value); threadInput.value=''"><mat-icon style="color: #00a884;">send</mat-icon></button>
+          </footer>
+        </aside>
       </div>
     </div>
 
@@ -593,7 +807,11 @@ import { VoiceRecorderService } from '../../core/services/voice-recorder.service
       --ease: cubic-bezier(0.16, 1, 0.3, 1);
     }
     .chat-viewport { height: 100%; background: var(--bg); }
-    .app-container { display: grid; grid-template-columns: 60px 340px 1fr; height: 100%; overflow: hidden; }
+    .app-container { display: grid; grid-template-columns: 60px 340px 1fr auto; height: 100%; overflow: hidden; }
+
+    /* Threading Layout */
+    .thread-sidebar { width: 0; transition: width 0.3s var(--ease); overflow: hidden; }
+    .thread-sidebar.animate-slide { width: 350px; }
 
     /* Side Rail */
     .nav-rail { background: var(--rail); border-right: 1px solid rgba(255, 255, 255, 0.08); display: flex; flex-direction: column; justify-content: space-between; align-items: center; padding: 1rem 0; height: 100%; z-index: 10; }
@@ -633,14 +851,12 @@ import { VoiceRecorderService } from '../../core/services/voice-recorder.service
     .double-check-icon { color: #53bdeb; font-size: 15px; width: 15px; height: 15px; font-weight: 800; }
     .unread-badge { background: var(--success); color: #111b21; font-size: 0.65rem; font-weight: 800; padding: 2px 6px; border-radius: 99px; margin-left: auto; }
 
-    /* WebSocket status indicators */
     .socket-status-dot { width: 10px; height: 10px; border-radius: 50%; }
     .socket-status-dot.connected { background: var(--success); box-shadow: 0 0 8px var(--success); }
     .socket-status-dot.connecting { background: #eab308; box-shadow: 0 0 8px #eab308; animation: blinkStatus 1.5s infinite alternate; }
     .socket-status-dot.disconnected { background: var(--danger); box-shadow: 0 0 8px var(--danger); }
     @keyframes blinkStatus { from { opacity: 0.5; } to { opacity: 1; } }
 
-    /* 🟢 NEW FEATURE: OPERATIONS STATUS REEL */
     .status-reel-container { padding: 0.75rem 0.5rem 0.5rem; border-bottom: 1px solid rgba(255, 255, 255, 0.05); background: rgba(0, 0, 0, 0.15); display: flex; gap: 0.85rem; overflow-x: auto; }
     .status-reel-container::-webkit-scrollbar { display: none; }
     .status-reel-item { display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer; min-width: 58px; }
@@ -649,7 +865,6 @@ import { VoiceRecorderService } from '../../core/services/voice-recorder.service
     .status-avatar-inner { width: 100%; height: 100%; border-radius: 50%; border: 2px solid var(--sidebar); background: linear-gradient(135deg, var(--primary), var(--accent)); color: #fff; display: grid; place-items: center; font-size: 0.75rem; font-weight: 800; }
     .status-reel-item span { font-size: 0.65rem; color: var(--txt-muted); max-width: 58px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
 
-    /* 🟢 SIDEBAR OVERLAYS */
     .sidebar-overlay-pane { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: var(--sidebar); z-index: 50; display: flex; flex-direction: column; }
     .sidebar-overlay-pane.animate-slide { animation: slideIn 0.25s var(--ease) both; }
     @keyframes slideIn { from { transform: translateX(-100%); } to { transform: translateX(0); } }
@@ -671,7 +886,6 @@ import { VoiceRecorderService } from '../../core/services/voice-recorder.service
     .ui-action-btn:hover:not(:disabled) { background: #1d4ed8; }
     .ui-action-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
-    /* Main Window */
     .chat-wrapper { display: flex; flex-direction: column; height: 100%; background: var(--bg); position: relative; flex: 1; border-left: 1px solid rgba(255, 255, 255, 0.05); }
     .chat-window-board { display: flex; flex-direction: column; height: 100%; background: var(--chat-bg); position: relative; }
     .chat-header { height: 64px; background: var(--rail); padding: 0 1rem; display: flex; align-items: center; justify-content: space-between; z-index: 10; border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
@@ -693,7 +907,6 @@ import { VoiceRecorderService } from '../../core/services/voice-recorder.service
     .reactions-row { display: flex; gap: 2px; position: absolute; bottom: -10px; right: 10px; z-index: 5; }
     .reaction-tag { background: #2a3942; border-radius: 99px; padding: 1px 6px; font-size: 0.7rem; border: 1px solid #111b21; }
 
-    /* Render media elements */
     .image-attachment-wrap { border-radius: 6px; overflow: hidden; max-height: 200px; border: 1px solid rgba(255,255,255,0.05); }
     .image-attachment-wrap img { max-width: 100%; display: block; object-fit: cover; }
     .document-attachment { display: flex; align-items: center; gap: 0.6rem; background: rgba(0,0,0,0.15); padding: 0.6rem; border-radius: 6px; border: 1px solid rgba(255,255,255,0.04); }
@@ -701,7 +914,6 @@ import { VoiceRecorderService } from '../../core/services/voice-recorder.service
     .document-attachment .doc-title { font-size: 0.8rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #fff; }
     .document-attachment a { font-size: 0.68rem; color: #3b82f6; text-decoration: none; font-weight: bold; }
 
-    /* 🟢 NEW FEATURE: AI Contextual replies */
     .quick-replies-reel { display: flex; gap: 0.5rem; padding: 0.5rem 1rem; background: var(--chat-bg); border-top: 1px solid rgba(255,255,255,0.04); overflow-x: auto; z-index: 5; }
     .quick-reply-chip { background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.08); color: var(--txt-main); padding: 6px 14px; border-radius: 99px; font-size: 0.78rem; font-weight: 600; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; }
     .quick-reply-chip:hover { background: var(--success); color: #111b21; border-color: var(--success); box-shadow: 0 2px 8px rgba(0, 168, 132, 0.2); }
@@ -713,7 +925,6 @@ import { VoiceRecorderService } from '../../core/services/voice-recorder.service
     .composer-input-wrap input { background: transparent; border: none; outline: none; width: 100%; color: var(--txt-main); padding: 0.5rem; font-size: 0.9rem; font-family: inherit; }
     .chat-send-btn { background: transparent; border: none; cursor: pointer; width: 40px; height: 40px; display: grid; place-items: center; }
 
-    /* EMOJI panel */
     .emoji-popover-panel { position: absolute; bottom: 70px; left: 60px; background: #1c272d; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 0.6rem; display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; z-index: 100; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
     .emoji-item { font-size: 1.4rem; cursor: pointer; width: 36px; height: 36px; display: grid; place-items: center; border-radius: 8px; }
     .emoji-item:hover { background: rgba(255, 255, 255, 0.08); }
@@ -724,7 +935,7 @@ import { VoiceRecorderService } from '../../core/services/voice-recorder.service
     .telemetry-lock-badge { position: absolute; top: -5px; left: -5px; background: var(--success); border-radius: 50%; width: 28px; height: 28px; display: grid; place-items: center; color: #111b21; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
     .welcome-laptop-icon { position: relative; width: 120px; height: 90px; margin-bottom: 0.5rem; }
     .welcome-laptop-icon .laptop { font-size: 6rem; color: #54656f; opacity: 0.85; }
-    .shortcut-card { flex: 1; background: var(--rail); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 12px; padding: 1rem; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 0.5rem; transition: transform 0.2s, background 0.2s; width: 100px; }
+    .shortcut-card { background: var(--rail); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 12px; padding: 1rem; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 0.5rem; transition: transform 0.2s, background 0.2s; width: 100px; }
     .shortcut-card:hover { transform: translateY(-2px); background: var(--active-row); }
     .shortcut-card mat-icon { color: var(--success); font-size: 1.5rem; }
     .shortcut-card strong { font-size: 0.78rem; color: var(--txt-main); }
@@ -735,7 +946,6 @@ import { VoiceRecorderService } from '../../core/services/voice-recorder.service
     .reaction-strip button:hover { background: rgba(255, 255, 255, 0.1); }
     .mt-6 { margin-top: 1.5rem; }
 
-    /* AI Specific */
     .ai-theme { background: #0f172a !important; }
     .ai-header { background: #1e293b !important; }
     .ai-background { background-color: #0f172a !important; background-image: radial-gradient(rgba(59, 130, 246, 0.1) 1px, transparent 0) !important; }
@@ -750,262 +960,150 @@ import { VoiceRecorderService } from '../../core/services/voice-recorder.service
     .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
     @keyframes bounce { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1.0); } }
 
-    /* 🟢 RESPONSIVE BACK BUTTON FOR MOBILE */
-    .mobile-back-btn {
-      display: none;
-      background: transparent;
-      border: none;
-      color: var(--txt-muted);
-      cursor: pointer;
-      padding: 6px;
-      border-radius: 50%;
-      margin-right: 0.5rem;
-      align-items: center;
-      justify-content: center;
-      width: 36px;
-      height: 36px;
-    }
-    .mobile-back-btn:hover {
-      background: rgba(255,255,255,0.05);
-      color: #fff;
-    }
+    .mobile-back-btn { display: none; background: transparent; border: none; color: var(--txt-muted); cursor: pointer; padding: 6px; border-radius: 50%; margin-right: 0.5rem; align-items: center; justify-content: center; width: 36px; height: 36px; }
+    .mobile-back-btn:hover { background: rgba(255,255,255,0.05); color: #fff; }
 
-    /* 🟢 STATUS STORY LIGHTBOX STYLE */
-    .status-lightbox-backdrop {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100vw;
-      height: 100vh;
-      background: rgba(11, 20, 26, 0.9);
-      display: grid;
-      place-items: center;
-      z-index: 1000;
-      backdrop-filter: blur(8px);
-    }
-    .status-lightbox-card {
-      width: 90%;
-      max-width: 420px;
-      background: var(--chat-bg);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 16px;
-      overflow: hidden;
-      box-shadow: 0 20px 40px rgba(0,0,0,0.5);
-      animation: lightboxScale 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-    }
-    @keyframes lightboxScale {
-      from { transform: scale(0.9); opacity: 0; }
-      to { transform: scale(1); opacity: 1; }
-    }
-    .lightbox-header {
-      padding: 1rem;
-      border-bottom: 1px solid rgba(255,255,255,0.05);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      background: var(--rail);
-    }
-    .lightbox-user {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-    }
-    .lightbox-user strong {
-      color: #fff;
-      font-size: 0.95rem;
-    }
-    .lightbox-user span.time {
-      color: var(--txt-muted);
-      font-size: 0.75rem;
-      margin-left: 0.5rem;
-    }
-    .lightbox-content {
-      padding: 2.5rem 1.5rem;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      min-height: 180px;
-      text-align: center;
-      background: linear-gradient(135deg, #1e293b, #0f172a);
-    }
-    .lightbox-content p {
-      font-size: 1.25rem;
-      color: #fff;
-      line-height: 1.6;
-      margin: 0;
-      word-break: break-word;
-    }
-    .lightbox-footer {
-      padding: 0.75rem 1rem;
-      border-top: 1px solid rgba(255,255,255,0.05);
-      text-align: center;
-      background: var(--rail);
-    }
-    .lightbox-footer span {
-      font-size: 0.72rem;
-      color: var(--txt-muted);
-    }
+    .status-lightbox-backdrop { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(11, 20, 26, 0.9); display: grid; place-items: center; z-index: 1000; backdrop-filter: blur(8px); }
+    .status-lightbox-card { width: 90%; max-width: 420px; background: var(--chat-bg); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 16px; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.5); animation: lightboxScale 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); }
+    @keyframes lightboxScale { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+    .lightbox-header { padding: 1rem; border-bottom: 1px solid rgba(255,255,255,0.05); display: flex; justify-content: space-between; align-items: center; background: var(--rail); }
+    .lightbox-user { display: flex; align-items: center; gap: 0.75rem; }
+    .lightbox-user strong { color: #fff; font-size: 0.95rem; }
+    .lightbox-user span.time { color: var(--txt-muted); font-size: 0.75rem; margin-left: 0.5rem; }
+    .lightbox-content { padding: 2.5rem 1.5rem; display: flex; justify-content: center; align-items: center; min-height: 180px; text-align: center; background: linear-gradient(135deg, #1e293b, #0f172a); }
+    .lightbox-content p { font-size: 1.25rem; color: #fff; line-height: 1.6; margin: 0; word-break: break-word; }
+    .lightbox-footer { padding: 0.75rem 1rem; border-top: 1px solid rgba(255,255,255,0.05); text-align: center; background: var(--rail); }
+    .lightbox-footer span { font-size: 0.72rem; color: var(--txt-muted); }
 
-    .blocked-operator-banner {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 0.75rem;
-      width: 100%;
-      background: rgba(239, 68, 68, 0.1);
-      border: 1px dashed rgba(239, 68, 68, 0.3);
-      padding: 0.75rem;
-      border-radius: 8px;
-      color: #fca5a5;
-      font-size: 0.85rem;
-    }
-    .blocked-operator-banner mat-icon {
-      color: var(--danger);
-    }
-    .unblock-btn {
-      background: var(--danger);
-      color: #fff;
-      border: none;
-      padding: 4px 12px;
-      border-radius: 6px;
-      font-size: 0.78rem;
-      font-weight: 700;
-      cursor: pointer;
-      font-family: inherit;
-      transition: background 0.2s;
-    }
-    .unblock-btn:hover {
-      background: #dc2626;
-    }
+    .blocked-operator-banner { display: flex; align-items: center; justify-content: center; gap: 0.75rem; width: 100%; background: rgba(239, 68, 68, 0.1); border: 1px dashed rgba(239, 68, 68, 0.3); padding: 0.75rem; border-radius: 8px; color: #fca5a5; font-size: 0.85rem; }
+    .blocked-operator-banner mat-icon { color: var(--danger); }
+    .unblock-btn { background: var(--danger); color: #fff; border: none; padding: 4px 12px; border-radius: 6px; font-size: 0.78rem; font-weight: 700; cursor: pointer; font-family: inherit; transition: background 0.2s; }
+    .unblock-btn:hover { background: #dc2626; }
 
-    /* 🎤 VOICE RECORDING STYLES */
-    .voice-recording-composer-bar {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      background: rgba(239, 68, 68, 0.08);
-      border: 1px dashed rgba(239, 68, 68, 0.3);
-      padding: 0.35rem 0.75rem;
-      border-radius: 8px;
-      height: 42px;
-      flex: 1;
-    }
-    .recording-live-dot-blink {
-      width: 10px;
-      height: 10px;
-      background: var(--danger);
-      border-radius: 50%;
-      animation: blinkStatus 0.8s infinite alternate;
-    }
-    .recording-timer-txt {
-      font-size: 0.82rem;
-      color: var(--txt-main);
-      font-family: 'JetBrains Mono', monospace;
-      font-weight: bold;
-      flex: 1;
-    }
-    .record-action-btn {
-      background: transparent;
-      border: none;
-      color: var(--txt-muted);
-      cursor: pointer;
-      width: 32px;
-      height: 32px;
-      display: grid;
-      place-items: center;
-      border-radius: 50%;
-      transition: all 0.2s;
-    }
-    .record-action-btn:hover {
-      background: rgba(255,255,255,0.05);
-    }
-    .record-action-btn.discard {
-      color: var(--danger);
-    }
-    .record-action-btn.submit {
-      color: var(--success);
-    }
+    .voice-recording-composer-bar { display: flex; align-items: center; gap: 0.75rem; background: rgba(239, 68, 68, 0.08); border: 1px dashed rgba(239, 68, 68, 0.3); padding: 0.35rem 0.75rem; border-radius: 8px; height: 42px; flex: 1; }
+    .recording-live-dot-blink { width: 10px; height: 10px; background: var(--danger); border-radius: 50%; animation: blinkStatus 0.8s infinite alternate; }
+    .recording-timer-txt { font-size: 0.82rem; color: var(--txt-main); font-family: 'JetBrains Mono', monospace; font-weight: bold; flex: 1; }
+    .record-action-btn { background: transparent; border: none; color: var(--txt-muted); cursor: pointer; width: 32px; height: 32px; display: grid; place-items: center; border-radius: 50%; transition: all 0.2s; }
+    .record-action-btn:hover { background: rgba(255,255,255,0.05); }
+    .record-action-btn.discard { color: var(--danger); }
+    .record-action-btn.submit { color: var(--success); }
 
-    /* 📭 EMPTY THREAD PANEL */
-    .empty-threads-panel {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      text-align: center;
-      padding: 4rem 1.5rem;
-      height: 100%;
-    }
-    .animate-fade {
-      animation: fadeIn 0.3s ease-out;
-    }
+    .empty-threads-panel { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 4rem 1.5rem; height: 100%; }
+    .animate-fade { animation: fadeIn 0.3s ease-out; }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
-    /* 🟢 MEDIA QUERIES FOR COMPREHENSIVE RESPONSIVENESS */
-    @media (max-width: 900px) {
-      .app-container {
-        grid-template-columns: 60px 280px 1fr;
-      }
-    }
+    /* INTELLIGENCE & SMART UI */
+    .rail-badge { position: absolute; top: 8px; right: 8px; width: 10px; height: 10px; background: var(--accent); border-radius: 50%; border: 2px solid #111b21; }
+    .inbox-item { background: rgba(255,255,255,0.03); border-radius: 12px; padding: 1rem; margin-bottom: 0.75rem; border-left: 4px solid var(--primary); transition: transform 0.2s; }
+    .inbox-item:hover { transform: translateX(4px); background: rgba(255,255,255,0.05); }
+    .inbox-item.urgent { border-left-color: var(--danger); background: rgba(239, 68, 68, 0.05); }
+    .inbox-item-header { display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.7rem; font-weight: bold; text-transform: uppercase; }
+    .type-tag { color: var(--accent); }
+    .time-tag { color: var(--txt-muted); }
+    .inbox-item strong { color: #fff; font-size: 0.85rem; display: block; margin-bottom: 0.25rem; }
+    .inbox-item p { color: var(--txt-muted); font-size: 0.78rem; margin: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .inbox-actions { margin-top: 0.75rem; }
+    .inbox-actions button { background: var(--accent); color: #000; border: none; padding: 4px 12px; border-radius: 6px; font-size: 0.7rem; font-weight: bold; cursor: pointer; transition: opacity 0.2s; }
+    .inbox-actions button:hover { opacity: 0.8; }
 
+    /* AUDIT LOG UI */
+    .audit-item { background: rgba(255,255,255,0.03); border-radius: 10px; padding: 1rem; margin-bottom: 0.75rem; border-left: 3px solid var(--danger); }
+    .audit-header { display: flex; justify-content: space-between; margin-bottom: 0.4rem; }
+    .audit-type { font-size: 0.65rem; font-weight: 900; color: var(--danger); text-transform: uppercase; }
+    .audit-time { font-size: 0.65rem; color: var(--txt-muted); }
+    .audit-actor { font-size: 0.75rem; color: #fff; font-weight: bold; margin-bottom: 4px; }
+    .audit-details { font-size: 0.72rem; color: var(--txt-muted); margin: 0; }
+
+    .intelligence-chips { display: flex; gap: 4px; margin-bottom: 4px; flex-wrap: wrap; }
+    .intel-tag { font-size: 0.65rem; background: rgba(59, 130, 246, 0.15); color: #60a5fa; padding: 2px 6px; border-radius: 4px; font-weight: bold; }
+    .ai-transcription { margin-top: 8px; padding: 8px; background: rgba(0,0,0,0.2); border-radius: 8px; border-left: 2px solid var(--accent); display: flex; gap: 8px; align-items: flex-start; }
+    .ai-transcription mat-icon { font-size: 14px; width: 14px; height: 14px; color: var(--accent); margin-top: 2px; }
+    .ai-transcription p { font-size: 0.75rem; color: #d1d5db; margin: 0; font-style: italic; }
+
+    .priority-urgent { border-left: 4px solid var(--danger) !important; background: rgba(239, 68, 68, 0.03) !important; }
+
+    .handover-summary-panel { position: absolute; top: 70px; left: 20px; right: 20px; z-index: 100; background: #1f2937; border: 1px solid var(--accent); border-radius: 12px; padding: 1.25rem; box-shadow: 0 10px 25px rgba(0,0,0,0.5); border-left: 5px solid var(--accent); }
+    .handover-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 0.5rem; }
+    .handover-header strong { color: var(--accent); font-size: 0.9rem; letter-spacing: 0.5px; }
+    .handover-header button { background: none; border: none; color: #fff; cursor: pointer; }
+    .handover-content { color: #e5e7eb; font-size: 0.85rem; line-height: 1.6; white-space: pre-wrap; max-height: 300px; overflow-y: auto; padding-right: 10px; }
+
+    /* THREAD SIDEBAR STYLES */
+    .thread-sidebar { border-left: 1px solid rgba(255,255,255,0.08); background: var(--sidebar); display: flex; flex-direction: column; height: 100%; position: relative; z-index: 20; box-shadow: -5px 0 25px rgba(0,0,0,0.3); }
+    .thread-sidebar-header { height: 64px; background: var(--rail); padding: 0 1rem; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.05); }
+    .thread-header-info strong { color: #fff; font-size: 1rem; display: block; }
+    .thread-header-info span { color: var(--txt-muted); font-size: 0.72rem; }
+    .thread-body { flex: 1; padding: 1.5rem; overflow-y: auto; background: var(--bg); }
+    .thread-parent-msg { margin-bottom: 1.5rem; }
+    .thread-replies { display: flex; flex-direction: column; gap: 0.5rem; }
+    .thread-reply-row { display: flex; width: 100%; }
+    .thread-reply-row.out { justify-content: flex-end; }
+    .thread-loading { color: var(--txt-muted); font-size: 0.75rem; text-align: center; margin-top: 2rem; font-style: italic; }
+    .thread-footer { background: var(--rail); padding: 0.75rem 1rem; display: flex; align-items: center; gap: 0.5rem; border-top: 1px solid rgba(255,255,255,0.05); }
+
+    /* POLL UI STYLES */
+    .chat-poll-container { background: rgba(0,0,0,0.18); border-radius: 12px; padding: 1.25rem; margin-top: 0.75rem; border: 1px solid rgba(255,255,255,0.08); box-shadow: inset 0 2px 10px rgba(0,0,0,0.2); }
+    .poll-question { color: #fff; font-weight: 800; font-size: 0.9rem; margin-bottom: 1rem; letter-spacing: 0.3px; }
+    .poll-option-row { margin-bottom: 0.75rem; cursor: pointer; transition: opacity 0.2s; }
+    .poll-option-row:hover { opacity: 0.85; }
+    .option-label { display: flex; justify-content: space-between; font-size: 0.78rem; color: #e9edef; margin-bottom: 0.4rem; font-weight: 600; }
+    .vote-count { font-weight: 800; color: var(--accent); background: rgba(0,168,132,0.1); padding: 1px 6px; border-radius: 4px; }
+    .option-bar-bg { height: 8px; background: rgba(255,255,255,0.05); border-radius: 4px; overflow: hidden; position: relative; }
+    .option-bar-fill { height: 100%; background: linear-gradient(90deg, var(--accent), #059669); border-radius: 4px; transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1); }
+    .poll-footer { font-size: 0.7rem; color: #86efac; margin-top: 0.75rem; font-style: italic; display: flex; align-items: center; gap: 4px; }
+    .poll-footer::before { content: '✓'; font-weight: bold; }
+
+    .translated-panel { margin-top: 10px; padding: 10px; background: rgba(0,0,0,0.25); border-radius: 8px; border-top: 2px solid var(--accent); }
+    .trans-header { font-size: 0.62rem; font-weight: 900; color: var(--accent); display: flex; align-items: center; gap: 6px; margin-bottom: 6px; letter-spacing: 0.5px; }
+    .trans-header mat-icon { font-size: 13px; width: 13px; height: 13px; }
+    .translated-panel p { margin: 0; font-size: 0.8rem; color: #e9edef; font-style: italic; }
+
+    .system-operational-result { background: #0f172a; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); margin-top: 8px; overflow: hidden; }
+    .result-header { background: #1e293b; padding: 6px 10px; display: flex; align-items: center; gap: 8px; font-size: 0.65rem; font-weight: 800; color: var(--accent); border-bottom: 1px solid rgba(255,255,255,0.05); }
+    .result-header mat-icon { font-size: 14px; width: 14px; height: 14px; }
+    .ops-pre { margin: 0; padding: 10px; font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: #cbd5e1; white-space: pre-wrap; line-height: 1.4; }
+
+    .delivery-status-ticks { display: inline-flex; align-items: center; margin-left: 4px; }
+    .delivery-status-ticks mat-icon { font-size: 13px; width: 13px; height: 13px; color: var(--txt-muted); }
+    .delivery-status-ticks .delivered { color: #86efac; }
+    .delivery-status-ticks .read { color: #38bdf8; }
+    .delivery-status-ticks .escalated { color: var(--danger); animation: pulse-danger 1s infinite; }
+    .delivery-status-ticks .failed { color: #f87171; }
+    @keyframes pulse-danger { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+
+    .spin { animation: fa-spin 2s infinite linear; }
+    @keyframes fa-spin { from { transform: rotate(0deg); } to { transform: rotate(359deg); } }
+
+    .add-opt-btn { background: none; border: 1.5px dashed var(--accent); color: var(--accent); padding: 8px; border-radius: 8px; cursor: pointer; width: 100%; font-size: 0.75rem; font-weight: 700; margin-top: 0.5rem; transition: background 0.2s; }
+    .add-opt-btn:hover { background: rgba(0,168,132,0.05); }
+    .dispatch-btn { width: 100%; height: 42px; background: var(--success); color: #111b21; border: none; border-radius: 8px; font-weight: 800; cursor: pointer; }
+    .form-group label { display: block; color: var(--txt-muted); font-size: 0.65rem; font-weight: 800; text-transform: uppercase; margin-bottom: 0.5rem; letter-spacing: 1px; }
+    .form-group input { width: 100%; background: var(--active-row); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 10px; color: #fff; outline: none; }
+
+    @media (max-width: 900px) { .app-container { grid-template-columns: 60px 280px 1fr; } }
     @media (max-width: 768px) {
-      .app-container {
-        grid-template-columns: 60px 1fr;
-      }
-      .mobile-back-btn {
-        display: flex;
-      }
-
-      /* When selectedThreadId or AI tab is active, show conversation and hide sidebar list */
-      .has-active-view .sidebar {
-        display: none;
-      }
-      .has-active-view .chat-wrapper {
-        display: flex;
-        width: 100%;
-      }
-
-      /* When NO thread is selected and NOT in AI tab, show sidebar list and hide conversation */
-      .has-no-active-view .sidebar {
-        display: flex;
-        width: 100%;
-      }
-      .has-no-active-view .chat-wrapper {
-        display: none;
-      }
-      
-      .emoji-popover-panel {
-        left: 10px;
-        bottom: 75px;
-        grid-template-columns: repeat(8, 1fr);
-        width: calc(100% - 20px);
-      }
+      .app-container { grid-template-columns: 60px 1fr; }
+      .mobile-back-btn { display: flex; }
+      .has-active-view .sidebar { display: none; }
+      .has-active-view .chat-wrapper { display: flex; width: 100%; }
+      .has-no-active-view .sidebar { display: flex; width: 100%; }
+      .has-no-active-view .chat-wrapper { display: none; }
+      .emoji-popover-panel { left: 10px; bottom: 75px; grid-template-columns: repeat(8, 1fr); width: calc(100% - 20px); }
     }
-
-    @media (max-width: 480px) {
-      .app-container {
-        grid-template-columns: 1fr;
-      }
-      
-      /* On very small devices, we place the nav rail at the bottom for native feel */
-      .nav-rail {
-        display: none; /* Can be hidden or transformed; hiding is simplest to maximize viewport space */
-      }
-      
-      .emoji-popover-panel {
-        grid-template-columns: repeat(4, 1fr);
-      }
-    }
+    @media (max-width: 480px) { .app-container { grid-template-columns: 1fr; } .nav-rail { display: none; } .emoji-popover-panel { grid-template-columns: repeat(4, 1fr); } }
   `]
 })
 export class CommunicationPageComponent implements OnInit, OnDestroy {
   private readonly commsApi = inject(CommunicationService);
   private readonly commsDataApi = inject(CommunicationDataService);
   private readonly chatSocket = inject(ChatSocketService);
-  private readonly aiService = inject(AiAssistantService);
+  private readonly aiApi = inject(AiAssistantService);
   protected readonly auth = inject(AuthService);
   protected readonly toast = inject(ToastService);
   private readonly snack = inject(MatSnackBar);
   private readonly voiceRecorder = inject(VoiceRecorderService);
+
+  @ViewChild('scrollContainer') private scrollContainer?: ElementRef;
 
   protected readonly isRecording = computed(() => this.voiceRecorder.isRecording());
   protected readonly recordingTime = computed(() => this.voiceRecorder.recordingTime());
@@ -1020,15 +1118,8 @@ export class CommunicationPageComponent implements OnInit, OnDestroy {
   protected readonly filteredThreads = computed(() => {
     const q = this.searchQuery.toLowerCase();
     const active = this.threads().filter(t => t.name.toLowerCase().includes(q));
-    
     if (!q) return active;
-
-    // If searching, also include matching contacts not already in active threads
-    const matchingContacts = this.allContacts().filter(c => 
-      c.name.toLowerCase().includes(q) && 
-      !active.some(a => a.id === c.id && a.type === 'PRIVATE')
-    );
-
+    const matchingContacts = this.allContacts().filter(c => c.name.toLowerCase().includes(q) && !active.some(a => a.id === c.id && a.type === 'PRIVATE'));
     return [...active, ...matchingContacts];
   });
 
@@ -1040,13 +1131,11 @@ export class CommunicationPageComponent implements OnInit, OnDestroy {
   protected readonly currentUserId = computed(() => this.auth.user()?.id || 0);
   protected readonly editingMessage = signal<ChatMessage | null>(null);
 
-  // Upgrade state signals
   protected readonly socketStatus = computed(() => this.chatSocket.status());
   protected readonly statuses = signal<StatusStory[]>([]);
   protected emojiDrawerOpen = false;
   private lastTypingSent = 0;
 
-  // Sidebar Overlays
   protected readonly directSyncActive = signal<boolean>(false);
   protected readonly groupSyncActive = signal<boolean>(false);
   protected readonly statusSyncActive = signal<boolean>(false);
@@ -1062,48 +1151,47 @@ export class CommunicationPageComponent implements OnInit, OnDestroy {
   protected selectedContactToAdd: any = null;
 
   protected readonly filteredContacts = computed(() => {
-    const query = (this.contactSearchQuery() || '').toLowerCase();
+    const query = this.contactSearchQuery().toLowerCase();
     return this.allContacts().filter(c => c.name.toLowerCase().includes(query));
   });
 
-  @ViewChild('scrollContainer') private scrollContainer?: ElementRef;
+  protected readonly smartInbox = signal<any>(null);
+  protected readonly smartInboxActive = signal(false);
+  protected readonly handoverSummary = signal<string | null>(null);
+  protected readonly handoverLoading = signal(false);
+  protected readonly searchActive = signal(false);
+  protected readonly searchResults = signal<ChatMessage[]>([]);
+  protected readonly isAnalyzingCompliance = signal(false);
+
+  protected readonly activeThreadParent = signal<ChatMessage | null>(null);
+  protected readonly threadMessages = signal<ChatMessage[]>([]);
+  protected readonly threadLoading = signal(false);
+
+  protected readonly auditEvents = signal<any[]>([]);
+  protected readonly auditActive = signal(false);
+
+  protected readonly pollCreatorActive = signal(false);
+  protected pollQuestion = '';
+  protected pollOptions: string[] = ['', ''];
 
   constructor() {
-    // 1. Sync messages with WebSocket
     effect(() => {
       const wsMsgs = this.chatSocket.messages();
       const thread = this.selectedThread();
       if (!thread || this.activeTab() === 'ai') return;
-
       const relevantMsgs = wsMsgs.filter(m => {
-        if (thread.type === 'GROUP') {
-          return m.groupId === thread.id;
-        } else {
-          return (m.senderId === thread.id && m.recipientId === this.currentUserId()) ||
-                 (m.senderId === this.currentUserId() && m.recipientId === thread.id);
-        }
+        if (thread.type === 'GROUP') return m.groupId === thread.id;
+        return (m.senderId === thread.id && m.recipientId === this.currentUserId()) || (m.senderId === this.currentUserId() && m.recipientId === thread.id);
       });
-
       if (relevantMsgs.length > 0) {
         this.messages.set([...relevantMsgs]);
         setTimeout(() => this.scrollToBottom(), 50);
       }
     });
-
-    // 2. Refresh threads list on new messages
-    effect(() => {
-      if (this.chatSocket.messages().length > 0) {
-        this.loadThreads();
-      }
-    });
-
-    // 3. Sync new group creations
+    effect(() => { if (this.chatSocket.messages().length > 0) this.loadThreads(); });
     effect(() => {
       const event = this.chatSocket.newGroupEvent();
-      if (event && event.data) {
-        this.loadThreads();
-        this.toast.show(`Secure Sync: New channel "${event.data.name}" established.`, 'info');
-      }
+      if (event && event.data) { this.loadThreads(); this.toast.show(`Secure Sync: New channel "${event.data.name}" established.`, 'success'); }
     });
   }
 
@@ -1111,111 +1199,61 @@ export class CommunicationPageComponent implements OnInit, OnDestroy {
     this.loadThreads();
     this.loadContacts();
     this.loadStatuses();
-
     const user = this.auth.user();
-    if (user && user.id && user.companyId) {
-      this.chatSocket.connect(user.id, user.companyId);
-    }
+    if (user && user.id && user.companyId) this.chatSocket.connect(user.id, user.companyId);
   }
 
-
-  ngOnDestroy() {
-    this.chatSocket.disconnect();
-  }
+  ngOnDestroy() { this.chatSocket.disconnect(); }
 
   loadThreads() {
-    console.log('[Communication] Loading chat summaries...');
-    this.commsApi.getChatSummaries().subscribe(data => {
-      console.log(`[Communication] Loaded ${data.length} threads`);
-      this.threads.set(data);
-    });
+    this.commsApi.getChatSummaries().subscribe(data => this.threads.set(data));
+    this.refreshSmartInbox();
   }
 
-  loadContacts() {
-    console.log('[Communication] Loading company directory...');
-    this.commsApi.getContacts().subscribe({
-      next: (data) => {
-        console.log(`[Communication] Discovered ${data.length} employees`);
-        this.allContacts.set(data);
-      },
-      error: (err) => console.error('[Communication] Directory discovery failed:', err)
-    });
-  }
+  refreshSmartInbox() { this.commsApi.getSmartInbox().subscribe(data => this.smartInbox.set(data)); }
+
+  loadContacts() { this.commsApi.getContacts().subscribe(data => this.allContacts.set(data)); }
 
   loadStatuses() {
     const cid = this.auth.user()?.companyId || 1;
-    const uid = this.currentUserId();
-    this.commsDataApi.loadStatuses(cid, uid).subscribe({
-      next: (data) => {
-        this.statuses.set(data);
-      },
-      error: (err) => console.warn('Could not sync status stories', err)
-    });
+    this.commsDataApi.loadStatuses(cid, this.currentUserId()).subscribe(data => this.statuses.set(data));
   }
 
   selectThread(thread: ChatSummary) {
     this.selectedThreadId.set(thread.id);
-    this.groupMembersActive.set(false); // Close members drawer when changing thread
-    
+    this.groupMembersActive.set(false);
     if (thread.type === 'GROUP') {
       this.chatSocket.subscribeToGroup(thread.id, this.auth.user()?.companyId || 1);
       this.loadGroupMembers(thread.id);
       this.peerBlocked.set(false);
     } else {
-      this.commsDataApi.isBlocked(this.currentUserId(), thread.id).subscribe({
-        next: (res) => this.peerBlocked.set(res),
-        error: () => this.peerBlocked.set(false)
-      });
+      this.commsDataApi.isBlocked(this.currentUserId(), thread.id).subscribe(res => this.peerBlocked.set(res));
     }
-
-    const obs = thread.type === 'GROUP' 
-      ? this.commsApi.getGroupThread(thread.id) 
-      : this.commsApi.getPrivateThread(thread.id);
-    
+    const obs = thread.type === 'GROUP' ? this.commsApi.getGroupThread(thread.id) : this.commsApi.getPrivateThread(thread.id);
     obs.subscribe(msgs => {
       this.chatSocket.replaceMessages(msgs);
       this.messages.set(msgs);
       this.editingMessage.set(null);
       this.currentInput = '';
       setTimeout(() => this.scrollToBottom(), 50);
-
-      // Trigger read-receipt marks
-      if (thread.type === 'GROUP') {
-        this.commsDataApi.markThreadAsRead(undefined, thread.id).subscribe();
-      } else {
+      if (thread.type === 'GROUP') this.commsDataApi.markThreadAsRead(undefined, thread.id).subscribe();
+      else {
         this.commsDataApi.markThreadAsRead(thread.id, undefined).subscribe();
-        
-        // Dispatch real-time read receipt to peer via socket
-        this.chatSocket.send({
-          messageType: 'READ_RECEIPT',
-          senderId: this.currentUserId(),
-          recipientId: thread.id,
-          groupId: null,
-          companyId: this.auth.user()?.companyId || 1,
-          content: 'READ',
-          isRead: true
-        } as any);
+        this.chatSocket.send({ messageType: 'READ_RECEIPT', senderId: this.currentUserId(), recipientId: thread.id, groupId: null, companyId: this.auth.user()?.companyId || 1, content: 'READ', isRead: true } as any);
       }
     });
   }
 
   onInputEnter() {
     if (!this.currentInput.trim()) return;
-    
-    if (this.activeTab() === 'ai') {
-      this.executeAiRequest();
-    } else if (this.editingMessage()) {
-      this.executeEdit();
-    } else {
-      this.executeSend();
-    }
+    if (this.activeTab() === 'ai') this.executeAiRequest();
+    else if (this.editingMessage()) this.executeEdit();
+    else this.executeSend();
   }
 
   onTyping() {
     const thread = this.selectedThread();
     if (!thread) return;
-
-    // Debounce/Throttle: limit STOMP socket typing alerts to once every 3.5 seconds
     const now = Date.now();
     if (now - this.lastTypingSent > 3500) {
       this.lastTypingSent = now;
@@ -1225,103 +1263,56 @@ export class CommunicationPageComponent implements OnInit, OnDestroy {
 
   private executeSend() {
     const thread = this.selectedThread();
-    if (!thread) return;
-
-    const payload: any = {
-      content: this.currentInput,
-      messageType: 'TEXT',
-      timestamp: new Date().toISOString(),
-      senderId: this.currentUserId(),
-      companyId: this.auth.user()?.companyId || 1,
-      clientMsgId: Math.random().toString(36).substring(2, 15),
-      isRead: false
-    };
-
-    if (thread.type === 'GROUP') payload.groupId = thread.id;
-    else payload.recipientId = thread.id;
-
-    // 🟢 OPTIMISTIC UI UPDATE
-    this.chatSocket.addOptimisticMessage(payload);
-    this.messages.update(msgs => [...msgs, payload]);
-
-    this.chatSocket.send(payload);
-    
-    this.currentInput = '';
-    this.emojiDrawerOpen = false;
-    setTimeout(() => this.scrollToBottom(), 50);
+    if (!thread || this.isAnalyzingCompliance()) return;
+    this.isAnalyzingCompliance.set(true);
+    this.aiApi.checkCompliance(this.currentInput).subscribe(result => {
+      this.isAnalyzingCompliance.set(false);
+      if (result && result.compliant === false) { this.toast.show('Transmission blocked: ' + (result.reason || 'Policy violation.'), 'danger'); return; }
+      const payload: any = { content: this.currentInput, messageType: 'TEXT', timestamp: new Date().toISOString(), senderId: this.currentUserId(), companyId: this.auth.user()?.companyId || 1, clientMsgId: Math.random().toString(36).substring(2, 15), isRead: false, deliveryStatus: 'SENT' };
+      if (thread.type === 'GROUP') payload.groupId = thread.id;
+      else payload.recipientId = thread.id;
+      this.chatSocket.addOptimisticMessage(payload);
+      this.messages.update(msgs => [...msgs, payload]);
+      this.chatSocket.send(payload);
+      this.currentInput = '';
+      this.emojiDrawerOpen = false;
+      setTimeout(() => this.scrollToBottom(), 50);
+    });
   }
 
-  sendQuickReply(text: string) {
-    this.currentInput = text;
-    this.executeSend();
-  }
-
-  insertEmoji(emoji: string) {
-    this.currentInput += emoji;
-    this.emojiDrawerOpen = false;
-  }
+  sendQuickReply(text: string) { this.currentInput = text; this.executeSend(); }
+  insertEmoji(emoji: string) { this.currentInput += emoji; this.emojiDrawerOpen = false; }
 
   onFileSelected(event: Event) {
     const thread = this.selectedThread();
     if (!thread) return;
-    const uploadThreadId = thread.id;
-    const uploadThreadType = thread.type;
-
     const element = event.currentTarget as HTMLInputElement;
     let fileList: FileList | null = element.files;
     if (fileList && fileList.length > 0) {
       const file = fileList[0];
       const isImg = file.type.startsWith('image/');
-      
-      this.toast.show(`Uploading file: ${file.name}...`, 'success' as ToastSeverity);
-
-      // Simulate network upload latency and then dispatch rich media payload
+      this.toast.show(`Uploading file: ${file.name}...`, 'success');
       setTimeout(() => {
-        const payload: any = {
-          content: isImg ? 'https://images.unsplash.com/photo-1543269865-cbf427effbad?auto=format&fit=crop&w=600&q=80' : file.name,
-          messageType: isImg ? 'IMAGE' : 'DOCUMENT',
-          timestamp: new Date().toISOString(),
-          senderId: this.currentUserId(),
-          companyId: this.auth.user()?.companyId || 1,
-          clientMsgId: Math.random().toString(36).substring(2, 15),
-          isRead: false,
-          fileUrl: isImg ? 'https://images.unsplash.com/photo-1543269865-cbf427effbad?auto=format&fit=crop&w=600&q=80' : 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf'
-        };
-
-        if (uploadThreadType === 'GROUP') payload.groupId = uploadThreadId;
-        else payload.recipientId = uploadThreadId;
-
-        // Verify if the user is still on the same thread before updating UI optimistically!
-        if (this.selectedThreadId() === uploadThreadId) {
-          this.chatSocket.addOptimisticMessage(payload);
-          this.messages.update(msgs => [...msgs, payload]);
-          setTimeout(() => this.scrollToBottom(), 50);
-        }
-        
+        const payload: any = { content: isImg ? 'https://images.unsplash.com/photo-1543269865-cbf427effbad?auto=format&fit=crop&w=600&q=80' : file.name, messageType: isImg ? 'IMAGE' : 'DOCUMENT', timestamp: new Date().toISOString(), senderId: this.currentUserId(), companyId: this.auth.user()?.companyId || 1, clientMsgId: Math.random().toString(36).substring(2, 15), isRead: false, fileUrl: isImg ? 'https://images.unsplash.com/photo-1543269865-cbf427effbad?auto=format&fit=crop&w=600&q=80' : 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf' };
+        if (thread.type === 'GROUP') payload.groupId = thread.id; else payload.recipientId = thread.id;
+        if (this.selectedThreadId() === thread.id) { this.chatSocket.addOptimisticMessage(payload); this.messages.update(msgs => [...msgs, payload]); setTimeout(() => this.scrollToBottom(), 50); }
         this.chatSocket.send(payload);
-        this.toast.show('Transmission uploaded successfully.', 'success' as ToastSeverity);
+        this.toast.show('Transmission uploaded successfully.', 'success');
       }, 1500);
     }
   }
 
   private executeAiRequest() {
-    const userMsg: any = {
-      content: this.currentInput,
-      senderId: this.currentUserId(),
-      timestamp: new Date().toISOString(),
-      messageType: 'TEXT'
-    };
-    
+    const userMsg: any = { content: this.currentInput, senderId: this.currentUserId(), timestamp: new Date().toISOString(), messageType: 'TEXT', clientMsgId: Math.random().toString(36).substring(2, 15) };
     this.aiMessages.update(msgs => [...msgs, userMsg]);
     const prompt = this.currentInput;
     this.currentInput = '';
     this.isTypingAi.set(true);
-    
     let aiResponseContent = '';
-    const aiMsg: any = { content: '', senderId: -1, timestamp: new Date().toISOString(), messageType: 'TEXT' };
+    const aiMsgId = Math.random().toString(36).substring(2, 15);
+    const aiMsg: any = { content: '', senderId: -1, timestamp: new Date().toISOString(), messageType: 'TEXT', clientMsgId: aiMsgId };
     this.aiMessages.update(msgs => [...msgs, aiMsg]);
-    
-    this.aiService.streamReply({ message: prompt }).subscribe({
+    this.aiApi.streamReply({ message: prompt }).subscribe({
       next: (chunk) => {
         aiResponseContent += chunk;
         this.aiMessages.update(msgs => {
@@ -1330,11 +1321,11 @@ export class CommunicationPageComponent implements OnInit, OnDestroy {
           return [...msgs];
         });
       },
-      error: () => {
-        this.isTypingAi.set(false);
-        this.toast.show('AI service unreachable.', 'error' as ToastSeverity);
-      },
-      complete: () => this.isTypingAi.set(false)
+      error: () => { this.isTypingAi.set(false); this.toast.show('AI service unreachable.', 'danger' as ToastSeverity); },
+      complete: () => {
+         this.isTypingAi.set(false);
+         setTimeout(() => this.scrollToBottom(), 50);
+      }
     });
   }
 
@@ -1347,330 +1338,105 @@ export class CommunicationPageComponent implements OnInit, OnDestroy {
     });
   }
 
-  editMessage(msg: ChatMessage) {
-    this.editingMessage.set(msg);
-    this.currentInput = msg.content;
-  }
+  editMessage(msg: ChatMessage) { this.editingMessage.set(msg); this.currentInput = msg.content; }
+  cancelEdit() { this.editingMessage.set(null); this.currentInput = ''; }
+  deleteMessage(msg: ChatMessage) { if (confirm('PURGE_TRANSMISSION: Are you sure?')) { this.commsApi.deleteMessage(msg.id!).subscribe(() => this.snack.open('Data purged.', 'OK', { duration: 3000 })); } }
+  react(msg: ChatMessage, emoji: string) { this.commsApi.applyReaction(msg.id!, emoji, this.currentUserId(), this.auth.user()?.companyId || 1).subscribe(); }
+  copyText(msg: ChatMessage) { navigator.clipboard.writeText(msg.content); this.snack.open('Text copied.', 'OK', { duration: 2000 }); }
 
-  cancelEdit() {
-    this.editingMessage.set(null);
-    this.currentInput = '';
-  }
-
-  deleteMessage(msg: ChatMessage) {
-    if (confirm('PURGE_TRANSMISSION: Are you sure?')) {
-      this.commsApi.deleteMessage(msg.id!).subscribe(() => {
-        this.snack.open('Data purged from stream.', 'OK', { duration: 3000 });
-      });
-    }
-  }
-
-  react(msg: ChatMessage, emoji: string) {
-    this.commsApi.applyReaction(msg.id!, emoji, this.currentUserId(), this.auth.user()?.companyId || 1).subscribe();
-  }
-
-  copyText(msg: ChatMessage) {
-    navigator.clipboard.writeText(msg.content);
-    this.snack.open('Text copied to clipboard.', 'OK', { duration: 2000 });
-  }
-
-  createNewThread() {
-    this.showNewGroup();
-  }
-
-  showNewDirectChat() {
-    this.groupSyncActive.set(false);
-    this.statusSyncActive.set(false);
-    this.contactSearchQuery.set('');
-    this.directSyncActive.set(true);
-  }
-
-  showNewGroup() {
-    this.directSyncActive.set(false);
-    this.statusSyncActive.set(false);
-    this.newGroupName = '';
-    this.selectedGroupMembers.set([]);
-    this.groupSyncActive.set(true);
-  }
-
-  toggleGroupMemberSelection(userId: number) {
-    this.selectedGroupMembers.update(ids => 
-      ids.includes(userId) ? ids.filter(id => id !== userId) : [...ids, userId]
-    );
-  }
-
-  publishStatus() {
-    this.directSyncActive.set(false);
-    this.groupSyncActive.set(false);
-    this.newStatusContent = '';
-    this.statusSyncActive.set(true);
-  }
-
+  showNewDirectChat() { this.groupSyncActive.set(false); this.statusSyncActive.set(false); this.contactSearchQuery.set(''); this.directSyncActive.set(true); }
+  showNewGroup() { this.directSyncActive.set(false); this.statusSyncActive.set(false); this.newGroupName = ''; this.selectedGroupMembers.set([]); this.groupSyncActive.set(true); }
+  toggleGroupMemberSelection(userId: number) { this.selectedGroupMembers.update(ids => ids.includes(userId) ? ids.filter(id => id !== userId) : [...ids, userId]); }
+  publishStatus() { this.directSyncActive.set(false); this.groupSyncActive.set(false); this.newStatusContent = ''; this.statusSyncActive.set(true); }
   executeCreateStatus() {
     if (!this.newStatusContent.trim()) return;
-    this.commsDataApi.createStatus({
-      content: this.newStatusContent,
-      statusType: 'TEXT',
-      expiresInHours: 24,
-      userId: this.currentUserId(),
-      companyId: this.auth.user()?.companyId || 1
-    }).subscribe({
-      next: () => {
-        this.statusSyncActive.set(false);
-        this.loadStatuses();
-        this.toast.show('Operational status story published.', 'success' as ToastSeverity);
-        this.newStatusContent = '';
-      },
-      error: (err) => {
-        console.error('Failed to publish status story', err);
-        this.toast.show('Could not publish status update.', 'error' as ToastSeverity);
-      }
+    this.commsDataApi.createStatus({ content: this.newStatusContent, statusType: 'TEXT', expiresInHours: 24, userId: this.currentUserId(), companyId: this.auth.user()?.companyId || 1 }).subscribe({
+      next: () => { this.statusSyncActive.set(false); this.loadStatuses(); this.toast.show('Status published.', 'success'); this.newStatusContent = ''; },
+      error: () => this.toast.show('Could not publish status.', 'danger')
     });
   }
 
-  onContactSearchChange(event: Event) {
-    const element = event.currentTarget as HTMLInputElement;
-    this.contactSearchQuery.set(element.value);
-  }
-
+  onContactSearchChange(event: Event) { this.contactSearchQuery.set((event.currentTarget as HTMLInputElement).value); }
   startDirectChat(contact: ChatSummary) {
     this.directSyncActive.set(false);
     const existing = this.threads().find(t => t.id === contact.id && t.type === 'PRIVATE');
-    if (existing) {
-      this.selectThread(existing);
-    } else {
-      const newThread: ChatSummary = {
-        id: contact.id,
-        name: contact.name,
-        avatar: contact.avatar ?? this.getInitials(contact.name),
-        lastMessage: '',
-        lastMessageTimestamp: new Date().toISOString(),
-        unreadCount: 0,
-        type: 'PRIVATE'
-      };
+    if (existing) this.selectThread(existing);
+    else {
+      const newThread: ChatSummary = { id: contact.id, name: contact.name, avatar: contact.avatar ?? this.getInitials(contact.name), lastMessage: '', lastMessageTimestamp: new Date().toISOString(), unreadCount: 0, type: 'PRIVATE' };
       this.threads.update(t => [newThread, ...t]);
       this.selectThread(newThread);
     }
-    this.toast.show(`Direct secure thread initialized with ${contact.name}.`, 'success' as ToastSeverity);
   }
 
   executeCreateGroup() {
     if (!this.newGroupName.trim()) return;
-    this.commsApi.createGroup(this.newGroupName, 'Standard operational group', this.selectedGroupMembers()).subscribe({
-      next: (res) => {
-        this.groupSyncActive.set(false);
-        this.loadThreads();
-        this.toast.show(`Operational channel "${this.newGroupName}" created.`, 'success' as ToastSeverity);
-        this.newGroupName = '';
-        this.selectedGroupMembers.set([]);
-      },
-      error: (err) => console.error('Failed to create group channel', err)
+    this.commsApi.createGroup(this.newGroupName, 'Standard group', this.selectedGroupMembers()).subscribe({
+      next: () => { this.groupSyncActive.set(false); this.loadThreads(); this.toast.show('Channel created.', 'success'); this.newGroupName = ''; this.selectedGroupMembers.set([]); },
+      error: (err) => console.error(err)
     });
   }
 
-  viewStatus(story: StatusStory) {
-    this.selectedStatus.set(story);
-    this.commsDataApi.markStatusViewed(story.id, this.currentUserId()).subscribe(() => {
-      this.loadStatuses();
-    });
-  }
-
-  isUserOnline(userId: number): boolean {
-    return this.chatSocket.presence().get(userId) === 'ONLINE';
-  }
-
-  isTyping(thread: ChatSummary): boolean {
-    const key = thread.type === 'GROUP' ? `G${thread.id}` : `U${thread.id}`;
-    return !!this.chatSocket.typing().get(key);
-  }
-
-  protected getInitials(name?: string) {
-    if (!name) return '??';
-    return name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
-  }
-
-  protected getInitialsForUserId(userId: number) {
-    const contact = this.allContacts().find(c => c.id === userId);
-    return this.getInitials(contact?.name || `User ${userId}`);
-  }
-
-  toggleBlockThread() {
-    if (this.peerBlocked()) {
-      this.executeUnblock();
-    } else {
-      this.executeBlock();
-    }
-  }
-
-  executeBlock() {
-    const thread = this.selectedThread();
-    if (!thread) return;
-    this.commsDataApi.blockUser(this.currentUserId(), thread.id, this.auth.user()?.companyId || 1).subscribe({
-      next: () => {
-        this.peerBlocked.set(true);
-        this.toast.show(`Operator ${thread.name} has been blocked.`, 'success' as ToastSeverity);
-      },
-      error: (err) => console.error('Failed to block operator', err)
-    });
-  }
-
-  executeUnblock() {
-    const thread = this.selectedThread();
-    if (!thread) return;
-    this.commsDataApi.unblockUser(this.currentUserId(), thread.id).subscribe({
-      next: () => {
-        this.peerBlocked.set(false);
-        this.toast.show(`Operator ${thread.name} has been unblocked.`, 'success' as ToastSeverity);
-      },
-      error: (err) => console.error('Failed to unblock operator', err)
-    });
-  }
-
-  toggleMuteThread(thread: ChatSummary) {
-    const isMuted = !thread.muted;
-    this.commsDataApi.updateConversationPreference({
-      userId: this.currentUserId(),
-      companyId: this.auth.user()?.companyId || 1,
-      conversationType: thread.type,
-      conversationId: thread.id,
-      archived: !!thread.archived,
-      muted: isMuted
-    }).subscribe({
-      next: () => {
-        this.loadThreads();
-        this.toast.show(isMuted ? 'Operational dispatch muted.' : 'Operational dispatch unmuted.', 'success' as ToastSeverity);
-      },
-      error: (err) => console.error('Failed to update preference', err)
-    });
-  }
-
+  viewStatus(story: StatusStory) { this.selectedStatus.set(story); this.commsDataApi.markStatusViewed(story.id, this.currentUserId()).subscribe(() => this.loadStatuses()); }
+  isUserOnline(userId: number): boolean { return this.chatSocket.presence().get(userId) === 'ONLINE'; }
+  isTyping(thread: ChatSummary): boolean { return !!this.chatSocket.typing().get(thread.type === 'GROUP' ? `G${thread.id}` : `U${thread.id}`); }
+  protected getInitials(name?: string) { return name ? name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() : '??'; }
+  protected getInitialsForUserId(userId: number) { return this.getInitials(this.allContacts().find(c => c.id === userId)?.name || `User ${userId}`); }
+  toggleBlockThread() { this.peerBlocked() ? this.executeUnblock() : this.executeBlock(); }
+  executeBlock() { const thread = this.selectedThread(); if (!thread) return; this.commsDataApi.blockUser(this.currentUserId(), thread.id, this.auth.user()?.companyId || 1).subscribe(() => { this.peerBlocked.set(true); this.toast.show('Operator blocked.', 'success'); }); }
+  executeUnblock() { const thread = this.selectedThread(); if (!thread) return; this.commsDataApi.unblockUser(this.currentUserId(), thread.id).subscribe(() => { this.peerBlocked.set(false); this.toast.show('Operator unblocked.', 'success'); }); }
+  toggleMuteThread(thread: ChatSummary) { const isMuted = !thread.muted; this.commsDataApi.updateConversationPreference({ userId: this.currentUserId(), companyId: this.auth.user()?.companyId || 1, conversationType: thread.type, conversationId: thread.id, archived: !!thread.archived, muted: isMuted }).subscribe(() => { this.loadThreads(); this.toast.show(isMuted ? 'Muted.' : 'Unmuted.', 'success'); }); }
   purgeChannel(thread: ChatSummary) {
     if (thread.type === 'GROUP') {
-      if (confirm(`Leave group channel "${thread.name}"?`)) {
-        this.commsApi.removeGroupMember(thread.id, this.currentUserId()).subscribe({
-          next: () => {
-            this.selectedThreadId.set(null);
-            this.loadThreads();
-            this.toast.show('You have left the group.', 'success' as ToastSeverity);
-          },
-          error: (err) => console.error('Failed to leave group', err)
-        });
-      }
-    } else {
-      if (confirm(`Purge private stream history with ${thread.name}?`)) {
-        this.messages.set([]);
-        this.toast.show('History purged locally.', 'success' as ToastSeverity);
-      }
-    }
+      if (confirm(`Leave channel "${thread.name}"?`)) this.commsApi.removeGroupMember(thread.id, this.currentUserId()).subscribe(() => { this.selectedThreadId.set(null); this.loadThreads(); this.toast.show('Left group.', 'success'); });
+    } else if (confirm(`Purge history with ${thread.name}?`)) { this.messages.set([]); this.toast.show('History purged.', 'success'); }
   }
 
-  showGroupMembers() {
-    const thread = this.selectedThread();
-    if (!thread || thread.type !== 'GROUP') return;
-    this.loadGroupMembers(thread.id);
-    this.groupMembersActive.set(true);
-  }
-
+  showGroupMembers() { const thread = this.selectedThread(); if (thread?.type === 'GROUP') { this.loadGroupMembers(thread.id); this.groupMembersActive.set(true); } }
   executeAddGroupMember() {
     if (!this.selectedContactToAdd || this.selectedContactToAdd === 'null') return;
-    const thread = this.selectedThread();
-    if (!thread) return;
-    this.commsApi.addGroupMember(thread.id, Number(this.selectedContactToAdd), this.currentUserId()).subscribe({
-      next: () => {
-        this.toast.show('Operator added to channel.', 'success' as ToastSeverity);
-        this.selectedContactToAdd = null;
-        this.loadGroupMembers(thread.id);
-        this.loadThreads();
-      },
-      error: (err) => console.error('Failed to add member', err)
-    });
+    const thread = this.selectedThread(); if (!thread) return;
+    this.commsApi.addGroupMember(thread.id, Number(this.selectedContactToAdd), this.currentUserId()).subscribe(() => { this.toast.show('Operator added.', 'success'); this.selectedContactToAdd = null; this.loadGroupMembers(thread.id); this.loadThreads(); });
   }
-
-  executeRemoveGroupMember(userId: number) {
-    const thread = this.selectedThread();
-    if (!thread) return;
-    if (confirm(`Remove operator from channel?`)) {
-      this.commsApi.removeGroupMember(thread.id, userId).subscribe({
-        next: () => {
-          this.toast.show('Operator removed from channel.', 'success' as ToastSeverity);
-          this.loadGroupMembers(thread.id);
-          this.loadThreads();
-        },
-        error: (err) => console.error('Failed to remove member', err)
-      });
-    }
-  }
-
-  loadGroupMembers(groupId: number) {
-    this.commsApi.getGroupMembers(groupId).subscribe({
-      next: (data) => this.groupMembers.set(data),
-      error: (err) => console.error('Failed to load group members', err)
-    });
-  }
-
-  getMemberName(userId: number): string {
-    const contact = this.allContacts().find(c => c.id === userId);
-    return contact ? contact.name : `Operator ${userId}`;
-  }
-
-  contactsNotInGroup(): any[] {
-    return this.allContacts().filter(c => !this.groupMembers().some(m => m.userId === c.id));
-  }
-
-  isCurrentUserGroupAdmin(): boolean {
-    const me = this.groupMembers().find(m => m.userId === this.currentUserId());
-    return (me && me.role === 'ADMIN') || this.auth.user()?.role === 'ROLE_ADMIN';
-  }
-
-  triggerNudgeChip(text: string) {
-    this.currentInput = text;
-    this.executeAiRequest();
-  }
-
-  startVoiceRecording() {
-    this.voiceRecorder.startRecording().then(() => {
-      this.toast.show('Voice recording started...', 'success' as ToastSeverity);
-    }).catch(err => {
-      this.toast.show('Microphone access denied or unavailable.', 'error' as ToastSeverity);
-    });
-  }
-
-  cancelVoiceRecording() {
-    this.voiceRecorder.cancelRecording();
-    this.toast.show('Voice recording discarded.', 'success' as ToastSeverity);
-  }
-
+  executeRemoveGroupMember(userId: number) { const thread = this.selectedThread(); if (thread && confirm('Remove operator?')) this.commsApi.removeGroupMember(thread.id, userId).subscribe(() => { this.toast.show('Operator removed.', 'success'); this.loadGroupMembers(thread.id); this.loadThreads(); }); }
+  loadGroupMembers(groupId: number) { this.commsApi.getGroupMembers(groupId).subscribe(data => this.groupMembers.set(data)); }
+  getMemberName(userId: number): string { return this.allContacts().find(c => c.id === userId)?.name || `Operator ${userId}`; }
+  contactsNotInGroup(): any[] { return this.allContacts().filter(c => !this.groupMembers().some(m => m.userId === c.id)); }
+  isCurrentUserGroupAdmin(): boolean { const me = this.groupMembers().find(m => m.userId === this.currentUserId()); return (me && me.role === 'ADMIN') || this.auth.user()?.role === 'ROLE_ADMIN'; }
+  triggerNudgeChip(text: string) { this.currentInput = text; this.executeAiRequest(); }
+  startVoiceRecording() { this.voiceRecorder.startRecording().then(() => this.toast.show('Recording...', 'success')).catch(() => this.toast.show('Mic error.', 'danger')); }
+  cancelVoiceRecording() { this.voiceRecorder.cancelRecording(); this.toast.show('Discarded.', 'success'); }
   stopAndSendVoiceRecording() {
-    const thread = this.selectedThread();
-    if (!thread) return;
-
-    this.voiceRecorder.stopRecording().then(base64Audio => {
-      if (!base64Audio) return;
-
-      const payload: any = {
-        content: base64Audio,
-        messageType: 'AUDIO',
-        timestamp: new Date().toISOString(),
-        senderId: this.currentUserId(),
-        companyId: this.auth.user()?.companyId || 1,
-        clientMsgId: Math.random().toString(36).substring(2, 15),
-        isRead: false
-      };
-
-      if (thread.type === 'GROUP') payload.groupId = thread.id;
-      else payload.recipientId = thread.id;
-
-      this.chatSocket.addOptimisticMessage(payload);
-      this.messages.update(msgs => [...msgs, payload]);
-      this.chatSocket.send(payload);
-      this.toast.show('Audio transmission sent.', 'success' as ToastSeverity);
+    const thread = this.selectedThread(); if (!thread) return;
+    this.voiceRecorder.stopRecording().then(base64 => {
+      if (!base64) return;
+      const payload: any = { content: base64, messageType: 'AUDIO', timestamp: new Date().toISOString(), senderId: this.currentUserId(), companyId: this.auth.user()?.companyId || 1, clientMsgId: Math.random().toString(36).substring(2, 15), isRead: false };
+      if (thread.type === 'GROUP') payload.groupId = thread.id; else payload.recipientId = thread.id;
+      this.chatSocket.addOptimisticMessage(payload); this.messages.update(msgs => [...msgs, payload]); this.chatSocket.send(payload); this.toast.show('Audio sent.', 'success');
     });
   }
 
-  private scrollToBottom(): void {
-    if (this.scrollContainer && !this.editingMessage()) {
-      const el = this.scrollContainer.nativeElement;
-      el.scrollTop = el.scrollHeight;
-    }
+  showSmartInbox() { this.refreshSmartInbox(); this.smartInboxActive.set(true); this.directSyncActive.set(false); this.groupSyncActive.set(false); this.searchActive.set(false); this.auditActive.set(false); this.pollCreatorActive.set(false); }
+  generateHandover() { const thread = this.selectedThread(); if (thread?.type !== 'GROUP') return; this.handoverLoading.set(true); this.commsApi.getShiftHandover(thread.id).subscribe({ next: (res) => { this.handoverSummary.set(res.summary); this.handoverLoading.set(false); }, error: () => this.handoverLoading.set(false) }); }
+  executeSearch() { if (!this.searchQuery.trim()) return; this.searchActive.set(true); this.commsApi.searchMessages(this.searchQuery).subscribe(results => this.searchResults.set(results)); }
+  acknowledge(messageId: number) { this.commsApi.acknowledgeMessage(messageId).subscribe(() => { this.refreshSmartInbox(); this.toast.show('Acknowledged.', 'success'); }); }
+  voteInPoll(pollId: number, option: string) { this.commsApi.post(`/api/communication/chat/poll/${pollId}/vote?option=${encodeURIComponent(option)}`, {}).subscribe(() => this.toast.show('Vote recorded.', 'success')); }
+  openThread(msg: ChatMessage) { this.activeThreadParent.set(msg); this.threadLoading.set(true); this.commsApi.getThreadMessages(msg.id!).subscribe({ next: (msgs) => { this.threadMessages.set(msgs); this.threadLoading.set(false); }, error: () => this.threadLoading.set(false) }); }
+  sendThreadReply(content: string) {
+    const parent = this.activeThreadParent(); if (!parent || !content.trim()) return;
+    const payload: any = { content, messageType: 'TEXT', timestamp: new Date().toISOString(), senderId: this.currentUserId(), companyId: this.auth.user()?.companyId || 1, parentMessageId: parent.id, groupId: parent.groupId, recipientId: parent.recipientId, deliveryStatus: 'SENT' };
+    this.commsApi.sendMessage(payload).subscribe(saved => this.threadMessages.update(msgs => [...msgs, saved]));
   }
+  translateMessage(msg: any) { if (msg.translatedContent) { msg.translatedContent = null; return; } this.commsApi.translateMessage(msg.content, 'English').subscribe(res => msg.translatedContent = res.translatedText); }
+  showAuditLog() { this.commsApi.get<any[]>('/api/communication/chat/audit').subscribe(data => { this.auditEvents.set(data); this.auditActive.set(true); this.smartInboxActive.set(false); this.directSyncActive.set(false); this.groupSyncActive.set(false); this.pollCreatorActive.set(false); }); }
+  addPollOption() { this.pollOptions.push(''); }
+  removePollOption(i: number) { this.pollOptions.splice(i, 1); }
+  submitPoll() {
+    if (!this.pollQuestion.trim() || this.pollOptions.some(o => !o.trim())) return;
+    const thread = this.selectedThread(); if (!thread) return;
+    const payload: any = { messageType: 'POLL', content: this.pollQuestion, senderId: this.currentUserId(), companyId: this.auth.user()?.companyId || 1, poll: { question: this.pollQuestion, options: this.pollOptions.filter(o => o.trim()), isMultipleChoice: false } };
+    if (thread.type === 'GROUP') payload.groupId = thread.id; else payload.recipientId = thread.id;
+    this.commsApi.post('/api/communication/chat/send', payload).subscribe(() => { this.pollCreatorActive.set(false); this.pollQuestion = ''; this.pollOptions = ['', '']; this.toast.show('Poll dispatched.', 'success'); });
+  }
+
+  private scrollToBottom(): void { if (this.scrollContainer && !this.editingMessage()) { const el = this.scrollContainer.nativeElement; el.scrollTop = el.scrollHeight; } }
 }

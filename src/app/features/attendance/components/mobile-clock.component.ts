@@ -161,8 +161,8 @@ export class MobileClockComponent implements OnInit, OnDestroy {
   private refreshStatus() {
     const user = this.auth.user();
     if (user) {
-      this.attendanceApi.getAttendanceStatus(user.id).subscribe((status: string) => {
-        this.currentStatus.set(status);
+      this.attendanceApi.getAttendanceStatus(user.id).subscribe((data: {status: string}) => {
+        this.currentStatus.set(data.status);
         this.attendanceApi.getTodayAttendance(user.id).subscribe((records: Attendance[]) => {
           this.currentAttendance = records.find((r: Attendance) => r.clockOut === null) || null;
         });

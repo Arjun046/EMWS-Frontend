@@ -45,27 +45,27 @@ export class SchedulingService {
   constructor(private readonly api: ApiService) {}
 
   getShifts(): Observable<Shift[]> {
-    return this.api.get<Shift[]>('/api/shifts', [], this.baseUrl);
+    return this.api.get<Shift[]>('/api/scheduling/shifts', [], this.baseUrl);
   }
 
   getShiftsByRange(start: string, end: string): Observable<Shift[]> {
-    return this.api.get<Shift[]>(`/api/shifts/range?start=${start}&end=${end}`, [], this.baseUrl);
+    return this.api.get<Shift[]>(`/api/scheduling/shifts/range?start=${start}&end=${end}`, [], this.baseUrl);
   }
 
   createShift(shift: Partial<Shift>): Observable<Shift> {
-    return this.api.post<Shift>('/api/shifts', shift, undefined, this.baseUrl);
+    return this.api.post<Shift>('/api/scheduling/shifts', shift, undefined, this.baseUrl);
   }
 
   updateShift(id: number, shift: Partial<Shift>): Observable<Shift> {
-    return this.api.put<Shift>(`/api/shifts/${id}`, shift, undefined, this.baseUrl);
+    return this.api.put<Shift>(`/api/scheduling/shifts/${id}`, shift, undefined, this.baseUrl);
   }
 
   updateStatus(id: number, status: string): Observable<Shift> {
-    return this.api.patch<Shift>(`/api/shifts/${id}/status?status=${status}`, {}, undefined, this.baseUrl);
+    return this.api.patch<Shift>(`/api/scheduling/shifts/${id}/status?status=${status}`, {}, undefined, this.baseUrl);
   }
 
   deleteShift(id: number): Observable<void> {
-    return this.api.delete<void>(`/api/shifts/${id}`, undefined, this.baseUrl);
+    return this.api.delete<void>(`/api/scheduling/shifts/${id}`, undefined, this.baseUrl);
   }
 
   extractShiftConflict(error: unknown): ShiftConflictResponse | null {

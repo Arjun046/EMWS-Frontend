@@ -90,7 +90,7 @@ interface NavigationItemExtended extends NavigationItem {
         <div class="app-content-area">
           <header class="app-header">
             <div class="breadcrumb-trail">
-              <button class="hamburger-btn" (click)="isSidebarOpen.set(!isSidebarOpen())">
+              <button class="hamburger-btn" (click)="isSidebarOpen.set(!isSidebarOpen())" aria-label="Toggle navigation menu">
                 <mat-icon style="font-size:1.1rem;">menu</mat-icon>
               </button>
               <span class="mut">SYSTEM</span>
@@ -101,11 +101,11 @@ interface NavigationItemExtended extends NavigationItem {
             <div class="header-ctrls">
               <div class="digital-clock-widget">{{ liveTime() | date:'h:mm:ss a' }}</div>
               
-              <button class="header-action-btn" (click)="theme.toggleTheme()" [title]="theme.isDarkMode() ? 'Light Mode' : 'Dark Mode'">
+              <button class="header-action-btn" (click)="theme.toggleTheme()" [title]="theme.isDarkMode() ? 'Light Mode' : 'Dark Mode'" [aria-label]="theme.isDarkMode() ? 'Light Mode' : 'Dark Mode'">
                  <mat-icon>{{ theme.isDarkMode() ? 'light_mode' : 'dark_mode' }}</mat-icon>
               </button>
 
-              <button class="header-action-btn" (click)="search.open()" title="Search (Ctrl+K)">
+              <button class="header-action-btn" (click)="search.open()" title="Search (Ctrl+K)" aria-label="Search">
                 <mat-icon>search</mat-icon>
               </button>
 
@@ -171,7 +171,7 @@ interface NavigationItemExtended extends NavigationItem {
           </header>
 
           <div class="page-scroll-container custom-scrollbar">
-            <div class="fade-up" style="display: flex; flex-direction: column; flex: 1;">
+            <div class="fade-up" style="display: flex; flex-direction: column; flex: 1; min-height: 0;">
               <router-outlet />
             </div>
           </div>
@@ -255,7 +255,7 @@ interface NavigationItemExtended extends NavigationItem {
     }
 
     .notif-list {
-      max-height: 480px;
+      max-height: min(480px, calc(100vh - 240px));
       overflow-y: auto;
       background: var(--bg);
     }
