@@ -23,8 +23,8 @@ import { PageHeaderComponent } from '../../shared/components/page-header.compone
   ],
   template: `
     <app-page-header
-      title="Workforce Coverage Console"
-      subtitle="Architect team presence by monitoring integrated shift cycles and absence timelines."
+      title="Team Calendar"
+      subtitle="Shifts and approved leave across your team, in one month view."
       secondaryActionLabel="Go to Today"
       secondaryIcon="today"
       (actionSecondary)="goToToday()"
@@ -32,28 +32,28 @@ import { PageHeaderComponent } from '../../shared/components/page-header.compone
 
     <section class="coverage-metrics">
        <mat-card class="metric-pill good">
-          <label>Operational Coverage</label>
-          <div class="value">94%</div>
-          <p class="delta">Within optimal range</p>
+          <label>Days Covered</label>
+          <div class="value">{{ coverage() }}%</div>
+          <p class="delta">Weekdays this month with at least one shift</p>
        </mat-card>
        <mat-card class="metric-pill warn">
-          <label>Detected Gaps</label>
+          <label>Uncovered Days</label>
           <div class="value">{{ coverageGaps() }}</div>
-          <p class="delta">Critical shift shortages</p>
+          <p class="delta">Weekdays this month with no shifts</p>
        </mat-card>
        <mat-card class="metric-pill accent">
-          <label>Active Staff</label>
+          <label>On Duty Today</label>
           <div class="value">{{ activeStaffCount() }}</div>
-          <p class="delta">Present on current shift</p>
+          <p class="delta">Staff with a shift today</p>
        </mat-card>
     </section>
 
     <section class="calendar-shell mt-6">
       <mat-card class="calendar-main shadow-xl">
         <div class="calendar-nav">
-          <button mat-icon-button (click)="prevMonth()"><mat-icon>chevron_left</mat-icon></button>
+          <button mat-icon-button (click)="prevMonth()" aria-label="Previous month"><mat-icon>chevron_left</mat-icon></button>
           <h2 class="month-title">{{ monthName }} {{ year }}</h2>
-          <button mat-icon-button (click)="nextMonth()"><mat-icon>chevron_right</mat-icon></button>
+          <button mat-icon-button (click)="nextMonth()" aria-label="Next month"><mat-icon>chevron_right</mat-icon></button>
           <div class="spacer"></div>
           <div class="view-toggles">
              <mat-chip-listbox selectable="false">
@@ -108,7 +108,7 @@ import { PageHeaderComponent } from '../../shared/components/page-header.compone
 
       <div class="calendar-sidebar">
         <mat-card class="sidebar-card">
-           <header><h3>Deployment Roster</h3></header>
+           <header><h3>On Duty Today</h3></header>
            <div class="roster-list">
               @for (emp of activeStaff(); track emp.id) {
                  <div class="roster-item">
@@ -192,6 +192,7 @@ export class TeamCalendarPageComponent implements OnInit {
   protected readonly activeStaff = signal<any[]>([]);
 
   protected readonly coverageGaps = signal(0);
+  protected readonly coverage = signal(0);
   protected readonly activeStaffCount = computed(() => this.activeStaff().length);
 
   protected month = new Date().getMonth();
@@ -219,19 +220,46 @@ export class TeamCalendarPageComponent implements OnInit {
     const end = new Date(this.year, this.month + 1, 0).toISOString();
 
     forkJoin({
-      leaves: this.leaveApi.getCompanyRequests(LeaveStatus.APPROVED).pipe(catchError(() => of([]))),
+      leaves: this.leaveApi.getAllCompanyRequests(LeaveStatus.APPROVED).pipe(catchError(() => of([]))),
       shifts: this.scheduleApi.getShiftsByRange(start, end).pipe(catchError(() => of([])))
     }).subscribe({
       next: (data) => {
         this.teamLeaves.set(data.leaves);
         this.teamShifts.set(data.shifts);
+        this.computeCoverage(data.shifts);
         this.isLoading.set(false);
       },
       error: () => {
         this.isLoading.set(false);
-        this.snack.open('Error synchronizing workforce coverage.', 'OK', { duration: 3000 });
+        this.snack.open('Could not load the calendar. Please try again.', 'OK', { duration: 3000 });
       }
     });
+  }
+
+  /** Derive on-duty roster + weekday coverage from the loaded shifts (no mock values). */
+  private computeCoverage(shifts: any[]): void {
+    const today = new Date();
+    const todayKey = `${today.getFullYear()}-${(today.getMonth() + 1).toString().padStart(2, '0')}-${today.getDate().toString().padStart(2, '0')}`;
+    const seen = new Map<number, { id: number; name: string; area: string }>();
+    for (const s of shifts ?? []) {
+      const day = String(s.startTime ?? '').split('T')[0];
+      if (day === todayKey && s.employeeId != null && !seen.has(s.employeeId)) {
+        seen.set(s.employeeId, { id: s.employeeId, name: s.employeeName || `Employee #${s.employeeId}`, area: s.area || s.role || 'Shift' });
+      }
+    }
+    this.activeStaff.set([...seen.values()]);
+
+    const daysInMonth = new Date(this.year, this.month + 1, 0).getDate();
+    const withShift = new Set((shifts ?? []).map((s) => String(s.startTime ?? '').split('T')[0]));
+    let weekdays = 0, covered = 0;
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dow = new Date(this.year, this.month, d).getDay();
+      if (dow === 0 || dow === 6) continue;
+      weekdays++;
+      if (withShift.has(this.getDateString(d))) covered++;
+    }
+    this.coverageGaps.set(weekdays - covered);
+    this.coverage.set(weekdays ? Math.round((covered / weekdays) * 100) : 0);
   }
 
   protected getLeavesForDay(day: number): any[] {

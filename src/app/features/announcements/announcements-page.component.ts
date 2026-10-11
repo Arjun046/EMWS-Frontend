@@ -65,7 +65,7 @@ import { PageHeaderComponent } from '../../shared/components/page-header.compone
                       <span class="pin-badge"><mat-icon>push_pin</mat-icon> Pinned</span>
                     </div>
                     @if (isAdminOrManager()) {
-                      <button mat-icon-button (click)="unpin(item)"><mat-icon>close</mat-icon></button>
+                      <button mat-icon-button (click)="unpin(item)" aria-label="Dismiss"><mat-icon>close</mat-icon></button>
                     }
                   </div>
                   <h2 class="ann-title">{{ item.title }}</h2>
@@ -91,8 +91,8 @@ import { PageHeaderComponent } from '../../shared/components/page-header.compone
                 </div>
                 @if (isAdminOrManager()) {
                   <div class="admin-actions">
-                    <button mat-icon-button title="Pin" (click)="pin(item)"><mat-icon>push_pin</mat-icon></button>
-                    <button mat-icon-button title="Delete" color="warn" (click)="deleteAnn(item)"><mat-icon>delete_outline</mat-icon></button>
+                    <button mat-icon-button title="Pin" aria-label="Pin" (click)="pin(item)"><mat-icon>push_pin</mat-icon></button>
+                    <button mat-icon-button title="Delete" aria-label="Delete" color="warn" (click)="deleteAnn(item)"><mat-icon>delete_outline</mat-icon></button>
                   </div>
                 }
               </div>

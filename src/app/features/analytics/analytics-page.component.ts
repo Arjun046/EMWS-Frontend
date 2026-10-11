@@ -8,9 +8,19 @@ import { MatTabsModule } from '@angular/material/tabs';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { AnalyticsService, Report, DashboardWidget } from '../../core/services/analytics.service';
+import { backendErrorMessage } from '../../shared/utils/password-policy';
 import { AuthService } from '../../core/services/auth.service';
 import { PageHeaderComponent } from '../../shared/components/page-header.component';
 import { toSignal } from '@angular/core/rxjs-interop';
+
+/** Live BE AdminDashboardDTO (analytics-service). */
+interface AdminDashboard {
+  totalEmployees: number;
+  currentlyClockedIn: number;
+  pendingLeaveRequests: number;
+  todayLaborCost: number;
+  breakViolationsToday: number;
+}
 
 @Component({
   selector: 'app-analytics-page',
@@ -36,76 +46,66 @@ import { toSignal } from '@angular/core/rxjs-interop';
     />
 
     <section class="analytics-shell">
-      <!-- 1. HIGH-LEVEL METRICS (Conditional based on scope) -->
-      @if (canReadOrgAnalytics()) {
-        <div class="metrics-grid">
-          <mat-card class="metric-card">
-            <label>Enterprise Headcount</label>
-            <div class="value">1,240</div>
-            <div class="trend up">+12% vs last quarter</div>
-          </mat-card>
-          <mat-card class="metric-card">
-            <label>Labor Utilization</label>
-            <div class="value">94.2%</div>
-            <div class="trend down">-2% vs goal</div>
-          </mat-card>
-          <mat-card class="metric-card">
-            <label>Retention Rate</label>
-            <div class="value">88%</div>
-            <div class="trend up">+5% YoY</div>
-          </mat-card>
-          <mat-card class="metric-card">
-            <label>Avg. Time to Hire</label>
-            <div class="value">18d</div>
-            <div class="trend stable">No change</div>
-          </mat-card>
-        </div>
-
-        <!-- 🟢 NEW: COMMUNICATION INTELLIGENCE METRICS -->
-        <div class="metrics-grid mt-6">
-          <mat-card class="metric-card comms-card">
-            <label>Total Dispatch Volume</label>
-            <div class="value">4,821</div>
-            <div class="trend up">+8% this week</div>
-          </mat-card>
-          <mat-card class="metric-card comms-card">
-            <label>Avg. Response Latency</label>
-            <div class="value">4.2m</div>
-            <div class="trend down">-1.5m improvement</div>
-          </mat-card>
-          <mat-card class="metric-card comms-card">
-            <label>Team Sentiment Index</label>
-            <div class="value">8.4</div>
-            <div class="trend up">Stable Positive</div>
-          </mat-card>
-          <mat-card class="metric-card comms-card">
-            <label>Policy Compliance Rate</label>
-            <div class="value">99.9%</div>
-            <div class="trend stable">1 flagged today</div>
-          </mat-card>
-        </div>
+      <!-- 1. HIGH-LEVEL METRICS (live admin dashboard; BE allows ORG or TEAM read) -->
+      @if (canReadOrgAnalytics() || canReadTeamAnalytics()) {
+        @if (adminLoading()) {
+          <div class="metrics-grid">
+            @for (i of [1,2,3,4,5]; track i) {
+              <mat-card class="metric-card"><div class="shimmer" style="height: 12px; width: 50%; margin-bottom: 1rem;"></div><div class="shimmer" style="height: 32px; width: 40%;"></div></mat-card>
+            }
+          </div>
+        } @else if (admin()) {
+          <div class="metrics-grid">
+            <mat-card class="metric-card">
+              <label>Total Employees</label>
+              <div class="value">{{ admin()!.totalEmployees }}</div>
+              <div class="trend stable">Company-wide</div>
+            </mat-card>
+            <mat-card class="metric-card">
+              <label>Currently Clocked In</label>
+              <div class="value">{{ admin()!.currentlyClockedIn }}</div>
+              <div class="trend stable">Right now</div>
+            </mat-card>
+            <mat-card class="metric-card">
+              <label>Pending Leave Requests</label>
+              <div class="value">{{ admin()!.pendingLeaveRequests }}</div>
+              <div class="trend stable">Awaiting review</div>
+            </mat-card>
+            <mat-card class="metric-card">
+              <label>Today's Labor Cost</label>
+              <div class="value">{{ admin()!.todayLaborCost | number:'1.0-2' }}</div>
+              <div class="trend stable">Today</div>
+            </mat-card>
+            <mat-card class="metric-card">
+              <label>Break Violations Today</label>
+              <div class="value">{{ admin()!.breakViolationsToday }}</div>
+              <div class="trend stable">Today</div>
+            </mat-card>
+          </div>
+        } @else {
+          <mat-card class="metric-card"><label>Analytics unavailable</label><div class="trend stable">Could not load dashboard metrics. Please try again later.</div></mat-card>
+        }
       }
 
       <div class="insights-grid mt-6">
-        <!-- 2. DEPARTMENTAL CHART (Conditional) -->
+        <!-- 2. DASHBOARD WIDGETS (real BE data for your role) -->
         @if (canReadOrgAnalytics() || canReadTeamAnalytics()) {
           <mat-card class="chart-card">
             <div class="card-header">
-              <h3>Staff Allocation by Department</h3>
-              <button mat-icon-button><mat-icon>more_vert</mat-icon></button>
+              <h3>Dashboard Widgets ({{ widgetRole() }})</h3>
             </div>
-            <div class="chart-placeholder">
-              <div class="bars">
-                <div class="bar" style="height: 80%"></div>
-                <div class="bar" style="height: 60%"></div>
-                <div class="bar" style="height: 95%"></div>
-                <div class="bar" style="height: 40%"></div>
-                <div class="bar" style="height: 70%"></div>
+            @if (widgets().length === 0) {
+              <div class="empty-state">No widgets configured for this role.</div>
+            } @else {
+              <div style="padding: 1rem 1.5rem; display: flex; flex-direction: column; gap: 0.75rem;">
+                @for (w of widgets(); track w.id) {
+                  <div style="display:flex; justify-content: space-between; align-items: center; padding: 0.75rem; border: 1px solid #f1f5f9; border-radius: 8px;">
+                    <div><strong>{{ w.name }}</strong><div class="trend stable">{{ w.type }} · position {{ w.position ?? '—' }}</div></div>
+                    <span class="format-tag">{{ w.role || widgetRole() }}</span>
+                  </div>
+                }
               </div>
-              <div class="labels">
-                <span>Ops</span><span>Eng</span><span>HR</span><span>Fin</span><span>Sup</span>
-              </div>
-            </div>
+            }
           </mat-card>
         }
 
@@ -115,10 +115,15 @@ import { toSignal } from '@angular/core/rxjs-interop';
             <h3>Recent Automated Reports</h3>
             <button mat-button color="primary" *ngIf="canExport()">View All</button>
           </div>
+          @if (reportsLoading()) {
+            <div class="empty-state">Loading reports…</div>
+          } @else if (reportsError()) {
+            <div class="empty-state">Could not load reports. Please try again later.</div>
+          } @else {
           <table mat-table [dataSource]="reports()" class="w-full">
             <ng-container matColumnDef="name">
               <th mat-header-cell *matHeaderCellDef>Report Name</th>
-              <td mat-cell *matCellDef="let row"><strong>{{row.name}}</strong></td>
+              <td mat-cell *matCellDef="let row"><strong>{{row.reportName}}</strong><div class="trend stable">{{row.dataSummary || ''}}</div></td>
             </ng-container>
             <ng-container matColumnDef="date">
               <th mat-header-cell *matHeaderCellDef>Generated</th>
@@ -127,20 +132,15 @@ import { toSignal } from '@angular/core/rxjs-interop';
             <ng-container matColumnDef="type">
               <th mat-header-cell *matHeaderCellDef>Format</th>
               <td mat-cell *matCellDef="let row">
-                <span class="format-tag">{{row.type}}</span>
+                <span class="format-tag">{{row.generatedBy || 'system'}}</span>
               </td>
             </ng-container>
-            <ng-container matColumnDef="actions">
-              <th mat-header-cell *matHeaderCellDef></th>
-              <td mat-cell *matCellDef="let row" class="text-right">
-                <button mat-icon-button color="primary"><mat-icon>download</mat-icon></button>
-              </td>
-            </ng-container>
-            <tr mat-header-row *matHeaderRowDef="['name', 'date', 'type', 'actions']"></tr>
-            <tr mat-row *matRowDef="let row; columns: ['name', 'date', 'type', 'actions'];"></tr>
+            <tr mat-header-row *matHeaderRowDef="['name', 'date', 'type']"></tr>
+            <tr mat-row *matRowDef="let row; columns: ['name', 'date', 'type'];"></tr>
           </table>
           @if (reports().length === 0) {
             <div class="empty-state">No recently generated reports.</div>
+          }
           }
         </mat-card>
       </div>
@@ -190,15 +190,76 @@ export class AnalyticsPageComponent {
   protected readonly auth = inject(AuthService);
   private readonly snack = inject(MatSnackBar);
 
-  protected readonly reports = toSignal(this.analyticsApi.getReports(), { initialValue: [] });
-  protected readonly widgets = toSignal(this.analyticsApi.getWidgets(), { initialValue: [] });
+  private readonly reportsSignal = signal<Report[]>([]);
+  protected readonly reports = this.reportsSignal.asReadonly();
+  protected readonly reportsLoading = signal(true);
+  protected readonly reportsError = signal(false);
+  /** Live admin aggregate (BE AdminDashboardDTO). Null = not loaded/failed. */
+  protected readonly admin = signal<AdminDashboard | null>(null);
+  protected readonly adminLoading = signal(false);
+  // Role-aware widgets (P1 fix: was hardcoded ADMIN, so managers/employees
+  // saw the wrong wall or nothing). Matches BE GET /widgets/{role}.
+  protected readonly widgets = toSignal(this.analyticsApi.getWidgets(this.widgetRole()), { initialValue: [] });
+
+  constructor() {
+    this.reloadReports();
+    if (this.canReadOrgAnalytics() || this.canReadTeamAnalytics()) {
+      this.loadAdmin();
+    }
+  }
+
+  protected widgetRole(): string {
+    if (this.auth.isAdmin()) return 'ADMIN';
+    if (this.auth.hasAnyScope(['ANALYTICS_ORG_READ', 'ANALYTICS_TEAM_READ'])) return 'MANAGER';
+    return 'EMPLOYEE';
+  }
+
+  private loadAdmin(): void {
+    this.adminLoading.set(true);
+    this.analyticsApi.getAdminDashboard().subscribe({
+      next: (data) => {
+        this.admin.set(data ?? null);
+        this.adminLoading.set(false);
+      },
+      error: () => {
+        this.admin.set(null);
+        this.adminLoading.set(false);
+      }
+    });
+  }
+
+  private reloadReports(): void {
+    this.reportsLoading.set(true);
+    this.reportsError.set(false);
+    this.analyticsApi.getReports().subscribe({
+      next: (reports) => {
+        this.reportsSignal.set(reports);
+        this.reportsLoading.set(false);
+      },
+      error: () => {
+        this.reportsLoading.set(false);
+        this.reportsError.set(true);
+      }
+    });
+  }
 
   protected onScheduleReport(): void {
     if (!this.canExport()) {
       this.snack.open('You do not have permission to schedule reports.', 'OK', { duration: 3000 });
       return;
     }
-    this.snack.open('Report scheduling logic coming soon.', 'OK', { duration: 2000 });
+    const name = `Workforce snapshot ${new Date().toISOString().split('T')[0]}`;
+    this.analyticsApi.generateReport({
+      reportName: name,
+      generatedBy: this.auth.user()?.email ?? 'console',
+      dataSummary: 'Scheduled from analytics dashboard.'
+    }).subscribe({
+      next: () => {
+        this.snack.open('Report scheduled.', 'OK', { duration: 3000 });
+        this.reloadReports();
+      },
+      error: (err) => this.snack.open(backendErrorMessage(err, 'Scheduling failed.'), 'Dismiss', { duration: 5000 })
+    });
   }
 
   protected canExport(): boolean {

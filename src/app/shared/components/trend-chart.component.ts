@@ -6,7 +6,7 @@ import { CommonModule } from '@angular/common';
   standalone: true,
   imports: [CommonModule],
   template: `
-    <svg viewBox="0 0 100 40" preserveAspectRatio="none" class="chart-svg">
+    <svg viewBox="0 0 100 40" preserveAspectRatio="none" class="chart-svg" aria-hidden="true" focusable="false">
       <defs>
         <linearGradient [id]="gradientId" x1="0%" y1="0%" x2="0%" y2="100%">
           <stop offset="0%" [attr.stop-color]="color" stop-opacity="0.3" />

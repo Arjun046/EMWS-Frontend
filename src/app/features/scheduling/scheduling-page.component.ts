@@ -10,7 +10,8 @@ import { MatDividerModule } from '@angular/material/divider';
 import { MatPaginatorModule, MatPaginator } from '@angular/material/paginator';
 import { MatSortModule, MatSort } from '@angular/material/sort';
 import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
-import { SchedulingService, Shift } from '../../core/services/scheduling.service';
+import { SchedulingService, Shift, ShiftSwapRequest } from '../../core/services/scheduling.service';
+import { backendErrorMessage } from '../../shared/utils/password-policy';
 import { EmployeeDataService, Employee } from '../../core/services/employee-data.service';
 import { WidgetSocketService } from '../../core/services/widget-socket.service';
 import { AuthService } from '../../core/services/auth.service';
@@ -39,13 +40,13 @@ import { catchError, of } from 'rxjs';
                    (keyup)="applyFilter($event)" placeholder="Search rosters (name, area, status)..." #filterInput>
           </div>
           <div class="ui-card" style="margin-bottom:0; padding:0 1rem; background:var(--surface-2); display:flex; align-items:center; gap:0.5rem; height:42px; border-radius:10px;">
-            <span style="font-size:0.7rem; font-weight:800; color:var(--txt-muted); text-transform:uppercase;">Epoch:</span>
-            <strong style="font-size:0.8rem;">W24 - MAY 2026</strong>
+            <span style="font-size:0.7rem; font-weight:800; color:var(--txt-muted); text-transform:uppercase;">Week:</span>
+            <strong style="font-size:0.8rem;">{{ currentWeekLabel() }}</strong>
           </div>
         </div>
-        <button class="ui-btn ui-btn-primary" (click)="openAddDrawer()" *appHasScope="'SCHEDULE_WRITE'">
+        <button class="ui-btn ui-btn-primary" (click)="openAddDrawer()" *appHasScope="['SCHEDULE_TEAM_WRITE', 'SCHEDULE_ORG_WRITE']">
           <mat-icon style="font-size:1.1rem; width:1.1rem; height:1.1rem;">add</mat-icon>
-          Deploy Shift
+          Add Shift
         </button>
       </div>
 
@@ -53,7 +54,7 @@ import { catchError, of } from 'rxjs';
         @if (isLoading()) {
           <div class="table-loading-overlay" style="padding:4rem; text-align:center;">
             <mat-spinner diameter="40" style="margin:0 auto;"></mat-spinner>
-            <p style="margin-top:1rem; color:var(--txt-muted); font-size:0.85rem;">Synchronizing shift telemetry...</p>
+            <p style="margin-top:1rem; color:var(--txt-muted); font-size:0.85rem;">Loading shifts…</p>
           </div>
         } @else {
           <div class="table-container custom-scrollbar">
@@ -61,7 +62,7 @@ import { catchError, of } from 'rxjs';
               
               <!-- Employee Column -->
               <ng-container matColumnDef="employee">
-                <th mat-header-cell *matHeaderCellDef mat-sort-header>Assigned Node</th>
+                <th mat-header-cell *matHeaderCellDef mat-sort-header>Employee</th>
                 <td mat-cell *matCellDef="let shift">
                   <div style="display:flex; align-items:center; gap:0.75rem;">
                     <div class="avatar-sm">{{ getInitials(shift.employeeId) }}</div>
@@ -72,26 +73,26 @@ import { catchError, of } from 'rxjs';
 
               <!-- Time Column -->
               <ng-container matColumnDef="time">
-                <th mat-header-cell *matHeaderCellDef mat-sort-header>Epoch Interval</th>
+                <th mat-header-cell *matHeaderCellDef mat-sort-header>Time</th>
                 <td mat-cell *matCellDef="let shift">
                   <div style="display:flex; flex-direction:column; gap:2px;">
                     <span style="font-weight:700; font-size:0.85rem;">{{ shift.startTime | date:'MMM d, HH:mm' }}</span>
-                    <span style="color:var(--txt-muted); font-size:0.7rem; font-family:'JetBrains Mono';">UNTIL {{ shift.endTime | date:'HH:mm' }}</span>
+                    <span style="color:var(--txt-muted); font-size:0.7rem; font-family:'JetBrains Mono';">until {{ shift.endTime | date:'HH:mm' }}</span>
                   </div>
                 </td>
               </ng-container>
 
               <!-- Area Column -->
               <ng-container matColumnDef="area">
-                <th mat-header-cell *matHeaderCellDef mat-sort-header>Sector / Area</th>
+                <th mat-header-cell *matHeaderCellDef mat-sort-header>Area</th>
                 <td mat-cell *matCellDef="let shift">
-                  <span class="ui-badge" style="background:var(--surface-2); color:var(--txt-secondary);">{{ shift.area || 'GENERAL' }}</span>
+                  <span class="ui-badge" style="background:var(--surface-2); color:var(--txt-secondary);">{{ shift.area || 'General' }}</span>
                 </td>
               </ng-container>
 
               <!-- Status Column -->
               <ng-container matColumnDef="status">
-                <th mat-header-cell *matHeaderCellDef mat-sort-header>Deployment Status</th>
+                <th mat-header-cell *matHeaderCellDef mat-sort-header>Status</th>
                 <td mat-cell *matCellDef="let shift">
                   <span class="ui-badge" [class.ui-badge-success]="shift.status === 'PUBLISHED'" 
                                         [class.ui-badge-warning]="shift.status === 'ASSIGNED'"
@@ -105,22 +106,26 @@ import { catchError, of } from 'rxjs';
               <ng-container matColumnDef="actions">
                 <th mat-header-cell *matHeaderCellDef style="text-align:right;"></th>
                 <td mat-cell *matCellDef="let shift" style="text-align:right;">
-                  <button mat-icon-button [matMenuTriggerFor]="menu" class="action-trigger">
+                  <button mat-icon-button [matMenuTriggerFor]="menu" class="action-trigger" aria-label="Row actions">
                     <mat-icon style="color:var(--txt-muted); font-size:18px;">more_vert</mat-icon>
                   </button>
                   <mat-menu #menu="matMenu" xPosition="before" class="ui-menu">
                     <button mat-menu-item (click)="openViewDrawer(shift)">
                       <mat-icon>visibility</mat-icon>
-                      <span>Inspect Packet</span>
+                      <span>View details</span>
                     </button>
-                    <button mat-menu-item (click)="openEditDrawer(shift)" *appHasScope="'SCHEDULE_WRITE'">
+                    <button mat-menu-item (click)="openEditDrawer(shift)" *appHasScope="['SCHEDULE_TEAM_WRITE', 'SCHEDULE_ORG_WRITE', 'SCHEDULE_DELETE']">
                       <mat-icon>edit</mat-icon>
-                      <span>Modify Roster</span>
+                      <span>Edit shift</span>
                     </button>
-                    <mat-divider *appHasScope="'SCHEDULE_WRITE'"></mat-divider>
-                    <button mat-menu-item (click)="confirmDelete(shift)" style="color:var(--danger);" *appHasScope="'SCHEDULE_WRITE'">
+                    <mat-divider *appHasScope="['SCHEDULE_TEAM_WRITE', 'SCHEDULE_ORG_WRITE', 'SCHEDULE_DELETE']"></mat-divider>
+                    <button mat-menu-item (click)="confirmDelete(shift)" style="color:var(--danger);" *appHasScope="['SCHEDULE_TEAM_WRITE', 'SCHEDULE_ORG_WRITE', 'SCHEDULE_DELETE']">
                       <mat-icon style="color:var(--danger);">delete_forever</mat-icon>
-                      <span>Purge Deployment</span>
+                      <span>Delete shift</span>
+                    </button>
+                    <button mat-menu-item (click)="requestSwap(shift)">
+                      <mat-icon>swap_horiz</mat-icon>
+                      <span>Request Swap</span>
                     </button>
                   </mat-menu>
                 </td>
@@ -129,17 +134,45 @@ import { catchError, of } from 'rxjs';
               <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
               <tr mat-row *matRowDef="let row; columns: displayedColumns;" class="table-row-hover"></tr>
             </table>
+            @if (dataSource.filteredData.length === 0) {
+              <div style="padding: 3rem; text-align: center; color: var(--txt-muted); font-size: 0.85rem;">No shifts found. Add your first shift to build the roster.</div>
+            }
           </div>
 
           <div class="table-pag-row" style="padding: 1rem 1.5rem; border-top:1px solid var(--border);">
             <span class="pag-counter-label">
-              Total Active Deployments: {{ dataSource.filteredData.length }}
+              Total shifts: {{ dataSource.filteredData.length }}
             </span>
             <mat-paginator [pageSizeOptions]="[10, 25, 100]" hidePageSize="true" style="background:transparent;"></mat-paginator>
           </div>
         }
       </div>
 
+    </div>
+
+    <!-- SWAP REQUESTS -->
+    <div class="ui-card" style="margin-top:1.5rem;">
+      <div class="ui-card-header"><h3>Swap requests ({{ swaps().length }})</h3></div>
+      @if (!swaps().length) {
+        <p style="color:var(--txt-muted);font-size:0.85rem;padding:0 1.5rem 1.5rem;">No swap requests. Use ⋮ → Request Swap on any shift.</p>
+      } @else {
+        <table class="ui-table">
+          <tr><th>Shift</th><th>Requested by</th><th>Status</th><th style="text-align:right;"></th></tr>
+          @for (s of swaps(); track s.id) {
+            <tr>
+              <td>#{{ s.originalShiftId }}</td><td>{{ s.requestingEmployeeId }}</td><td>{{ s.status }}</td>
+              <td style="text-align:right;white-space:nowrap;">
+                @if (s.status === 'PENDING') {
+                  <button class="ui-btn" (click)="acceptSwap(s.id)">Accept</button>
+                }
+                @if (s.status === 'ACCEPTED') {
+                  <button class="ui-btn ui-btn-primary" (click)="approveSwap(s.id)" *appHasScope="['SCHEDULE_TEAM_WRITE', 'SCHEDULE_ORG_WRITE', 'SCHEDULE_DELETE']">Approve</button>
+                }
+              </td>
+            </tr>
+          }
+        </table>
+      }
     </div>
 
     <!-- CRUD SIDE SHEET DRAWER -->
@@ -155,37 +188,37 @@ import { catchError, of } from 'rxjs';
     >
       <form [formGroup]="shiftForm" class="drawer-crud-form">
         
-        <div class="form-section">Target Assignment</div>
+        <div class="form-section">Assignment</div>
         <div class="f-group">
-          <label>Personnel Node</label>
+          <label>Employee</label>
           <select class="f-input" formControlName="employeeId">
-            <option [value]="null">UNASSIGNED_SLOT</option>
+            <option [value]="null">Unassigned</option>
             @for (emp of employees(); track emp.id) {
               <option [value]="emp.id">{{ emp.firstName }} {{ emp.lastName }} ({{ emp.employeeNumber }})</option>
             }
           </select>
         </div>
 
-        <div class="form-section">Epoch Configuration</div>
+        <div class="form-section">Schedule</div>
         <div class="f-grid">
           <div class="f-group">
-            <label>Start Interval</label>
+            <label>Starts</label>
             <input class="f-input" type="datetime-local" formControlName="startTime">
           </div>
           <div class="f-group">
-            <label>Termination Interval</label>
+            <label>Ends</label>
             <input class="f-input" type="datetime-local" formControlName="endTime">
           </div>
         </div>
 
-        <div class="form-section">Deployment Metadata</div>
+        <div class="form-section">Details</div>
         <div class="f-grid">
           <div class="f-group">
-            <label>Sector / Area</label>
-            <input class="f-input" formControlName="area" placeholder="e.g. Sector-A, HQ">
+            <label>Area</label>
+            <input class="f-input" formControlName="area" placeholder="e.g. Floor A, HQ">
           </div>
           <div class="f-group">
-            <label>Operational Status</label>
+            <label>Status</label>
             <select class="f-input" formControlName="status">
               <option value="OPEN">Open (Unassigned)</option>
               <option value="ASSIGNED">Assigned</option>
@@ -196,22 +229,22 @@ import { catchError, of } from 'rxjs';
         </div>
 
         <div class="f-group">
-          <label>Administrative Notes</label>
-          <textarea class="f-input" formControlName="notes" style="height:100px; padding:0.75rem;" placeholder="Special instructions for the deployment node..."></textarea>
+          <label>Notes</label>
+          <textarea class="f-input" formControlName="notes" style="height:100px; padding:0.75rem;" placeholder="Special instructions for this shift…"></textarea>
         </div>
 
       </form>
     </app-side-sheet-drawer>
 
-    <!-- CONFIRM PURGE MODAL -->
+    <!-- CONFIRM DELETE MODAL -->
     <div class="confirm-modal-overlay" [class.open]="showDeleteConfirm">
       <div class="confirm-modal-box">
         <mat-icon style="font-size:3rem; width:3rem; height:3rem; color:var(--danger); margin-bottom:1rem;">auto_delete</mat-icon>
-        <h3>Confirm Deployment Purge?</h3>
-        <p>This will permanently remove the shift packet from the operational roster. This action is irreversible.</p>
+        <h3>Delete this shift?</h3>
+        <p>This will permanently remove the shift from the roster. This action cannot be undone.</p>
         <div style="display:flex; gap:0.75rem; margin-top:2rem; justify-content:center;">
-          <button class="ui-btn ui-btn-secondary" (click)="showDeleteConfirm = false">Abort Purge</button>
-          <button class="ui-btn ui-btn-danger" (click)="executeDelete()">Confirm Purge</button>
+          <button class="ui-btn ui-btn-secondary" (click)="showDeleteConfirm = false">Cancel</button>
+          <button class="ui-btn ui-btn-danger" (click)="executeDelete()">Delete</button>
         </div>
       </div>
     </div>
@@ -266,9 +299,9 @@ export class SchedulingPageComponent implements OnInit {
 
   // Drawer State
   isDrawerOpen = false;
-  drawerTitle = 'Deploy Shift';
-  drawerSubtitle = 'Initializing new operational roster node.';
-  drawerSaveText = 'Lock Deployment';
+  drawerTitle = 'Add Shift';
+  drawerSubtitle = 'Create a new shift on the roster.';
+  drawerSaveText = 'Save Shift';
   currentMode: 'add' | 'edit' | 'view' = 'add';
   selectedShift: Shift | null = null;
 
@@ -293,15 +326,65 @@ export class SchedulingPageComponent implements OnInit {
     });
   }
 
+  protected readonly swaps = signal<ShiftSwapRequest[]>([]);
+
+  /** Current ISO week label (replaces the hardcoded visual badge). */
+  protected readonly currentWeekLabel = computed(() => {
+    const now = new Date();
+    const jan1 = new Date(now.getFullYear(), 0, 1);
+    const week = Math.ceil(((now.getTime() - jan1.getTime()) / 86400000 + jan1.getDay() + 1) / 7);
+    const month = now.toLocaleString('en-US', { month: 'short' }).toUpperCase();
+    return `W${week} · ${month} ${now.getFullYear()}`;
+  });
+
   ngOnInit(): void {
     this.loadShifts();
+    this.loadSwaps();
+  }
+
+  loadSwaps(): void {
+    this.schedulingService.getSwaps().subscribe({
+      next: (swaps) => this.swaps.set(swaps),
+      error: (err) => this.snack.open(backendErrorMessage(err, 'Could not load swap requests.'), 'Dismiss', { duration: 5000 })
+    });
+  }
+
+  requestSwap(shift: Shift): void {
+    this.schedulingService.requestSwap(shift.id).subscribe({
+      next: () => {
+        this.snack.open('Swap requested.', 'OK', { duration: 3000 });
+        this.loadSwaps();
+      },
+      error: (err) => this.snack.open(backendErrorMessage(err, 'Swap request failed.'), 'Dismiss', { duration: 5000 })
+    });
+  }
+
+  acceptSwap(id: number): void {
+    this.schedulingService.acceptSwap(id).subscribe({
+      next: () => {
+        this.snack.open('Swap accepted — awaiting manager approval.', 'OK', { duration: 3000 });
+        this.loadSwaps();
+      },
+      error: (err) => this.snack.open(this.conflictMessage(err, 'Accept failed.'), 'Dismiss', { duration: 6000 })
+    });
+  }
+
+  approveSwap(id: number): void {
+    this.schedulingService.approveSwap(id).subscribe({
+      next: () => {
+        this.snack.open('Swap approved.', 'OK', { duration: 3000 });
+        this.loadSwaps();
+        this.loadShifts();
+      },
+      error: (err) => this.snack.open(this.conflictMessage(err, 'Approval failed.'), 'Dismiss', { duration: 6000 })
+    });
   }
 
   loadShifts(): void {
     this.isLoading.set(true);
     this.schedulingService.getShifts().pipe(
       catchError(() => {
-        this.snack.open('Roster synchronization failed.', 'OK', { duration: 4000 });
+        this.snack.open('Could not load shifts. Please try again.', 'OK', { duration: 4000 });
         return of([]);
       })
     ).subscribe(shifts => {
@@ -319,9 +402,9 @@ export class SchedulingPageComponent implements OnInit {
 
   openAddDrawer() {
     this.currentMode = 'add';
-    this.drawerTitle = 'Deploy Shift Packet';
-    this.drawerSubtitle = 'Provisioning a new operational interval.';
-    this.drawerSaveText = 'Lock Deployment';
+    this.drawerTitle = 'Add Shift';
+    this.drawerSubtitle = 'Create a new shift on the roster.';
+    this.drawerSaveText = 'Save Shift';
     this.shiftForm.reset({
       status: 'PUBLISHED',
       area: 'GENERAL'
@@ -333,9 +416,9 @@ export class SchedulingPageComponent implements OnInit {
   openEditDrawer(shift: Shift) {
     this.currentMode = 'edit';
     this.selectedShift = shift;
-    this.drawerTitle = 'Modify Roster Packet';
-    this.drawerSubtitle = `Altering deployment parameters for ID: ${shift.id}.`;
-    this.drawerSaveText = 'Sync Changes';
+    this.drawerTitle = 'Edit Shift';
+    this.drawerSubtitle = `Updating shift #${shift.id}.`;
+    this.drawerSaveText = 'Save Changes';
     this.shiftForm.patchValue({
       ...shift,
       startTime: this.formatDateForInput(shift.startTime),
@@ -348,8 +431,8 @@ export class SchedulingPageComponent implements OnInit {
   openViewDrawer(shift: Shift) {
     this.currentMode = 'view';
     this.selectedShift = shift;
-    this.drawerTitle = 'Shift Packet Inspection';
-    this.drawerSubtitle = 'Viewing high-fidelity roster metadata.';
+    this.drawerTitle = 'Shift Details';
+    this.drawerSubtitle = 'Shift information.';
     this.shiftForm.patchValue({
       ...shift,
       startTime: this.formatDateForInput(shift.startTime),
@@ -376,28 +459,35 @@ export class SchedulingPageComponent implements OnInit {
     if (this.currentMode === 'add') {
       this.schedulingService.createShift(data).subscribe({
         next: () => {
-          this.snack.open('Shift Deployment Locked.', 'OK', { duration: 3000 });
+          this.snack.open('Shift added.', 'OK', { duration: 3000 });
           this.loadShifts();
           this.closeDrawer();
         },
-        error: () => {
-          this.snack.open('Deployment Failure.', 'OK', { duration: 4000 });
+        error: (err) => {
+          this.snack.open(this.conflictMessage(err, 'Could not add shift.'), 'Dismiss', { duration: 6000 });
           this.isLoading.set(false);
         }
       });
     } else if (this.currentMode === 'edit' && this.selectedShift) {
       this.schedulingService.updateShift(this.selectedShift.id, data).subscribe({
         next: () => {
-          this.snack.open('Roster Packet Synchronized.', 'OK', { duration: 3000 });
+          this.snack.open('Shift updated.', 'OK', { duration: 3000 });
           this.loadShifts();
           this.closeDrawer();
         },
-        error: () => {
-          this.snack.open('Synchronization Failure.', 'OK', { duration: 4000 });
+        error: (err) => {
+          this.snack.open(this.conflictMessage(err, 'Could not update shift.'), 'Dismiss', { duration: 6000 });
           this.isLoading.set(false);
         }
       });
     }
+  }
+
+  /** Surface BE SHIFT_CONFLICT details (overlaps, leave, weekly-hours) instead of a generic error. */
+  private conflictMessage(err: unknown, fallback: string): string {
+    const conflict = this.schedulingService.extractShiftConflict(err);
+    const details = conflict?.data?.conflicts?.map((c) => c.message).filter(Boolean).join(' ');
+    return details ? `${conflict?.message ?? 'Shift conflict.'} ${details}` : backendErrorMessage(err, fallback);
   }
 
   confirmDelete(shift: Shift) {
@@ -410,12 +500,12 @@ export class SchedulingPageComponent implements OnInit {
     this.isLoading.set(true);
     this.schedulingService.deleteShift(this.selectedShift.id).subscribe({
       next: () => {
-        this.snack.open('Shift Packet Purged.', 'OK', { duration: 3000 });
+        this.snack.open('Shift deleted.', 'OK', { duration: 3000 });
         this.showDeleteConfirm = false;
         this.loadShifts();
       },
-      error: () => {
-        this.snack.open('Purge Protocol Failed.', 'OK', { duration: 4000 });
+      error: (err) => {
+        this.snack.open(backendErrorMessage(err, 'Could not delete shift.'), 'Dismiss', { duration: 5000 });
         this.isLoading.set(false);
       }
     });
@@ -428,7 +518,7 @@ export class SchedulingPageComponent implements OnInit {
   }
   getEmployeeName(empId: number): string {
     const emp = this.employees().find(e => e.id === empId);
-    return emp ? `${emp.firstName} ${emp.lastName}` : 'UNASSIGNED';
+    return emp ? `${emp.firstName} ${emp.lastName}` : 'Unassigned';
   }
   private formatDateForInput(dateStr: string): string {
     const d = new Date(dateStr);

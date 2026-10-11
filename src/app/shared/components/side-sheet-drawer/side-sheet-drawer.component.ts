@@ -2,20 +2,24 @@ import { Component, Input, Output, EventEmitter } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
+import { CdkTrapFocus } from '@angular/cdk/a11y';
 
 @Component({
   selector: 'app-side-sheet-drawer',
   standalone: true,
-  imports: [CommonModule, MatIconModule, MatButtonModule],
+  imports: [CommonModule, MatIconModule, MatButtonModule, CdkTrapFocus],
   template: `
-    <div class="drawer-scrim" [class.active-scrim]="isOpen" (click)="close.emit()"></div>
-    <div class="side-sheet-drawer" [class.active-drawer]="isOpen">
+    <div class="drawer-scrim" [class.active-scrim]="isOpen" (click)="close.emit()" aria-hidden="true"></div>
+    <div class="side-sheet-drawer" [class.active-drawer]="isOpen"
+         role="dialog" aria-modal="true" [attr.aria-label]="title" [attr.aria-hidden]="!isOpen"
+         [inert]="!isOpen" [cdkTrapFocus]="isOpen" [cdkTrapFocusAutoCapture]="isOpen"
+         (keydown.escape)="close.emit()">
       <div class="drawer-header">
         <div class="header-text-stack">
           <h2>{{ title }}</h2>
           <p *ngIf="subtitle">{{ subtitle }}</p>
         </div>
-        <button mat-icon-button (click)="close.emit()">
+        <button mat-icon-button (click)="close.emit()" aria-label="Close dialog">
           <mat-icon>close</mat-icon>
         </button>
       </div>
@@ -56,13 +60,16 @@ import { MatButtonModule } from '@angular/material/button';
       border-left: 1px solid var(--border);
       z-index: 1001;
       transform: translateX(100%);
-      transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+      visibility: hidden;
+      transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), visibility 0s linear 0.4s;
       display: flex;
       flex-direction: column;
       box-shadow: -20px 0 25px -5px rgba(15, 23, 42, 0.1);
     }
     .side-sheet-drawer.active-drawer {
       transform: translateX(0);
+      visibility: visible;
+      transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
     }
     .drawer-header {
       padding: 1.5rem 2rem;

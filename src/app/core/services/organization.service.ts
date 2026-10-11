@@ -10,6 +10,10 @@ export interface Company {
   timezone: string;
   primaryColor?: string;
   secondaryColor?: string;
+  accentColor?: string;
+  backgroundColor?: string;
+  textColor?: string;
+  themeMode?: string;
   logoUrl?: string;
 }
 
@@ -67,14 +71,18 @@ export class OrganizationService {
     return this.api.post<Company>('/api/organization/companies/me/reset-theme', {}, undefined, this.baseUrl);
   }
 
-  // Legacy/Admin support for internal tools
-  getCompanies(): Observable<Company[]> {
-    return this.api.get<Company[]>('/api/organization/companies', [], this.baseUrl);
+  // BE has no list-all route (POST / creates, GET /{id} reads) — use scoped reads.
+  getCompany(id: number): Observable<Company> {
+    return this.api.get<Company>(`/api/organization/companies/${id}`, undefined, this.baseUrl);
   }
 
   // Locations
   getMyLocations(): Observable<Location[]> {
     return this.api.get<Location[]>('/api/organization/locations', [], this.baseUrl);
+  }
+
+  getLocation(id: number): Observable<Location> {
+    return this.api.get<Location>(`/api/organization/locations/${id}`, undefined, this.baseUrl);
   }
 
   createLocation(location: Partial<Location>): Observable<Location> {
@@ -92,6 +100,18 @@ export class OrganizationService {
   // Departments
   getMyDepartments(): Observable<Department[]> {
     return this.api.get<Department[]>('/api/organization/departments', [], this.baseUrl);
+  }
+
+  getDepartment(id: number): Observable<Department> {
+    return this.api.get<Department>(`/api/organization/departments/${id}`, undefined, this.baseUrl);
+  }
+
+  getDepartmentsByLocation(locationId: number): Observable<Department[]> {
+    return this.api.get<Department[]>(
+      `/api/organization/departments/location/${locationId}`,
+      [],
+      this.baseUrl
+    );
   }
 
   getSubDepartments(parentId: number): Observable<Department[]> {

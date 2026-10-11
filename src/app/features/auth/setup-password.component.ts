@@ -6,6 +6,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSnackBarModule, MatSnackBar } from '@angular/material/snack-bar';
 import { AuthService } from '../../core/services/auth.service';
+import { passwordPolicyValidator, passwordMatchValidator, backendErrorMessage } from '../../shared/utils/password-policy';
 
 @Component({
   selector: 'app-setup-password',
@@ -88,9 +89,9 @@ export class SetupPasswordComponent implements OnInit {
   private token: string | null = null;
 
   protected readonly setupForm = this.fb.group({
-    password: ['', [Validators.required, Validators.minLength(8)]],
+    password: ['', [Validators.required, passwordPolicyValidator()]],
     confirmPassword: ['', [Validators.required]]
-  }, { validators: this.passwordMatchValidator });
+  }, { validators: passwordMatchValidator('password', 'confirmPassword') });
 
   ngOnInit(): void {
     this.token = this.route.snapshot.queryParamMap.get('token');
@@ -100,15 +101,11 @@ export class SetupPasswordComponent implements OnInit {
     }
   }
 
-  private passwordMatchValidator(g: any) {
-    return g.get('password').value === g.get('confirmPassword').value ? null : { mismatch: true };
-  }
-
   onSubmit(): void {
     if (this.setupForm.valid && this.token) {
       this.isLoading.set(true);
       const password = this.setupForm.value.password!;
-      
+
       this.auth.setupPassword(this.token, password).subscribe({
         next: (res) => {
           this.snack.open(res.message || 'Account activated!', 'Login Now', { duration: 5000 });
@@ -116,8 +113,7 @@ export class SetupPasswordComponent implements OnInit {
         },
         error: (err) => {
           this.isLoading.set(false);
-          const msg = err.error?.message || 'Failed to activate account. The link may have expired.';
-          this.snack.open(msg, 'OK', { duration: 5000 });
+          this.snack.open(backendErrorMessage(err, 'Failed to activate account. The link may have expired.'), 'OK', { duration: 6000 });
         }
       });
     }

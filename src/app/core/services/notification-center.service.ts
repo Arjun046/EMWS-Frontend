@@ -13,6 +13,8 @@ export class NotificationCenterService {
   private readonly baseUrl = environment.apiBaseUrl;
   
   private readonly manualNotifications = signal<NotificationItem[]>([]);
+  /** True when history failed to load — the feed may be missing items. */
+  readonly historyError = signal(false);
 
   readonly items = computed(() => {
     const socketItems = this.widgetSocket.events()
@@ -23,7 +25,7 @@ export class NotificationCenterService {
           id: payload.id || (2000 + index),
           title: payload.title || 'Live Alert',
           content: payload.message || payload.content || 'New event received.',
-          category: payload.type || 'System',
+          category: payload.category || payload.type || 'System',
           when: 'Just now',
           status: 'Unread' as const,
           isRead: false
@@ -51,30 +53,38 @@ export class NotificationCenterService {
   }
 
   loadHistory(): void {
-    this.api.get<any[]>(`${this.baseUrl}/api/notifications/me`, []).subscribe(logs => {
-      const mapped = logs.map((l: any) => ({
-        id: l.id,
-        title: l.title || 'System Notification',
-        content: l.message || l.content,
-        category: l.type || 'Alert',
-        when: 'Earlier',
-        status: (l.status === 'READ' ? 'Read' : 'Unread') as any,
-        isRead: l.status === 'READ'
-      } as NotificationItem));
+    // No fallback: callers read historyError to show a retry state.
+    // A [] fallback would masquerade an outage as "all caught up".
+    this.historyError.set(false);
+    this.api.get<any[]>(`${this.baseUrl}/api/notifications/me`, undefined).subscribe({
+      next: (logs) => {
+        const mapped = (logs ?? []).map((l: any) => ({
+          id: l.id,
+          title: l.subject || l.title || 'System Notification',
+          content: l.content || l.message,
+          category: l.category || l.type || 'Alert',
+          when: 'Earlier',
+          status: (l.status === 'READ' ? 'Read' : 'Unread') as any,
+          isRead: l.status === 'READ'
+        } as NotificationItem));
 
-      this.manualNotifications.set(mapped);
+        this.manualNotifications.set(mapped);
+      },
+      error: () => this.historyError.set(true)
     });
   }
 
   markAllAsRead(): void {
-    this.api.patch(`${this.baseUrl}/api/notifications/me/read-all`, {}).subscribe(() => {
-      this.loadHistory();
+    this.api.patch(`${this.baseUrl}/api/notifications/me/read-all`, {}).subscribe({
+      next: () => this.loadHistory(),
+      error: () => console.warn('[notifications] mark-all-read failed')
     });
   }
 
   markAsRead(id: number): void {
-    this.api.patch(`${this.baseUrl}/api/notifications/${id}/read`, {}).subscribe(() => {
-      this.loadHistory();
+    this.api.patch(`${this.baseUrl}/api/notifications/${id}/read`, {}).subscribe({
+      next: () => this.loadHistory(),
+      error: () => console.warn('[notifications] mark-read failed', id)
     });
   }
 }

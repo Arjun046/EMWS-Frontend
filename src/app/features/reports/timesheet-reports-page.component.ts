@@ -12,8 +12,12 @@ import { MatSnackBarModule, MatSnackBar } from '@angular/material/snack-bar';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { FormsModule } from '@angular/forms';
-import { TimesheetService, TimesheetEntry, TimesheetSummary } from '../../core/services/timesheet.service';
+import { map } from 'rxjs';
+import { TimesheetService, Timesheet, TimesheetEntry, TimesheetReconciliation, TimesheetSummary } from '../../core/services/timesheet.service';
+import { AttendanceService, Attendance } from '../../core/services/attendance.service';
+import { EmployeeDataService } from '../../core/services/employee-data.service';
 import { AuthService } from '../../core/services/auth.service';
+import { backendErrorMessage } from '../../shared/utils/password-policy';
 import { PageHeaderComponent } from '../../shared/components/page-header.component';
 import { StatusBadgeComponent } from '../../shared/components/status-badge.component';
 
@@ -69,6 +73,7 @@ import { StatusBadgeComponent } from '../../shared/components/status-badge.compo
             <button mat-stroked-button (click)="setRange('week')" [class.active-range]="activeRange() === 'week'">This Week</button>
             <button mat-stroked-button (click)="setRange('month')" [class.active-range]="activeRange() === 'month'">This Month</button>
             <button mat-stroked-button (click)="setRange('prev-month')" [class.active-range]="activeRange() === 'prev-month'">Last Month</button>
+            <button mat-stroked-button color="primary" (click)="generateTimesheet()">Generate timesheet</button>
           </div>
         </div>
       </mat-card>
@@ -134,7 +139,7 @@ import { StatusBadgeComponent } from '../../shared/components/status-badge.compo
                             <div class="mini-avatar">{{ getInitials(row.employeeName) }}</div>
                             <div class="flex flex-col">
                               <strong>{{ row.employeeName }}</strong>
-                              <span class="text-xs text-slate-400">{{ row.department || 'Operations' }}</span>
+                              <span class="text-xs text-slate-400">{{ row.department || '—' }}</span>
                             </div>
                           </div>
                         </td>
@@ -266,6 +271,136 @@ import { StatusBadgeComponent } from '../../shared/components/status-badge.compo
               </mat-card>
             </div>
           </mat-tab>
+          <mat-tab label="Documents & Approvals">
+            <div class="tab-content mt-6">
+              @if (isAdminOrManager()) {
+                <mat-card class="data-card overflow-hidden" style="margin-bottom:1.5rem;">
+                  <div class="card-header bg-slate-50 border-b">
+                    <div>
+                      <h3 class="font-bold m-0">Review Queue</h3>
+                      <p class="subtle-copy m-0">Pending and submitted timesheets in your scope</p>
+                    </div>
+                    <div class="count-pill"><strong>{{ reviewQueue().length }}</strong> awaiting</div>
+                  </div>
+                  @if (queueLoading()) {
+                    <p style="padding:1.5rem;color:var(--txt-muted,#64748b);font-size:0.85rem;">Loading review queue…</p>
+                  } @else if (queueError()) {
+                    <div class="empty-state p-12 text-center text-slate-400">
+                      <mat-icon class="text-5xl mb-3">cloud_off</mat-icon>
+                      <h4>Review queue unavailable</h4>
+                      <p>Could not load pending timesheets. <button mat-button color="primary" (click)="loadDocuments()">Retry</button></p>
+                    </div>
+                  } @else if (!reviewQueue().length) {
+                    <div class="empty-state p-12 text-center text-slate-400">
+                      <mat-icon class="text-5xl mb-3">mark_email_read</mat-icon>
+                      <h4>Queue clear</h4>
+                      <p>No pending or submitted timesheets need your decision.</p>
+                    </div>
+                  } @else {
+                    <table mat-table [dataSource]="reviewQueue()" class="w-full">
+                      <ng-container matColumnDef="period">
+                        <th mat-header-cell *matHeaderCellDef>Period</th>
+                        <td mat-cell *matCellDef="let doc"><strong>#{{ doc.id }}</strong> · {{ doc.startDate | date:'MMM d' }} – {{ doc.endDate | date:'MMM d, y' }}</td>
+                      </ng-container>
+                      <ng-container matColumnDef="hours">
+                        <th mat-header-cell *matHeaderCellDef>Hours</th>
+                        <td mat-cell *matCellDef="let doc"><strong>{{ doc.totalHours | number:'1.1-1' }}h</strong></td>
+                      </ng-container>
+                      <ng-container matColumnDef="status">
+                        <th mat-header-cell *matHeaderCellDef>Status</th>
+                        <td mat-cell *matCellDef="let doc"><app-status-badge [value]="doc.status" /></td>
+                      </ng-container>
+                      <ng-container matColumnDef="actions">
+                        <th mat-header-cell *matHeaderCellDef>Decision</th>
+                        <td mat-cell *matCellDef="let doc">
+                          @if (isOwnDoc(doc)) {
+                            <span class="text-xs text-slate-400">Awaiting another approver</span>
+                          } @else if (doc.status === 'APPROVED') {
+                            <span class="text-xs text-slate-400">Locked</span>
+                          } @else {
+                            <button mat-stroked-button color="primary" (click)="transitionDoc(doc, 'APPROVED')">Approve</button>
+                            <button mat-stroked-button color="warn" (click)="transitionDoc(doc, 'REJECTED')">Reject</button>
+                          }
+                        </td>
+                      </ng-container>
+                      <tr mat-header-row *matHeaderRowDef="['period','hours','status','actions']"></tr>
+                      <tr mat-row *matRowDef="let row; columns: ['period','hours','status','actions'];"></tr>
+                    </table>
+                  }
+                </mat-card>
+              }
+
+              <mat-card class="data-card overflow-hidden">
+                <div class="card-header bg-slate-50 border-b">
+                  <div>
+                    <h3 class="font-bold m-0">My Timesheet Documents</h3>
+                    <p class="subtle-copy m-0">Submit for approval · approved documents are locked</p>
+                  </div>
+                  <button mat-stroked-button color="primary" (click)="loadDocuments()">Refresh</button>
+                </div>
+                @if (docsLoading()) {
+                  <p style="padding:1.5rem;color:#64748b;font-size:0.85rem;">Loading documents…</p>
+                } @else if (docsError()) {
+                  <div class="empty-state p-12 text-center text-slate-400">
+                    <mat-icon class="text-5xl mb-3">cloud_off</mat-icon>
+                    <h4>Documents unavailable</h4>
+                    <p>Could not load timesheet documents. <button mat-button color="primary" (click)="loadDocuments()">Retry</button></p>
+                  </div>
+                } @else if (!documents().length) {
+                  <div class="empty-state p-12 text-center text-slate-400">
+                    <mat-icon class="text-5xl mb-3">description</mat-icon>
+                    <h4>No timesheet documents yet</h4>
+                    <p>Generate one for the selected period, then submit it for approval.</p>
+                  </div>
+                } @else {
+                  <table mat-table [dataSource]="documents()" class="w-full">
+                    <ng-container matColumnDef="period">
+                      <th mat-header-cell *matHeaderCellDef>Period</th>
+                      <td mat-cell *matCellDef="let doc"><strong>#{{ doc.id }}</strong> · {{ doc.startDate | date:'MMM d' }} – {{ doc.endDate | date:'MMM d, y' }}</td>
+                    </ng-container>
+                    <ng-container matColumnDef="hours">
+                      <th mat-header-cell *matHeaderCellDef>Hours</th>
+                      <td mat-cell *matCellDef="let doc"><strong>{{ doc.totalHours | number:'1.1-1' }}h</strong></td>
+                    </ng-container>
+                    <ng-container matColumnDef="status">
+                      <th mat-header-cell *matHeaderCellDef>Status</th>
+                      <td mat-cell *matCellDef="let doc"><app-status-badge [value]="doc.status" /></td>
+                    </ng-container>
+                    <ng-container matColumnDef="recon">
+                      <th mat-header-cell *matHeaderCellDef>Reconciliation</th>
+                      <td mat-cell *matCellDef="let doc">
+                        @if (reconFor(doc.id); as rec) {
+                          @if (rec.matches) {
+                            <span class="text-xs" style="color:#15803d;font-weight:700;">Verified · {{ rec.currentHours | number:'1.1-1' }}h</span>
+                          } @else {
+                            <span class="text-xs" style="color:#c2410c;font-weight:700;">Mismatch Δ{{ rec.deltaHours | number:'1.1-1' }}h · {{ rec.openSessions }} open</span>
+                          }
+                        } @else {
+                          <button mat-button color="primary" (click)="verifyDoc(doc)" [disabled]="reconLoadingId() === doc.id">
+                            {{ reconLoadingId() === doc.id ? 'Verifying…' : 'Verify' }}
+                          </button>
+                        }
+                      </td>
+                    </ng-container>
+                    <ng-container matColumnDef="actions">
+                      <th mat-header-cell *matHeaderCellDef>Actions</th>
+                      <td mat-cell *matCellDef="let doc">
+                        @switch (doc.status) {
+                          @case ('PENDING') { <button mat-stroked-button color="primary" (click)="transitionDoc(doc, 'SUBMITTED')">Submit</button> }
+                          @case ('SUBMITTED') { <button mat-stroked-button (click)="transitionDoc(doc, 'PENDING')">Recall</button> }
+                          @case ('REJECTED') { <button mat-stroked-button color="primary" (click)="transitionDoc(doc, 'PENDING')">Resubmit</button> }
+                          @case ('APPROVED') { <span class="text-xs text-slate-400">Locked</span> }
+                          @default { <span class="text-xs text-slate-400">{{ doc.status }}</span> }
+                        }
+                      </td>
+                    </ng-container>
+                    <tr mat-header-row *matHeaderRowDef="['period','hours','status','recon','actions']"></tr>
+                    <tr mat-row *matRowDef="let row; columns: ['period','hours','status','recon','actions'];"></tr>
+                  </table>
+                }
+              </mat-card>
+            </div>
+          </mat-tab>
         </mat-tab-group>
       }
     </section>
@@ -360,12 +495,27 @@ import { StatusBadgeComponent } from '../../shared/components/status-badge.compo
 })
 export class TimesheetReportsPageComponent implements OnInit {
   private readonly timesheetApi = inject(TimesheetService);
+  private readonly attendanceApi = inject(AttendanceService);
+  private readonly employeeApi = inject(EmployeeDataService);
   protected readonly auth = inject(AuthService);
   private readonly snack = inject(MatSnackBar);
+  private employeeNames = new Map<number, string>();
+  private employeeDepts = new Map<number, string>();
 
   protected readonly isLoading = signal(false);
   protected readonly entries = signal<TimesheetEntry[]>([]);
   protected readonly summaries = signal<TimesheetSummary[]>([]);
+  /** Official timesheet documents (BE lifecycle states). */
+  protected readonly documents = signal<Timesheet[]>([]);
+  protected readonly docsLoading = signal(false);
+  protected readonly docsError = signal(false);
+  /** Manager review queue (PENDING/SUBMITTED in scope). */
+  protected readonly reviewQueue = signal<Timesheet[]>([]);
+  protected readonly queueLoading = signal(false);
+  protected readonly queueError = signal(false);
+  /** Reconciliation results by timesheet id. */
+  protected readonly reconciliations = signal<Record<number, TimesheetReconciliation>>({});
+  protected readonly reconLoadingId = signal<number | null>(null);
   protected readonly activeRange = signal<'week' | 'month' | 'prev-month' | 'custom'>('month');
   protected searchQuery = '';
 
@@ -407,6 +557,7 @@ export class TimesheetReportsPageComponent implements OnInit {
 
   ngOnInit(): void {
     this.setRange('month');
+    this.loadDocuments();
   }
 
   protected isAdminOrManager(): boolean {
@@ -441,29 +592,191 @@ export class TimesheetReportsPageComponent implements OnInit {
   protected loadData(): void {
     if (!this.startDate || !this.endDate) return;
     this.isLoading.set(true);
-    const userId = this.auth.user()?.id;
+    const userId = this.auth.user()?.id ?? 1;
+    const start = `${this.startDate}T00:00:00Z`;
+    const end = `${this.endDate}T23:59:59Z`;
 
-    if (this.isAdminOrManager()) {
-      this.timesheetApi.getTimesheetSummary(this.startDate, this.endDate).subscribe({
-        next: (data) => this.summaries.set(data),
-        error: () => this.snack.open('Unable to load timesheet summary.', 'OK', { duration: 3000 })
-      });
-    }
+    // Real BE range endpoints (AttendanceController); per-day entries are
+    // mapped locally and the workforce summary is aggregated client-side.
+    // getAll* follows every server page so period totals stay correct at scale.
+    const rangeObs = this.isAdminOrManager()
+      ? this.attendanceApi.getAllAttendanceRange(start, end)
+      : this.attendanceApi.getEmployeeAttendance(userId, start, end).pipe(
+          map((page) => page.content ?? [])
+        );
 
-    const entryObs = this.isAdminOrManager()
-      ? this.timesheetApi.getTimesheetEntries(this.startDate, this.endDate)
-      : this.timesheetApi.getMyTimesheet(userId || 1, this.startDate, this.endDate);
+    this.employeeApi.getEmployees().subscribe({
+      next: (res: any) => {
+        const list = Array.isArray(res) ? res : (res?.content ?? []);
+        this.employeeNames = new Map(
+          list.map((e: any) => [e.id, `${e.firstName ?? ''} ${e.lastName ?? ''}`.trim() || e.email || `Staff #${e.id}`])
+        );
+        this.employeeDepts = new Map(list.map((e: any) => [e.id, e.department || '—']));
+        this.loadEntries(rangeObs);
+      },
+      error: () => this.loadEntries(rangeObs)
+    });
+  }
 
-    entryObs.subscribe({
-      next: (data) => {
-        this.entries.set(data);
+  private loadEntries(rangeObs: import('rxjs').Observable<Attendance[]>): void {
+    rangeObs.subscribe({
+      next: (records) => {
+        const entries = records.map((a) => this.toEntry(a));
+        this.entries.set(entries);
+        this.summaries.set(this.aggregate(entries));
         this.isLoading.set(false);
       },
-      error: () => {
+      error: (err) => {
         this.isLoading.set(false);
-        this.snack.open('Unable to load timesheet entries.', 'OK', { duration: 3000 });
+        this.snack.open(backendErrorMessage(err, 'Unable to load timesheet entries.'), 'Dismiss', { duration: 5000 });
       }
     });
+  }
+
+  private toEntry(a: Attendance): TimesheetEntry {
+    const total = a.totalHours ?? this.hoursBetween(a.clockIn, a.clockOut);
+    const overtime = a.overtimeHours ?? Math.max(0, total - 8);
+    return {
+      id: a.id,
+      employeeId: a.employeeId,
+      employeeName: this.employeeNames.get(a.employeeId) || `Staff #${a.employeeId}`,
+      date: a.clockIn,
+      clockIn: a.clockIn,
+      clockOut: a.clockOut,
+      regularHours: Math.max(0, total - overtime),
+      overtimeHours: overtime,
+      totalHours: total,
+      breakMinutes: this.breakMinutesBetween(a.breakStartTime, a.breakEndTime),
+      status: a.isLate ? 'LATE' : 'PRESENT'
+    };
+  }
+
+  private breakMinutesBetween(start: string | null, end: string | null): number {
+    if (!start || !end) return 0;
+    return Math.max(0, Math.round((new Date(end).getTime() - new Date(start).getTime()) / 60000));
+  }
+
+  private aggregate(entries: TimesheetEntry[]): TimesheetSummary[] {
+    const byEmp = new Map<number, TimesheetEntry[]>();
+    entries.forEach((e) => {
+      if (!byEmp.has(e.employeeId)) byEmp.set(e.employeeId, []);
+      byEmp.get(e.employeeId)!.push(e);
+    });
+    const weekdaysInRange = this.weekdaysBetween(this.startDate, this.endDate);
+    return [...byEmp.entries()].map(([employeeId, rows]) => {
+      const presentDays = new Set(rows.map((r) => String(r.date ?? '').split('T')[0]));
+      return {
+        employeeId,
+        employeeName: rows[0].employeeName,
+        department: this.employeeDepts.get(employeeId) || '—',
+        totalRegularHours: rows.reduce((s, r) => s + r.regularHours, 0),
+        totalOvertimeHours: rows.reduce((s, r) => s + r.overtimeHours, 0),
+        totalHours: rows.reduce((s, r) => s + r.totalHours, 0),
+        daysPresent: presentDays.size,
+        daysAbsent: Math.max(0, weekdaysInRange - presentDays.size),
+        daysLate: rows.filter((r) => r.status === 'LATE').length
+      };
+    });
+  }
+
+  /** Weekdays (Mon–Fri) in [start, end] (yyyy-MM-dd). Absence = weekdays with no record. */
+  private weekdaysBetween(start: string, end: string): number {
+    if (!start || !end) return 0;
+    let count = 0;
+    const d = new Date(`${start}T00:00:00Z`);
+    const last = new Date(`${end}T00:00:00Z`);
+    while (d <= last) {
+      const dow = d.getUTCDay();
+      if (dow !== 0 && dow !== 6) count++;
+      d.setUTCDate(d.getUTCDate() + 1);
+    }
+    return count;
+  }
+
+  private hoursBetween(clockIn: string, clockOut: string | null): number {
+    if (!clockIn || !clockOut) return 0;
+    return Math.max(0, (new Date(clockOut).getTime() - new Date(clockIn).getTime()) / 3600000);
+  }
+
+  /** Generate an official timesheet document for the selected period (BE lifecycle API). */
+  protected generateTimesheet(): void {
+    if (!this.startDate || !this.endDate) return;
+    const userId = this.isAdminOrManager() ? null : (this.auth.user()?.id ?? 1);
+    this.timesheetApi.generateTimesheet(userId, this.startDate, this.endDate).subscribe({
+      next: (ts) => {
+        this.snack.open(`Timesheet #${ts.id} generated (${ts.totalHours ?? 0}h, ${ts.status}).`, 'OK', { duration: 4000 });
+        this.loadDocuments();
+      },
+      error: (err) => this.snack.open(backendErrorMessage(err, 'Generation failed.'), 'Dismiss', { duration: 6000 })
+    });
+  }
+
+  /** Load my documents + (managers) the review queue. Failures surface, never empty-lists. */
+  protected loadDocuments(): void {
+    const userId = this.auth.user()?.id;
+    if (!userId) return;
+    this.docsLoading.set(true);
+    this.docsError.set(false);
+    this.timesheetApi.getEmployeeTimesheets(userId).subscribe({
+      next: (docs) => {
+        this.documents.set(docs ?? []);
+        this.docsLoading.set(false);
+      },
+      error: (err) => {
+        this.docsLoading.set(false);
+        this.docsError.set(true);
+        this.snack.open(backendErrorMessage(err, 'Unable to load timesheet documents.'), 'Dismiss', { duration: 5000 });
+      }
+    });
+    if (this.isAdminOrManager()) {
+      this.queueLoading.set(true);
+      this.queueError.set(false);
+      this.timesheetApi.pendingTimesheets().subscribe({
+        next: (queue) => {
+          this.reviewQueue.set(queue ?? []);
+          this.queueLoading.set(false);
+        },
+        error: (err) => {
+          this.queueLoading.set(false);
+          this.queueError.set(true);
+          this.snack.open(backendErrorMessage(err, 'Unable to load review queue.'), 'Dismiss', { duration: 5000 });
+        }
+      });
+    }
+  }
+
+  /** Lifecycle transition on a document (submit/recall/resubmit/approve/reject). BE owns legality. */
+  protected transitionDoc(doc: Timesheet, status: string): void {
+    this.timesheetApi.updateStatus(doc.id, status).subscribe({
+      next: (updated) => {
+        this.snack.open(`Timesheet #${doc.id} → ${updated.status}.`, 'OK', { duration: 3000 });
+        this.loadDocuments();
+      },
+      error: (err) => this.snack.open(backendErrorMessage(err, 'Transition rejected.'), 'Dismiss', { duration: 6000 })
+    });
+  }
+
+  /** Compare stored totals against live attendance for one document. */
+  protected verifyDoc(doc: Timesheet): void {
+    this.reconLoadingId.set(doc.id);
+    this.timesheetApi.reconcile(doc.id).subscribe({
+      next: (rec) => {
+        this.reconciliations.update((m) => ({ ...m, [doc.id]: rec }));
+        this.reconLoadingId.set(null);
+      },
+      error: (err) => {
+        this.reconLoadingId.set(null);
+        this.snack.open(backendErrorMessage(err, 'Reconciliation failed.'), 'Dismiss', { duration: 5000 });
+      }
+    });
+  }
+
+  protected reconFor(id: number): TimesheetReconciliation | null {
+    return this.reconciliations()[id] ?? null;
+  }
+
+  protected isOwnDoc(doc: Timesheet): boolean {
+    return doc.employeeId === this.auth.user()?.id;
   }
 
   protected getInitials(name: string): string {

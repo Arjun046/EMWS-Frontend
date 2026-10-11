@@ -39,8 +39,14 @@ export class ThemeService {
     this.applyTheme();
   }
 
+  /**
+   * BE has no /branding route — theme lives on the Company entity, so this
+   * PUTs /companies/me (ORG_BRANDING_WRITE) and resets via /me/reset-theme.
+   * companyId is kept in the signature for callers; the tenant comes from auth.
+   */
   updateTheme(companyId: number, theme: CompanyTheme) {
-    return this.api.put<CompanyTheme>(`/api/organization/companies/${companyId}/branding`, theme).pipe(
+    void companyId;
+    return this.api.put<CompanyTheme>('/api/organization/companies/me', theme).pipe(
       tap(updated => {
         this.currentTheme.set(updated);
         this.applyBranding(updated);
@@ -49,7 +55,8 @@ export class ThemeService {
   }
 
   resetTheme(companyId: number) {
-    return this.api.delete<void>(`/api/organization/companies/${companyId}/branding`).pipe(
+    void companyId;
+    return this.api.post<void>('/api/organization/companies/me/reset-theme', {}).pipe(
       tap(() => {
         this.currentTheme.set(null);
         this.clearBranding();

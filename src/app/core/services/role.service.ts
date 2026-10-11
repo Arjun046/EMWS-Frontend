@@ -53,4 +53,41 @@ export class RoleService {
   deletePermission(id: number): Observable<void> {
     return this.api.delete<void>(`/api/roles/permissions/${id}`, undefined, this.baseUrl);
   }
+
+  // Matches RoleManagementController detail / permission / clone / hierarchy APIs.
+  getRoleDetail(id: number): Observable<any> {
+    return this.api.get<any>(`/api/roles/${id}`, undefined, this.baseUrl);
+  }
+
+  getRolePermissions(id: number): Observable<Permission[]> {
+    return this.api.get<Permission[]>(`/api/roles/${id}/permissions`, [], this.baseUrl);
+  }
+
+  replaceRolePermissions(id: number, permissions: Partial<Permission>[]) {
+    return this.api.put<Permission[]>(`/api/roles/${id}/permissions`, permissions, undefined, this.baseUrl);
+  }
+
+  addRolePermission(id: number, permission: Partial<Permission>): Observable<any> {
+    return this.api.post<any>(`/api/roles/${id}/permissions`, permission, undefined, this.baseUrl);
+  }
+
+  removeRolePermission(id: number, permissionId: number): Observable<void> {
+    return this.api.delete<void>(
+      `/api/roles/${id}/permissions/${permissionId}`,
+      undefined,
+      this.baseUrl
+    );
+  }
+
+  cloneRole(id: number, name?: string): Observable<any> {
+    return this.api.post<any>(`/api/roles/${id}/clone`, name ? { name } : {}, undefined, this.baseUrl);
+  }
+
+  getAssignedUsers(id: number): Observable<any[]> {
+    return this.api.get<any[]>(`/api/roles/${id}/assigned-users`, [], this.baseUrl);
+  }
+
+  getPermissionMatrix(): Observable<any[]> {
+    return this.api.get<any[]>('/api/roles/permissions/matrix', [], this.baseUrl);
+  }
 }

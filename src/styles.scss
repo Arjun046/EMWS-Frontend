@@ -16,7 +16,8 @@
       
       --txt-main: #0f172a;
       --txt-secondary: #475569;
-      --txt-muted: #94a3b8;
+      /* Muted text meets WCAG AA (4.5:1) on surface (#fff 5.45) and surface-2 (#f1f5f9 4.97). */
+      --txt-muted: #5b6b7f;
       
       --success: #10b981;
       --success-soft: #ecfdf5;
@@ -50,11 +51,70 @@
       
       --txt-main: #f8fafc;
       --txt-secondary: #94a3b8;
-      --txt-muted: #64748b;
+      /* Muted text meets WCAG AA (4.5:1) on dark surfaces. */
+      --txt-muted: #94a3b8;
       
       --success-soft: rgba(16, 185, 129, 0.12);
       --warning-soft: rgba(245, 158, 11, 0.12);
       --danger-soft: rgba(239, 68, 68, 0.12);
+    }
+
+    /* ════════════════ ACCESSIBILITY FOUNDATIONS (WCAG 2.2 AA) ════════════════ */
+
+    /* Visible keyboard focus on every interactive element. */
+    :focus-visible {
+      outline: 2px solid var(--primary);
+      outline-offset: 2px;
+      border-radius: 4px;
+    }
+    /* Never hide focus inside dialogs/menus rendered in overlays. */
+    .cdk-overlay-container :focus-visible {
+      outline: 2px solid var(--primary);
+      outline-offset: 2px;
+    }
+
+    /* Skip link: first tab stop, visible on focus. */
+    .skip-link {
+      position: fixed;
+      top: -100px;
+      left: 1rem;
+      z-index: 2000;
+      background: var(--primary);
+      color: #fff;
+      font-weight: 800;
+      font-size: 0.85rem;
+      padding: 0.75rem 1.25rem;
+      border-radius: 0 0 12px 12px;
+      text-decoration: none;
+      transition: top 0.15s ease;
+    }
+    .skip-link:focus-visible {
+      top: 0;
+      outline-color: #fff;
+    }
+
+    /* Respect users who request reduced motion: kill decorative animation. */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+      }
+    }
+
+    /* Minimum touch target for icon-only buttons outside Material defaults. */
+    button.icon-btn {
+      min-width: 44px;
+      min-height: 44px;
+    }
+
+    /* Usable native checkboxes (bulk-select, preferences, task lists). */
+    input[type="checkbox"] {
+      width: 1.1rem;
+      height: 1.1rem;
+      accent-color: var(--primary);
+      flex-shrink: 0;
     }
 
     * {

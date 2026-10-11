@@ -120,7 +120,7 @@ export class WhoIsInComponent {
     const today = new Date().toISOString().split('T')[0];
     const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
     
-    this.attendanceApi.getAttendanceRange(
+    this.attendanceApi.getAllAttendanceRange(
       today + 'T00:00:00Z',
       tomorrow + 'T00:00:00Z'
     ).subscribe(data => {

@@ -48,14 +48,9 @@ export class DevLoginComponent {
   protected email = 'dev@local.ws';
 
   bypass() {
-    localStorage.setItem('ewms.auth.token', 'dev-bypass-token');
-    localStorage.setItem('ewms.auth.user', JSON.stringify({
-      id: 999,
-      name: this.email.split('@')[0].toUpperCase(),
-      email: this.email,
-      role: 'ADMIN',
-      avatar: this.email.substring(0, 2).toUpperCase()
-    }));
-    window.location.href = '/dashboard';
+    // Disabled (C-1): public sandbox bypass removed from router.
+    // If re-enabled locally for UI testing, do not commit the route.
+    console.warn('[sandbox] dev bypass disabled — redirecting to login');
+    window.location.href = '/auth/login';
   }
 }

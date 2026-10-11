@@ -14,7 +14,7 @@ import { AuthService } from '../../../core/services/auth.service';
   template: `
     <div class="mobile-clock-fullscreen" [class]="currentStatus().toLowerCase()">
       <div class="header">
-        <button mat-icon-button routerLink="/dashboard" class="back-btn">
+        <button mat-icon-button routerLink="/dashboard" class="back-btn" aria-label="Back to dashboard">
           <mat-icon>arrow_back</mat-icon>
         </button>
         <div class="brand-mini">EWMS Mobile</div>
@@ -161,11 +161,17 @@ export class MobileClockComponent implements OnInit, OnDestroy {
   private refreshStatus() {
     const user = this.auth.user();
     if (user) {
-      this.attendanceApi.getAttendanceStatus(user.id).subscribe((data: {status: string}) => {
-        this.currentStatus.set(data.status);
-        this.attendanceApi.getTodayAttendance(user.id).subscribe((records: Attendance[]) => {
-          this.currentAttendance = records.find((r: Attendance) => r.clockOut === null) || null;
-        });
+      this.attendanceApi.getAttendanceStatus(user.id).subscribe({
+        next: (data: {status: string}) => {
+          this.currentStatus.set(data.status);
+          this.attendanceApi.getTodayAttendance(user.id).subscribe({
+            next: (records: Attendance[]) => {
+              this.currentAttendance = records.find((r: Attendance) => r.clockOut === null) || null;
+            },
+            error: () => this.snack.open('Could not load today\u2019s records.', 'OK', { duration: 4000 })
+          });
+        },
+        error: () => this.snack.open('Could not load your status. Please try again.', 'OK', { duration: 4000 })
       });
     }
   }
@@ -210,27 +216,36 @@ export class MobileClockComponent implements OnInit, OnDestroy {
 
   clockOut() {
     if (this.currentAttendance) {
-      this.attendanceApi.clockOut(this.currentAttendance.id).subscribe(() => {
-        this.snack.open('Clocked out. Have a nice day!', 'OK', { duration: 3000 });
-        this.refreshStatus();
+      this.attendanceApi.clockOut(this.currentAttendance.id).subscribe({
+        next: () => {
+          this.snack.open('Clocked out. Have a nice day!', 'OK', { duration: 3000 });
+          this.refreshStatus();
+        },
+        error: (err) => this.snack.open(err.error?.message || 'Clock-out failed. Please try again.', 'OK', { duration: 5000 })
       });
     }
   }
 
   startBreak() {
     if (this.currentAttendance) {
-      this.attendanceApi.startBreak(this.currentAttendance.id).subscribe(() => {
-        this.snack.open('Break started', 'OK', { duration: 3000 });
-        this.refreshStatus();
+      this.attendanceApi.startBreak(this.currentAttendance.id).subscribe({
+        next: () => {
+          this.snack.open('Break started', 'OK', { duration: 3000 });
+          this.refreshStatus();
+        },
+        error: (err) => this.snack.open(err.error?.message || 'Could not start break. Please try again.', 'OK', { duration: 5000 })
       });
     }
   }
 
   endBreak() {
     if (this.currentAttendance) {
-      this.attendanceApi.endBreak(this.currentAttendance.id).subscribe(() => {
-        this.snack.open('Break ended. Welcome back!', 'OK', { duration: 3000 });
-        this.refreshStatus();
+      this.attendanceApi.endBreak(this.currentAttendance.id).subscribe({
+        next: () => {
+          this.snack.open('Break ended. Welcome back!', 'OK', { duration: 3000 });
+          this.refreshStatus();
+        },
+        error: (err) => this.snack.open(err.error?.message || 'Could not end break. Please try again.', 'OK', { duration: 5000 })
       });
     }
   }

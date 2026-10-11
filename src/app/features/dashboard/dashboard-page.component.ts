@@ -25,16 +25,10 @@ import { TrendChartComponent } from '../../shared/components/trend-chart.compone
   template: `
     <div class="dashboard-viewport fade-up">
 
-      @if (biometricScanning()) {
-        <div class="biometric-overlay">
-          <div class="scan-frame">
-             <div class="scan-line"></div>
-             <div style="position:absolute; inset:0; display:grid; place-items:center; font-size:60px; opacity:0.2;">
-               <mat-icon style="width:100px; height:100px; font-size:100px;">face</mat-icon>
-             </div>
-          </div>
-          <h2 style="margin-top:2rem; letter-spacing:0.2em; font-weight:900;">AUTHENTICATING BIOMETRIC ID...</h2>
-          <p style="color:var(--txt-muted)">Synchronizing node telemetry with command center.</p>
+      @if (dashboardApi.loadErrors().length) {
+        <div class="ui-card" role="alert" style="border-left:4px solid var(--warning);margin-bottom:1rem;">
+          <strong>Some workforce data is unavailable ({{ dashboardApi.loadErrors().join(', ') }}).</strong>
+          <span style="color:var(--txt-muted);font-size:0.8rem;"> Values marked — are unknown, not zero.</span>
         </div>
       }
 
@@ -45,8 +39,8 @@ import { TrendChartComponent } from '../../shared/components/trend-chart.compone
             <div class="tag-pulse-dot" [class.active]="currentStatus() === 'CLOCKED_IN'" [class.break]="currentStatus() === 'ON_BREAK'"></div>      
             <span>{{ getStatusLabel() }}</span>
           </div>
-          <h2 class="dash-hero-title">Workforce Readiness <span>Verified.</span></h2>
-          <p class="dash-hero-sub">Local operations terminal initialized for sector NY-01. Professional workspace mappings active.</p>
+          <h2 class="dash-hero-title">Good day. <span>Ready to work.</span></h2>
+          <p class="dash-hero-sub">Clock in to start your shift. Your session, breaks, and attendance sync automatically.</p>
           <div class="dash-hero-actions">
             @if (currentStatus() === 'CLOCKED_OUT') {
                <button class="ui-btn ui-btn-primary" (click)="clockIn()">Start Shift</button>
@@ -71,12 +65,26 @@ import { TrendChartComponent } from '../../shared/components/trend-chart.compone
       <!-- MAIN TELEMETRY CHART -->
       <div class="ui-card">
         <div class="ui-card-header">
-          <h3>Workforce Activity Telemetry (Sector NY-01)</h3>
-          <span class="ui-badge ui-badge-success">Live_Telemetry</span>
+          <h3>Today's Workforce Snapshot</h3>
+          <span class="ui-badge ui-badge-success">Live</span>
         </div>
-        <div style="height: 160px; width: 100%;">
-           <app-trend-chart [data]="[10, 15, 8, 20, 18, 25, 22, 30, 25, 35]" color="var(--primary)" />
-        </div>
+        @if (!hasTelemetry()) {
+          @if (dashboardApi.loadErrors().length) {
+            <div style="padding: 2rem; text-align: center; color: var(--txt-muted); font-size: 0.85rem;">Workforce data unavailable — could not load {{ dashboardApi.loadErrors().join(', ') }}.</div>
+          } @else {
+            <div style="padding: 2rem; text-align: center; color: var(--txt-muted); font-size: 0.85rem;">No attendance activity yet today.</div>
+          }
+        } @else {
+          <div style="height: 160px; width: 100%;">
+             <app-trend-chart [data]="telemetry()" color="var(--primary)" />
+          </div>
+          <div style="display:flex; gap:1rem; flex-wrap:wrap; font-size:0.75rem; color:var(--txt-muted); padding: 0 0.25rem;">
+            <span>Present: {{ telemetry()[0] }}</span>
+            <span>Absent: {{ telemetry()[1] }}</span>
+            <span>Late: {{ telemetry()[2] }}</span>
+            <span>On leave: {{ telemetry()[3] }}</span>
+          </div>
+        }
       </div>
 
       <!-- KPI METRICS ROW -->
@@ -128,7 +136,7 @@ import { TrendChartComponent } from '../../shared/components/trend-chart.compone
                 </div>
               }
               @if (socket.events().length === 0) {
-                 <div style="padding: 2rem; text-align: center; color: var(--txt-muted); font-size: 0.8rem;">Awaiting telemetry synchronization...</div>
+                 <div style="padding: 2rem; text-align: center; color: var(--txt-muted); font-size: 0.8rem;">No recent activity. New attendance and scheduling updates will appear here.</div>
               }
            </div>
         </div>
@@ -145,7 +153,7 @@ import { TrendChartComponent } from '../../shared/components/trend-chart.compone
                 </div>
               }
               @if (announcements().length === 0) {
-                 <div style="padding: 2rem; text-align: center; color: var(--txt-muted); font-size: 0.8rem;">No active administrative protocols.</div>
+                 <div style="padding: 2rem; text-align: center; color: var(--txt-muted); font-size: 0.8rem;">No announcements right now.</div>
               }
            </div>
         </div>
@@ -193,6 +201,21 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
   protected readonly biometricScanning = signal(false);
   private timerHandle?: any;
 
+  /** Real-data chart series derived from live DashboardService stats
+   * (Present, Absent, Late, On Leave). No mock values. */
+  protected readonly telemetry = computed(() => {
+    const stats = this.dashboardApi.stats();
+    const num = (label: string): number => {
+      const found = stats.find((s) => s.label === label);
+      const n = Number(found?.value);
+      return Number.isFinite(n) ? n : 0;
+    };
+    return [num('Present Today'), num('Absent Today'), num('Late Arrivals'), num('On Leave')];
+  });
+
+  /** True when there is any activity to chart (template cannot use arrow fns). */
+  protected readonly hasTelemetry = computed(() => this.telemetry().some((v) => v !== 0));
+
   constructor() {
     effect(() => {
       const events = this.socket.events();
@@ -238,9 +261,9 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
 
   protected getStatusLabel(): string {
     switch (this.currentStatus()) {
-      case 'CLOCKED_IN': return 'STATION_ACTIVE';
-      case 'ON_BREAK': return 'RECESS_MODE';
-      default: return 'STATION_STANDBY';
+      case 'CLOCKED_IN': return 'Clocked in';
+      case 'ON_BREAK': return 'On break';
+      default: return 'Clocked out';
     }
   }
 
@@ -276,18 +299,18 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
 
   protected getEventSummary(payload: any): string {
     if (typeof payload === 'string') return payload.replace('_', ' ');
-    
+
     const type = payload.type || payload.action;
     const empId = payload.employeeId;
-    
+
     switch (type) {
-      case 'ATTENDANCE_CLOCKED_IN': return `Node EMP-${empId} initialized station active.`;
-      case 'ATTENDANCE_CLOCKED_OUT': return `Node EMP-${empId} terminated operational session.`;
-      case 'ATTENDANCE_BREAK_START': return `Node EMP-${empId} entered recess mode.`;
-      case 'ATTENDANCE_BREAK_END': return `Node EMP-${empId} resumed station activity.`;
-      case 'ATTENDANCE_MANUAL_NODE': return `Administrative node injection successful for EMP-${empId}.`;
-      case 'SHIFT_ASSIGNED': return `Roster deployment node updated for EMP-${empId}.`;
-      default: return payload.desc || 'Telemetry synchronization successful.';
+      case 'ATTENDANCE_CLOCKED_IN': return `Employee ${empId} clocked in.`;
+      case 'ATTENDANCE_CLOCKED_OUT': return `Employee ${empId} clocked out.`;
+      case 'ATTENDANCE_BREAK_START': return `Employee ${empId} started a break.`;
+      case 'ATTENDANCE_BREAK_END': return `Employee ${empId} ended a break.`;
+      case 'ATTENDANCE_MANUAL_NODE': return `Manual attendance entry recorded for employee ${empId}.`;
+      case 'SHIFT_ASSIGNED': return `Shift assigned for employee ${empId}.`;
+      default: return payload.desc || 'Update received.';
     }
   }
 
@@ -295,28 +318,19 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
     const user = this.auth.user();
     if (!user) return;
 
-    // 1. START BIOMETRIC SIMULATION (WOW FACTOR)
-    this.biometricScanning.set(true);
-    
-    setTimeout(() => {
-        // 2. AFTER 3s OF SCANNING, CAPTURE GPS
-        if (navigator.geolocation) {
-          navigator.geolocation.getCurrentPosition(
-            (pos) => {
-              this.biometricScanning.set(false);
-              this.executeClockIn(user.id, pos.coords.latitude, pos.coords.longitude);
-            },
-            () => {
-              this.biometricScanning.set(false);
-              this.executeClockIn(user.id, 40.7128, -74.0060);
-            },
-            { timeout: 5000 }
-          );
-        } else {
-          this.biometricScanning.set(false);
-          this.executeClockIn(user.id);
-        }
-    }, 3200);
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          this.executeClockIn(user.id, pos.coords.latitude, pos.coords.longitude);
+        },
+        () => {
+          this.executeClockIn(user.id, 40.7128, -74.0060);
+        },
+        { timeout: 5000 }
+      );
+    } else {
+      this.executeClockIn(user.id);
+    }
   }
 
   private executeClockIn(userId: number, lat?: number, lng?: number) {
@@ -324,11 +338,11 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
       next: (res) => {
         this.currentAttendance = res;
         this.currentStatus.set('CLOCKED_IN'); // INSTANT UI UPDATE
-        this.snack.open('STATION_ACTIVE: Operational session initialized.', 'OK', { duration: 3000 });
+        this.snack.open('Clocked in. Have a good shift.', 'OK', { duration: 3000 });
         this.loadDashboardData();
       },
       error: (err) => {
-        this.snack.open('SYNC_FAILURE: ' + (err.error?.message || 'Unauthorized node entry'), 'ERROR');
+        this.snack.open('Clock-in failed: ' + (err.error?.message || 'Please try again.'), 'Dismiss');
         this.isLoading.set(false);
       }
     });
@@ -336,18 +350,18 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
 
   clockOut() {
     if (!this.currentAttendance) return;
-    
-    if (confirm('TERMINATION_CONFIRM: End operational session?')) {
+
+    if (confirm('End your current shift?')) {
       this.isLoading.set(true);
       this.attendanceApi.clockOut(this.currentAttendance.id).subscribe({
         next: () => {
           this.currentStatus.set('CLOCKED_OUT'); // INSTANT UI UPDATE
           this.currentAttendance = null;
-          this.snack.open('STATION_STANDBY: Session terminated.', 'OK', { duration: 3000 });
+          this.snack.open('Clocked out.', 'OK', { duration: 3000 });
           this.loadDashboardData();
         },
         error: () => {
-          this.snack.open('TERMINATION_FAILURE', 'ERROR');
+          this.snack.open('Clock-out failed. Please try again.', 'Dismiss');
           this.isLoading.set(false);
         }
       });
@@ -366,11 +380,11 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
       next: (res) => {
         this.currentAttendance = res;
         this.currentStatus.set(isCurrentlyOnBreak ? 'CLOCKED_IN' : 'ON_BREAK'); // INSTANT UI UPDATE
-        this.snack.open(isCurrentlyOnBreak ? 'STATION_RESUMED' : 'RECESS_INITIALIZED', 'OK');
+        this.snack.open(isCurrentlyOnBreak ? 'Break ended.' : 'Break started.', 'OK');
         this.loadDashboardData();
       },
       error: () => {
-        this.snack.open('BREAK_PROTOCOL_FAILED', 'ERROR');
+        this.snack.open('Break update failed. Please try again.', 'Dismiss');
         this.isLoading.set(false);
       }
     });

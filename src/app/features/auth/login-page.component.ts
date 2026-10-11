@@ -9,6 +9,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { CommonModule } from '@angular/common';
 import { AuthService } from '../../core/services/auth.service';
+import { backendErrorMessage } from '../../shared/utils/password-policy';
 
 @Component({
   selector: 'app-login-page',
@@ -76,8 +77,18 @@ import { AuthService } from '../../core/services/auth.service';
               </div>
             </div>
 
+            @if (mfaToken()) {
+              <div class="f-group">
+                <label>MFA Code</label>
+                <div class="input-icon-wrap">
+                  <mat-icon class="material-icons">key</mat-icon>
+                  <input type="text" class="f-input" formControlName="mfaCode" placeholder="6-digit code">
+                </div>
+              </div>
+            }
+
             <button class="btn-submit" type="submit" [disabled]="form.invalid || loading()">
-              <span>{{ loading() ? 'Authenticating...' : 'Authenticate and Enter' }}</span>
+              <span>{{ loading() ? 'Authenticating...' : mfaToken() ? 'Verify MFA and Enter' : 'Authenticate and Enter' }}</span>
               <mat-icon style="margin-left: auto;">arrow_forward</mat-icon>
             </button>
           </form>
@@ -101,26 +112,60 @@ export class LoginPageComponent {
   protected readonly loading = signal(false);
   protected readonly errorMessage = signal<string | null>(null);
 
+  protected readonly mfaToken = signal<string | null>(null);
+
+  // Professional: login must NOT enforce password policy (BE LoginRequest is @NotBlank only).
+  // Policy applies to register/reset/setup/change only.
   protected readonly form = this.fb.group({
     email: ['', [Validators.required, Validators.email]],
-    password: ['', [Validators.required, Validators.minLength(4)]]
+    password: ['', [Validators.required]],
+    mfaCode: ['']
   });
 
   protected submit(): void {
     if (this.form.invalid) return;
 
-    const { email, password } = this.form.getRawValue();
+    const { email, password, mfaCode } = this.form.getRawValue();
+    // Step 2 of MFA: verify code against BE mfaToken from step 1.
+    if (this.mfaToken() && (mfaCode ?? '').trim()) {
+      this.loading.set(true);
+      this.auth.verifyMfa(this.mfaToken()!, (mfaCode ?? '').trim()).subscribe({
+        next: () => {
+          this.loading.set(false);
+          this.mfaToken.set(null);
+          void this.router.navigateByUrl('/dashboard');
+        },
+        error: () => {
+          this.loading.set(false);
+          this.errorMessage.set('Invalid MFA code. Retry.');
+        }
+      });
+      return;
+    }
+
     this.loading.set(true);
     this.errorMessage.set(null);
 
     this.auth.login(email ?? '', password ?? '').subscribe({
-      next: () => {
+      next: (res: any) => {
         this.loading.set(false);
+        // BE MFA challenge: {mfaRequired:true, mfaToken} — stay on page, ask for code.
+        if (res?.mfaRequired) {
+          this.mfaToken.set(res.mfaToken);
+          this.errorMessage.set('MFA required — enter your authenticator code.');
+          return;
+        }
         void this.router.navigateByUrl('/dashboard');
       },
-      error: () => {
+      error: (err) => {
         this.loading.set(false);
-        this.errorMessage.set('Identity verification failed. Synchronize credentials and retry.');
+        if (err?.status === 429) {
+          this.errorMessage.set('Too many attempts. Wait a minute and retry.');
+        } else if (err?.status === 401) {
+          this.errorMessage.set(backendErrorMessage(err, 'Invalid username or password.'));
+        } else {
+          this.errorMessage.set(backendErrorMessage(err, 'Sign-in failed. Retry.'));
+        }
       }
     });
   }

@@ -3,6 +3,7 @@ import { ApiService } from './api.service';
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { environment } from '../../../environments/environment';
+import { Page, PageQuery, toPageParams } from '../../shared/models/ui.models';
 
 export interface Employee {
   id: number;
@@ -78,6 +79,11 @@ export class EmployeeDataService {
     );
   }
 
+  /** Server-paged directory query for org-scale tables (fail loudly — no fallback). */
+  getEmployeesPaged(query: PageQuery = { page: 0, size: 25, sort: 'lastName,asc' }): Observable<Page<Employee>> {
+    return this.api.get<Page<Employee>>(`/api/employees?${toPageParams(query)}`, undefined, this.baseUrl);
+  }
+
   getEmployeeCount(): Observable<number> {
     return this.api.get<number>('/api/employees/count', undefined, this.baseUrl);
   }
@@ -102,6 +108,29 @@ export class EmployeeDataService {
 
   getEmployeesByDepartment(deptId: number): Observable<Employee[]> {
     return this.api.get<Employee[]>(`/api/employees/department/${deptId}`, [], this.baseUrl);
+  }
+
+  getEmployeesByLocation(locationId: number): Observable<Employee[]> {
+    return this.api.get<Employee[]>(`/api/employees/location/${locationId}`, [], this.baseUrl);
+  }
+
+  /** BE: GET /search?email= — single employee lookup (not free text). */
+  searchByEmail(email: string): Observable<Employee> {
+    return this.api.get<Employee>(
+      `/api/employees/search?email=${encodeURIComponent(email)}`,
+      undefined,
+      this.baseUrl
+    );
+  }
+
+  /** BE: PATCH /{id}/status with JSON body {status, terminationDate?} (USER_WRITE). */
+  updateStatus(id: number, status: string, terminationDate?: string | null): Observable<Employee> {
+    return this.api.patch<Employee>(
+      `/api/employees/${id}/status`,
+      { status, terminationDate: terminationDate ?? null },
+      undefined,
+      this.baseUrl
+    );
   }
 
   // --- State Transitions ---
@@ -160,5 +189,40 @@ export class EmployeeDataService {
 
   addDependent(empId: number, dependent: Dependent): Observable<Dependent> {
     return this.api.post<Dependent>(`/api/employees/${empId}/profiles/dependents`, dependent, undefined, this.baseUrl);
+  }
+
+  deleteAddress(empId: number, addressId: number): Observable<void> {
+    return this.api.delete<void>(
+      `/api/employees/${empId}/profiles/addresses/${addressId}`,
+      undefined,
+      this.baseUrl
+    );
+  }
+
+  deleteEmergencyContact(empId: number, contactId: number): Observable<void> {
+    return this.api.delete<void>(
+      `/api/employees/${empId}/profiles/emergency-contacts/${contactId}`,
+      undefined,
+      this.baseUrl
+    );
+  }
+
+  deleteDependent(empId: number, dependentId: number): Observable<void> {
+    return this.api.delete<void>(
+      `/api/employees/${empId}/profiles/dependents/${dependentId}`,
+      undefined,
+      this.baseUrl
+    );
+  }
+
+  /** BE: POST /{employeeId}/documents (multipart file) → EmployeeDocument. */
+  uploadEmployeeDocument(empId: number, file: File): Observable<any> {
+    const formData = new FormData();
+    formData.append('file', file);
+    return this.api.post<any>(`/api/employees/${empId}/documents`, formData, undefined, this.baseUrl);
+  }
+
+  downloadEmployeeDocument(empId: number, documentId: number): Observable<Blob> {
+    return this.api.getBlob(`/api/employees/${empId}/documents/${documentId}`, this.baseUrl);
   }
 }

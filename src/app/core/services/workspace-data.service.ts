@@ -67,8 +67,8 @@ export class WorkspaceDataService {
 
       case 'leaves':
         return combineLatest([
-          this.api.get<any[]>('/api/leaves/status/PENDING', []),
-          this.api.get<any[]>('/api/leaves/status/APPROVED', [])
+          this.api.get<any[]>('/api/leaves/company?status=PENDING', []),
+          this.api.get<any[]>('/api/leaves/company?status=APPROVED', [])
         ]).pipe(
           map(([pending, approved]) => {
             const base = WORKSPACE_CONFIGS.leaves;
@@ -93,8 +93,8 @@ export class WorkspaceDataService {
 
       case 'payroll':
         return combineLatest([
-          this.api.get<any[]>('/api/payroll/records/1', []),
-          this.api.get<any[]>('/api/payroll/pending', [])
+          this.api.get<any[]>('/api/payroll/me/records', []),
+          this.api.get<any[]>('/api/payroll/company/pending', [])
         ]).pipe(
           map(([records, pending]) => {
             const base = WORKSPACE_CONFIGS.payroll;
@@ -143,7 +143,7 @@ export class WorkspaceDataService {
         );
 
       case 'performance':
-        return this.api.get<any[]>('/api/performance-reviews', []).pipe(
+        return this.api.get<any[]>('/api/performance-reviews/me', []).pipe(
           map((reviews) => {
             const base = WORKSPACE_CONFIGS.performance;
             const rows = reviews.slice(0, 12).map((review) => ({
@@ -166,7 +166,7 @@ export class WorkspaceDataService {
         );
 
       case 'compliance':
-        return this.api.get<any[]>('/api/audit-trails/all', []).pipe(
+        return this.api.get<any[]>('/api/audit-trails', []).pipe(
           map((audits) => {
             const base = WORKSPACE_CONFIGS.compliance;
             const rows = audits.slice(0, 12).map((audit) => ({
@@ -189,14 +189,14 @@ export class WorkspaceDataService {
         );
 
       case 'documents':
-        return this.api.get<any[]>('/api/documents', []).pipe(
+        return this.api.get<any[]>('/api/documents/me', []).pipe(
           map((documents) => {
             const base = WORKSPACE_CONFIGS.documents;
             const rows = documents.slice(0, 12).map((document) => ({
-              document: document.fileName ?? document.documentName ?? 'Document',
-              owner: document.employeeId ? `Employee ${document.employeeId}` : (document.createdBy ?? 'System'),
-              updated: document.updatedAt ?? document.createdAt ?? new Date().toISOString(),
-              status: document.status ?? 'PUBLISHED'
+              document: document.fileName ?? 'Document',
+              owner: document.employeeId ? `Employee ${document.employeeId}` : 'System',
+              updated: document.uploadDate ?? new Date().toISOString(),
+              status: document.category ?? 'PUBLISHED'
             }));
 
             return {
@@ -214,15 +214,15 @@ export class WorkspaceDataService {
       case 'analytics':
         return combineLatest([
           this.api.get<any>('/api/analytics/dashboard/admin', null),
-          this.api.get<any[]>('/api/reports', [])
+          this.api.get<any[]>('/api/analytics/reports', [])
         ]).pipe(
           map(([dashboard, reports]) => {
             const base = WORKSPACE_CONFIGS.analytics;
             const rows = reports.slice(0, 12).map((report) => ({
-              metric: report.reportName ?? report.name ?? 'Report',
-              current: report.status ?? 'READY',
-              previous: report.format ?? 'PDF',
-              status: report.frequency ?? 'TRACKED'
+              metric: report.reportName ?? 'Report',
+              current: report.generatedBy ?? 'system',
+              previous: report.generatedDate ?? '',
+              status: 'READY'
             }));
 
             return {
@@ -238,22 +238,23 @@ export class WorkspaceDataService {
         );
 
       case 'organization':
-        return this.api.get<any[]>('/api/organization/companies', []).pipe(
-          map((companies) => {
+        // BE has no companies list route — render departments (real array).
+        return this.api.get<any[]>('/api/organization/departments', []).pipe(
+          map((departments) => {
             const base = WORKSPACE_CONFIGS.organization;
-            const rows = companies.slice(0, 12).map((company) => ({
-              entity: company.name ?? 'Company',
-              type: 'Company',
-              owner: company.contactEmail ?? 'Corporate Ops',
-              status: company.status ?? 'ACTIVE'
+            const rows = departments.slice(0, 12).map((dept) => ({
+              entity: dept.name ?? 'Department',
+              type: 'Department',
+              owner: 'Corporate Ops',
+              status: 'ACTIVE'
             }));
 
             return {
               ...base,
               stats: [
-                { label: 'Companies', value: String(companies.length), delta: 'Organization API', tone: 'default' },
-                { label: 'Active', value: String(rows.filter((row) => row.status === 'ACTIVE').length), delta: 'Live entities', tone: 'good' },
-                { label: 'Needs Review', value: String(rows.filter((row) => row.status !== 'ACTIVE').length), delta: 'Org changes', tone: 'accent' }
+                { label: 'Departments', value: String(departments.length), delta: 'Organization API', tone: 'default' },
+                { label: 'Active', value: String(rows.length), delta: 'Live entities', tone: 'good' },
+                { label: 'Needs Review', value: '0', delta: 'Org changes', tone: 'accent' }
               ],
               rows: rows.length ? rows : base.rows
             };

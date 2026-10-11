@@ -13,6 +13,7 @@ export class ApiService {
     return this.http.get<T>(this.buildUrl(path, baseUrl)).pipe(
       catchError((error) => {
         if (fallback !== undefined) {
+          console.warn('[api] GET failed, using fallback', path, error?.status ?? error);
           return of(fallback);
         }
         return throwError(() => error);
@@ -25,6 +26,7 @@ export class ApiService {
     return this.http.post<T>(this.buildUrl(path, baseUrl), bodyWithTenant).pipe(
       catchError((error) => {
         if (fallback !== undefined) {
+          console.warn('[api] POST failed, using fallback', path, error?.status ?? error);
           return of(fallback);
         }
         return throwError(() => error);
@@ -37,6 +39,7 @@ export class ApiService {
     return this.http.put<T>(this.buildUrl(path, baseUrl), bodyWithTenant).pipe(
       catchError((error) => {
         if (fallback !== undefined) {
+          console.warn('[api] PUT failed, using fallback', path, error?.status ?? error);
           return of(fallback);
         }
         return throwError(() => error);
@@ -49,6 +52,7 @@ export class ApiService {
     return this.http.patch<T>(this.buildUrl(path, baseUrl), bodyWithTenant).pipe(
       catchError((error) => {
         if (fallback !== undefined) {
+          console.warn('[api] PATCH failed, using fallback', path, error?.status ?? error);
           return of(fallback);
         }
         return throwError(() => error);
@@ -60,6 +64,7 @@ export class ApiService {
     return this.http.delete<T>(this.buildUrl(path, baseUrl)).pipe(
       catchError((error) => {
         if (fallback !== undefined) {
+          console.warn('[api] DELETE failed, using fallback', path, error?.status ?? error);
           return of(fallback);
         }
         return throwError(() => error);

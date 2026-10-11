@@ -11,25 +11,34 @@ import { FormsModule } from '@angular/forms';
   imports: [CommonModule, MatIconModule, FormsModule],
   template: `
     <div class="search-overlay" [class.open]="search.isOpen()" (click)="search.close()">
-      <div class="search-modal" (click)="$event.stopPropagation()">
+      <div class="search-modal" role="dialog" aria-modal="true" aria-label="Global search" (click)="$event.stopPropagation()">
         <div class="search-input-row">
-          <mat-icon>search</mat-icon>
-          <input type="text" placeholder="Search employees, pages, actions..." 
-                 [(ngModel)]="query" (input)="handleSearch()" 
-                 (keydown.escape)="search.close()" (keydown.enter)="handleEnter()" autofocus>
+          <mat-icon aria-hidden="true">search</mat-icon>
+          <input type="text" placeholder="Search employees, pages, actions..." aria-label="Search employees, pages, actions"
+                 role="combobox" aria-expanded="true" aria-controls="global-search-listbox"
+                 [attr.aria-activedescendant]="activeDescendantId()"
+                 [(ngModel)]="query" (input)="handleSearch()"
+                 (keydown.escape)="search.close()" (keydown.enter)="handleEnter()"
+                 (keydown.arrowdown)="moveActive(1); $event.preventDefault()"
+                 (keydown.arrowup)="moveActive(-1); $event.preventDefault()" autofocus>
           <span class="search-kbd" (click)="search.close()">ESC</span>
         </div>
 
-        <div class="search-results custom-scrollbar">
+        <div class="search-results custom-scrollbar" role="listbox" id="global-search-listbox" aria-label="Search results">
            @if (query().length > 0 && results().length === 0) {
               <div style="padding: 3rem; text-align: center; color: var(--txt-muted); font-size: 0.9rem;">No matches found for "{{ query() }}"</div>
            } @else {
               @for (section of sections; track section.label) {
                 @if (getFilteredResults(section.label).length > 0) {
-                  <div class="search-section-label">{{ section.label }}</div>
+                  <div class="search-section-label" role="presentation">{{ section.label }}</div>
                   @for (item of getFilteredResults(section.label); track item.route) {
-                    <div class="search-result-item" (click)="navigate(item.route)">
-                       <mat-icon>{{ item.icon }}</mat-icon>
+                    <div class="search-result-item" role="option"
+                         [id]="'gs-option-' + section.label + '-' + $index"
+                         [attr.aria-selected]="isActive(section.label, $index)"
+                         [class.active-option]="isActive(section.label, $index)"
+                         (click)="navigate(item.route)"
+                         (keydown.enter)="navigate(item.route)" tabindex="0">
+                       <mat-icon aria-hidden="true">{{ item.icon }}</mat-icon>
                        <span class="search-result-label">{{ item.name }}</span>
                        <span class="search-result-sub">{{ item.sub }}</span>
                     </div>
@@ -49,6 +58,7 @@ import { FormsModule } from '@angular/forms';
   `,
   styles: [`
     :host { display: block; }
+    .search-result-item.active-option { background: var(--primary-soft); outline: 2px solid var(--primary); outline-offset: -2px; }
   `]
 })
 export class GlobalSearchComponent {
@@ -57,6 +67,8 @@ export class GlobalSearchComponent {
   
   query = signal('');
   results = signal<any[]>([]);
+  /** Flat keyboard cursor over the rendered options (section order, then row order). */
+  private readonly activeIndex = signal(0);
 
   sections = [
     { label: 'Navigation' },
@@ -89,9 +101,48 @@ export class GlobalSearchComponent {
     const q = this.query().toLowerCase();
     if (!q) {
       this.results.set([]);
+      this.activeIndex.set(0);
       return;
     }
     this.results.set(this.allItems.filter(i => i.name.toLowerCase().includes(q) || i.sub.toLowerCase().includes(q)));
+    this.activeIndex.set(0);
+  }
+
+  /** Render-order options (section order, then row order) for arrow-key navigation. */
+  private flatOptions(): any[] {
+    const out: any[] = [];
+    for (const section of this.sections) {
+      out.push(...this.getFilteredResults(section.label));
+    }
+    return out;
+  }
+
+  private flatOptionKeys(): string[] {
+    const keys: string[] = [];
+    for (const section of this.sections) {
+      const rows = this.getFilteredResults(section.label);
+      rows.forEach((_, i) => keys.push(`${section.label}:${i}`));
+    }
+    return keys;
+  }
+
+  protected moveActive(delta: number): void {
+    const options = this.flatOptions();
+    if (!options.length) return;
+    const next = (this.activeIndex() + delta + options.length) % options.length;
+    this.activeIndex.set(next);
+    const key = this.flatOptionKeys()[next];
+    if (key) document.getElementById(`gs-option-${key.replace(':', '-')}`)?.scrollIntoView({ block: 'nearest' });
+  }
+
+  protected isActive(section: string, index: number): boolean {
+    const keys = this.flatOptionKeys();
+    return keys[this.activeIndex()] === `${section}:${index}`;
+  }
+
+  protected activeDescendantId(): string | null {
+    const key = this.flatOptionKeys()[this.activeIndex()];
+    return key ? `gs-option-${key.replace(':', '-')}` : null;
   }
 
   getFilteredResults(section: string) {
@@ -102,8 +153,8 @@ export class GlobalSearchComponent {
   }
 
   handleEnter() {
-    const topResult = this.results()[0];
-    if (topResult) this.navigate(topResult.route);
+    const current = this.flatOptions()[this.activeIndex()];
+    if (current) this.navigate(current.route);
   }
 
   navigate(route: string) {

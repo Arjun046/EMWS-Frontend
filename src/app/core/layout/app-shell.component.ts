@@ -38,6 +38,7 @@ interface NavigationItemExtended extends NavigationItem {
   ],
   template: `
     <div class="app-viewport">
+      <a class="skip-link" href="#main-content">Skip to main content</a>
       <div class="main-shell">
         <!-- Sidebar Backdrop for Mobile -->
         <div class="sidebar-backdrop" [class.active]="isSidebarOpen()" (click)="isSidebarOpen.set(false)"></div>
@@ -109,7 +110,7 @@ interface NavigationItemExtended extends NavigationItem {
                 <mat-icon>search</mat-icon>
               </button>
 
-              <button class="header-action-btn" [matMenuTriggerFor]="notifMenu" title="Notifications">
+              <button class="header-action-btn" [matMenuTriggerFor]="notifMenu" title="Notifications" aria-label="Notifications">
                 <mat-icon [matBadge]="notifications.unreadCount() || null" matBadgeColor="primary">notifications_none</mat-icon>
                 @if (notifications.unreadCount() > 0) {
                   <div class="btn-notif-ping"></div>
@@ -164,16 +165,16 @@ interface NavigationItemExtended extends NavigationItem {
                 </div>
               </mat-menu>
               
-              <button class="header-action-btn" [routerLink]="'/settings'" title="Settings">
+              <button class="header-action-btn" [routerLink]="'/settings'" title="Settings" aria-label="Settings">
                  <mat-icon>settings</mat-icon>
               </button>
             </div>
           </header>
 
           <div class="page-scroll-container custom-scrollbar">
-            <div class="fade-up" style="display: flex; flex-direction: column; flex: 1; min-height: 0;">
+            <main id="main-content" class="fade-up" style="display: flex; flex-direction: column; flex: 1; min-height: 0;" tabindex="-1">
               <router-outlet />
-            </div>
+            </main>
           </div>
         </div>
       </div>
@@ -184,7 +185,7 @@ interface NavigationItemExtended extends NavigationItem {
     <app-global-search />
 
     <!-- TOAST NOTIFICATIONS -->
-    <div class="toast-notifications-container">
+    <div class="toast-notifications-container" aria-live="polite" aria-atomic="false">
        @for (toast of toastService.toasts(); track toast.id) {
          <div class="toast-card" [class]="toast.severity + '-toast'">
             <mat-icon style="font-size: 18px; width:18px; height:18px;">{{ toast.icon }}</mat-icon>
@@ -429,18 +430,32 @@ export class AppShellComponent implements OnInit, OnDestroy {
   private timerHandle?: any;
   protected readonly isSidebarOpen = signal(false);
 
+  // P0 fix: nav scopes mirror app.routes.ts guards exactly so a route being
+  // reachable always means its nav item is visible. Admins bypass via
+  // AuthService.hasAnyScope() — these lists govern manager/employee scoping.
   private readonly navItems: NavigationItemExtended[] = [
     { label: 'Dashboard', icon: 'dashboard', route: '/dashboard', section: 'Workspace' },
-    { label: 'Messages', icon: 'chat', route: '/communication', section: 'Workspace', scopes: ['CHAT_DM_READ', 'CHAT_CHANNEL_READ', 'CHAT_DM_WRITE', 'CHAT_CHANNEL_CREATE'] },
+    { label: 'Command Center', icon: 'monitor_heart', route: '/ops', section: 'Workspace', scopes: ['DASHBOARD_OPS_READ', 'ATTENDANCE_ORG_READ', 'LEAVE_ORG_APPROVE'] },
+    { label: 'Messages', icon: 'chat', route: '/communication', section: 'Workspace', scopes: ['CHAT_DM_WRITE', 'CHAT_CHANNEL_CREATE', 'CHAT_ANALYTICS_READ'] },
 
-    { label: 'Employees', icon: 'people', route: '/employees', section: 'Workforce', scopes: ['USER_ORG_READ', 'USER_TEAM_READ'] },
-    { label: 'Scheduling', icon: 'calendar_today', route: '/scheduling', section: 'Workforce', scopes: ['SCHEDULE_ORG_READ', 'SCHEDULE_TEAM_READ'] },
+    { label: 'Employees', icon: 'people', route: '/employees', section: 'Workforce', scopes: ['USER_SELF_READ', 'USER_TEAM_READ', 'USER_ORG_READ'] },
+    { label: 'Scheduling', icon: 'calendar_today', route: '/scheduling', section: 'Workforce', scopes: ['SCHEDULE_SELF_READ', 'SCHEDULE_TEAM_READ', 'SCHEDULE_ORG_READ'] },
+    { label: 'Marketplace', icon: 'storefront', route: '/marketplace', section: 'Workforce', scopes: ['SCHEDULE_SELF_READ', 'SCHEDULE_TEAM_READ', 'SCHEDULE_ORG_READ'] },
     { label: 'Attendance', icon: 'timer', route: '/attendance', section: 'Workforce', scopes: ['ATTENDANCE_SELF_READ', 'ATTENDANCE_TEAM_READ', 'ATTENDANCE_ORG_READ'] },
-    { label: 'Leaves', icon: 'event_busy', route: '/leaves', section: 'Workforce', scopes: ['LEAVE_SELF_READ', 'LEAVE_TEAM_READ', 'LEAVE_ORG_READ'] },
+    { label: 'Leaves', icon: 'event_busy', route: '/leaves', section: 'Workforce', scopes: ['LEAVE_SELF_READ', 'LEAVE_TEAM_APPROVE', 'LEAVE_ORG_APPROVE'] },
+    { label: 'Team Calendar', icon: 'groups', route: '/team-calendar', section: 'Workforce', scopes: ['SCHEDULE_TEAM_READ', 'SCHEDULE_ORG_READ', 'LEAVE_TEAM_APPROVE', 'LEAVE_ORG_APPROVE'] },
+    { label: 'Tasks', icon: 'task_alt', route: '/tasks', section: 'Workforce', scopes: ['TASKS_SELF_WRITE', 'TASKS_TEAM_WRITE', 'TASKS_ORG_WRITE'] },
 
-    { label: 'Payroll Hub', icon: 'payments', route: '/payroll', section: 'Administration', scopes: ['PAYROLL_ORG_READ'] },
-    { label: 'Compliance Ledger', icon: 'gavel', route: '/compliance', section: 'Administration', scopes: ['AUDIT_ORG_READ'] },
-    { label: 'Permissions', icon: 'admin_panel_settings', route: '/roles', section: 'Administration', scopes: ['ROLE_ORG_READ'] },
+    { label: 'Payroll Hub', icon: 'payments', route: '/payroll', section: 'Administration', scopes: ['PAYROLL_SELF_READ', 'PAYROLL_TEAM_READ', 'PAYROLL_ORG_READ', 'PAYROLL_RUN'] },
+    { label: 'Compliance Ledger', icon: 'gavel', route: '/compliance', section: 'Administration', scopes: ['AUDIT_SELF_READ', 'AUDIT_TEAM_READ', 'AUDIT_ORG_READ', 'COMPLIANCE_RULES_WRITE'] },
+    { label: 'Permissions', icon: 'admin_panel_settings', route: '/roles', section: 'Administration', scopes: ['ROLE_SELF_READ', 'ROLE_ORG_READ', 'ROLE_CREATE', 'ROLE_WRITE', 'ROLE_ASSIGN'] },
+    { label: 'Organization', icon: 'apartment', route: '/organization', section: 'Administration', scopes: ['ORG_READ', 'ORG_DEPT_WRITE', 'ORG_LOCATION_WRITE'] },
+    { label: 'Documents', icon: 'folder_shared', route: '/documents', section: 'Administration', scopes: ['DOCS_SELF_READ', 'DOCS_TEAM_READ', 'DOCS_WRITE'] },
+    { label: 'Integrations', icon: 'hub', route: '/integrations', section: 'Administration', scopes: ['ORG_READ', 'ORG_DEPT_WRITE', 'ORG_LOCATION_WRITE'] },
+
+    { label: 'Analytics', icon: 'insights', route: '/analytics', section: 'Insights', scopes: ['ANALYTICS_SELF_READ', 'ANALYTICS_TEAM_READ', 'ANALYTICS_ORG_READ'] },
+    { label: 'Reports', icon: 'summarize', route: '/reports', section: 'Insights', scopes: ['ANALYTICS_SELF_READ', 'ANALYTICS_TEAM_READ', 'ANALYTICS_ORG_READ', 'ANALYTICS_EXPORT'] },
+    { label: 'Notifications', icon: 'notifications', route: '/notifications', section: 'Insights', scopes: ['DASHBOARD_SELF_READ', 'DASHBOARD_OPS_READ'] },
 
     { label: 'My Profile', icon: 'account_circle', route: '/profile', section: 'Account' },
     { label: 'Settings', icon: 'settings', route: '/settings', section: 'Account' }
@@ -452,9 +467,11 @@ export class AppShellComponent implements OnInit, OnDestroy {
   });
 
   protected readonly currentRouteLabel = computed(() => {
-    const url = this.router.url;
-    const item = this.navItems.find(i => url.includes(i.route));
-    return item?.label || 'Dashboard';
+    const url = this.router.url.split('?')[0].split('#')[0];
+    const match = this.navItems
+      .filter((i) => url === i.route || url.startsWith(i.route + '/'))
+      .sort((a, b) => b.route.length - a.route.length)[0];
+    return match?.label || 'Dashboard';
   });
 
   ngOnInit(): void {

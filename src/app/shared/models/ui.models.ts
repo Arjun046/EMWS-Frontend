@@ -19,6 +19,11 @@ export interface AuthResponse {
   username?: string;
   id?: number;
   companyId?: number;
+  // BE MFA challenge: POST /api/auth/login returns this instead of a JWT
+  // when user.isMfaEnabled — {mfaRequired:true, mfaToken, userId, companyId}
+  mfaRequired?: boolean;
+  mfaToken?: string;
+  userId?: number;
   capabilities?: {
     permissions?: string[];
     scope?: Record<string, string>;
@@ -46,6 +51,49 @@ export interface TableColumn {
 export interface FilterOption {
   label: string;
   value: string;
+}
+
+/** Spring Data Page payload (employee/attendance/leave list endpoints). */
+export interface Page<T> {
+  content: T[];
+  totalElements: number;
+  totalPages: number;
+  number: number;
+  size: number;
+  first: boolean;
+  last: boolean;
+}
+
+export function isPage<T>(value: unknown): value is Page<T> {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    Array.isArray((value as Page<T>).content) &&
+    typeof (value as Page<T>).totalElements === 'number'
+  );
+}
+
+export const EMPTY_PAGE: Page<never> = {
+  content: [],
+  totalElements: 0,
+  totalPages: 0,
+  number: 0,
+  size: 0,
+  first: true,
+  last: true
+};
+
+/** Server-side page request. `sort` uses Spring syntax, e.g. "clockIn,desc". */
+export interface PageQuery {
+  page: number;
+  size: number;
+  sort?: string;
+}
+
+export function toPageParams(query: PageQuery): string {
+  const params = [`page=${query.page}`, `size=${query.size}`];
+  if (query.sort) params.push(`sort=${encodeURIComponent(query.sort)}`);
+  return params.join('&');
 }
 
 export interface StatCard {

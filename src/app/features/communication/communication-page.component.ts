@@ -61,7 +61,7 @@ import { VoiceRecorderService } from '../../core/services/voice-recorder.service
           <div class="sidebar-header" *ngIf="!directSyncActive() && !groupSyncActive() && !statusSyncActive() && !groupMembersActive()">
             <div style="display: flex; align-items: center; gap: 0.5rem;">
               <strong>{{ activeTab() | uppercase }}</strong>
-              <div class="socket-status-dot" [class]="socketStatus()" [title]="'Terminal Status: ' + socketStatus()"></div>
+              <div class="socket-status-dot" [class]="socketStatus()" [title]="'Connection: ' + socketStatus()"></div>
             </div>
             <div style="display:flex; gap:0.25rem; align-items: center;">
                <button class="header-action-btn" [matMenuTriggerFor]="sidebarMenu"><mat-icon>add_box</mat-icon></button>
@@ -71,10 +71,10 @@ import { VoiceRecorderService } from '../../core/services/voice-recorder.service
 
           <mat-menu #sidebarMenu="matMenu">
             <button mat-menu-item (click)="showNewDirectChat()">
-              <mat-icon>chat_bubble</mat-icon><span>New Direct Thread</span>
+              <mat-icon>chat_bubble</mat-icon><span>New Direct Message</span>
             </button>
             <button mat-menu-item (click)="showNewGroup()">
-              <mat-icon>hub</mat-icon><span>New Operational Group</span>
+              <mat-icon>hub</mat-icon><span>New Group</span>
             </button>
           </mat-menu>
 
@@ -83,7 +83,7 @@ import { VoiceRecorderService } from '../../core/services/voice-recorder.service
             <div class="overlay-header">
               <div style="display:flex; align-items:center; gap:0.5rem;">
                 <mat-icon style="color:var(--primary);">chat_bubble</mat-icon>
-                <strong>New Direct Sync</strong>
+                <strong>New Direct Message</strong>
               </div>
               <button class="header-action-btn" (click)="directSyncActive.set(false)"><mat-icon>close</mat-icon></button>
             </div>
@@ -101,7 +101,7 @@ import { VoiceRecorderService } from '../../core/services/voice-recorder.service
                   </div>
                   <div class="contact-body">
                     <strong>{{ c.name }}</strong>
-                    <span>{{ c.status || 'Active Operator' }}</span>
+                    <span>{{ c.status || 'Available' }}</span>
                   </div>
                 </div>
               }
@@ -113,7 +113,7 @@ import { VoiceRecorderService } from '../../core/services/voice-recorder.service
             <div class="overlay-header">
               <div style="display:flex; align-items:center; gap:0.5rem;">
                 <mat-icon style="color:var(--accent);">hub</mat-icon>
-                <strong>New Operational Group</strong>
+                <strong>New Group</strong>
               </div>
               <button class="header-action-btn" (click)="groupSyncActive.set(false)"><mat-icon>close</mat-icon></button>
             </div>
@@ -239,7 +239,7 @@ import { VoiceRecorderService } from '../../core/services/voice-recorder.service
             </div>
             <div class="overlay-form">
               <div style="display:flex; flex-direction:column; gap:0.85rem; padding: 1rem 0.5rem;">
-                <textarea placeholder="Share an operational update..." [(ngModel)]="newStatusContent" class="overlay-textarea" rows="3"></textarea>
+                <textarea placeholder="Share an update..." [(ngModel)]="newStatusContent" class="overlay-textarea" rows="3"></textarea>
                 <button class="ui-action-btn" [disabled]="!newStatusContent.trim()" (click)="executeCreateStatus()">Publish Update</button>
               </div>
             </div>
@@ -489,7 +489,7 @@ import { VoiceRecorderService } from '../../core/services/voice-recorder.service
                             <mat-icon style="color: #10b981;">insert_drive_file</mat-icon>
                             <div class="doc-meta">
                               <span class="doc-title">{{ msg.content }}</span>
-                              <a [href]="msg.fileUrl || '#'" target="_blank">Download Secure Packet</a>
+                              <a [href]="msg.fileUrl || '#'" target="_blank">Download attachment</a>
                             </div>
                           </div>
                         } @else if (msg.messageType === 'SYSTEM') {
@@ -596,6 +596,9 @@ import { VoiceRecorderService } from '../../core/services/voice-recorder.service
                   <button mat-menu-item (click)="translateMessage(msg)">
                     <mat-icon>translate</mat-icon><span>{{ msg.translatedContent ? 'Show Original' : 'Translate to English' }}</span>
                   </button>
+                  <button mat-menu-item (click)="extractAction(msg)">
+                    <mat-icon>task_alt</mat-icon><span>Extract action → task</span>
+                  </button>
                   <button mat-menu-item (click)="copyText(msg)">
                     <mat-icon>content_copy</mat-icon><span>Copy Transmission</span>
                   </button>
@@ -670,7 +673,7 @@ import { VoiceRecorderService } from '../../core/services/voice-recorder.service
                    <div class="composer-input-wrap">
                       <button class="composer-icon-btn" (click)="emojiDrawerOpen = !emojiDrawerOpen"><mat-icon>mood</mat-icon></button>
                       <button class="composer-icon-btn" (click)="pollCreatorActive.set(true)" title="Operational Poll"><mat-icon>poll</mat-icon></button>
-                      <input type="text" [placeholder]="editingMessage() ? 'MODIFYING_TRANSIMISSION...' : 'Type message...'" 
+                      <input type="text" [placeholder]="editingMessage() ? 'Edit message...' : 'Type message...'" 
                              [(ngModel)]="currentInput" (keyup)="onTyping()" (keyup.enter)="onInputEnter()" (keyup.escape)="cancelEdit()">
                    </div>
                    @if (!currentInput) {
@@ -1267,7 +1270,7 @@ export class CommunicationPageComponent implements OnInit, OnDestroy {
     this.isAnalyzingCompliance.set(true);
     this.aiApi.checkCompliance(this.currentInput).subscribe(result => {
       this.isAnalyzingCompliance.set(false);
-      if (result && result.compliant === false) { this.toast.show('Transmission blocked: ' + (result.reason || 'Policy violation.'), 'danger'); return; }
+      if (result && result.compliant === false) { this.toast.show('Message blocked: ' + (result.reason || 'Policy violation.'), 'danger'); return; }
       const payload: any = { content: this.currentInput, messageType: 'TEXT', timestamp: new Date().toISOString(), senderId: this.currentUserId(), companyId: this.auth.user()?.companyId || 1, clientMsgId: Math.random().toString(36).substring(2, 15), isRead: false, deliveryStatus: 'SENT' };
       if (thread.type === 'GROUP') payload.groupId = thread.id;
       else payload.recipientId = thread.id;
@@ -1287,18 +1290,21 @@ export class CommunicationPageComponent implements OnInit, OnDestroy {
     const thread = this.selectedThread();
     if (!thread) return;
     const element = event.currentTarget as HTMLInputElement;
-    let fileList: FileList | null = element.files;
+    const fileList: FileList | null = element.files;
     if (fileList && fileList.length > 0) {
       const file = fileList[0];
       const isImg = file.type.startsWith('image/');
-      this.toast.show(`Uploading file: ${file.name}...`, 'success');
-      setTimeout(() => {
-        const payload: any = { content: isImg ? 'https://images.unsplash.com/photo-1543269865-cbf427effbad?auto=format&fit=crop&w=600&q=80' : file.name, messageType: isImg ? 'IMAGE' : 'DOCUMENT', timestamp: new Date().toISOString(), senderId: this.currentUserId(), companyId: this.auth.user()?.companyId || 1, clientMsgId: Math.random().toString(36).substring(2, 15), isRead: false, fileUrl: isImg ? 'https://images.unsplash.com/photo-1543269865-cbf427effbad?auto=format&fit=crop&w=600&q=80' : 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf' };
-        if (thread.type === 'GROUP') payload.groupId = thread.id; else payload.recipientId = thread.id;
-        if (this.selectedThreadId() === thread.id) { this.chatSocket.addOptimisticMessage(payload); this.messages.update(msgs => [...msgs, payload]); setTimeout(() => this.scrollToBottom(), 50); }
-        this.chatSocket.send(payload);
-        this.toast.show('Transmission uploaded successfully.', 'success');
-      }, 1500);
+      // No server-side file upload yet: preview the sender's real file locally
+      // via an object URL instead of hotlinking external placeholder content.
+      // Follow-up: POST the file to a document/media endpoint and send the
+      // returned URL so recipients can resolve it too.
+      const previewUrl = URL.createObjectURL(file);
+      const payload: any = { content: file.name, messageType: isImg ? 'IMAGE' : 'DOCUMENT', timestamp: new Date().toISOString(), senderId: this.currentUserId(), companyId: this.auth.user()?.companyId || 1, clientMsgId: Math.random().toString(36).substring(2, 15), isRead: false, fileUrl: previewUrl };
+      if (thread.type === 'GROUP') payload.groupId = thread.id; else payload.recipientId = thread.id;
+      if (this.selectedThreadId() === thread.id) { this.chatSocket.addOptimisticMessage(payload); this.messages.update(msgs => [...msgs, payload]); setTimeout(() => this.scrollToBottom(), 50); }
+      this.chatSocket.send(payload);
+      this.toast.show(`Attached ${file.name}.`, 'success');
+      element.value = '';
     }
   }
 
@@ -1334,13 +1340,13 @@ export class CommunicationPageComponent implements OnInit, OnDestroy {
     this.commsApi.editMessage(msg.id!, this.currentInput).subscribe(() => {
       this.currentInput = '';
       this.editingMessage.set(null);
-      this.snack.open('Transmission modified.', 'OK', { duration: 3000 });
+      this.snack.open('Message updated.', 'OK', { duration: 3000 });
     });
   }
 
   editMessage(msg: ChatMessage) { this.editingMessage.set(msg); this.currentInput = msg.content; }
   cancelEdit() { this.editingMessage.set(null); this.currentInput = ''; }
-  deleteMessage(msg: ChatMessage) { if (confirm('PURGE_TRANSMISSION: Are you sure?')) { this.commsApi.deleteMessage(msg.id!).subscribe(() => this.snack.open('Data purged.', 'OK', { duration: 3000 })); } }
+  deleteMessage(msg: ChatMessage) { if (confirm('Delete this message?')) { this.commsApi.deleteMessage(msg.id!).subscribe({ next: () => this.snack.open('Message deleted.', 'OK', { duration: 3000 }), error: () => this.snack.open('Could not delete message.', 'Dismiss', { duration: 4000 }) }); } }
   react(msg: ChatMessage, emoji: string) { this.commsApi.applyReaction(msg.id!, emoji, this.currentUserId(), this.auth.user()?.companyId || 1).subscribe(); }
   copyText(msg: ChatMessage) { navigator.clipboard.writeText(msg.content); this.snack.open('Text copied.', 'OK', { duration: 2000 }); }
 
@@ -1419,7 +1425,13 @@ export class CommunicationPageComponent implements OnInit, OnDestroy {
   generateHandover() { const thread = this.selectedThread(); if (thread?.type !== 'GROUP') return; this.handoverLoading.set(true); this.commsApi.getShiftHandover(thread.id).subscribe({ next: (res) => { this.handoverSummary.set(res.summary); this.handoverLoading.set(false); }, error: () => this.handoverLoading.set(false) }); }
   executeSearch() { if (!this.searchQuery.trim()) return; this.searchActive.set(true); this.commsApi.searchMessages(this.searchQuery).subscribe(results => this.searchResults.set(results)); }
   acknowledge(messageId: number) { this.commsApi.acknowledgeMessage(messageId).subscribe(() => { this.refreshSmartInbox(); this.toast.show('Acknowledged.', 'success'); }); }
-  voteInPoll(pollId: number, option: string) { this.commsApi.post(`/api/communication/chat/poll/${pollId}/vote?option=${encodeURIComponent(option)}`, {}).subscribe(() => this.toast.show('Vote recorded.', 'success')); }
+  voteInPoll(pollId: number, option: string) {
+    void pollId; void option;
+    // P1 orphan close-out: no BE poll-vote endpoint exists (removed dead
+    // POST /poll/{id}/vote that 404d). Polls render read-only until the
+    // polls backend lands.
+    this.toast.show('Poll voting is not available yet.', 'warning');
+  }
   openThread(msg: ChatMessage) { this.activeThreadParent.set(msg); this.threadLoading.set(true); this.commsApi.getThreadMessages(msg.id!).subscribe({ next: (msgs) => { this.threadMessages.set(msgs); this.threadLoading.set(false); }, error: () => this.threadLoading.set(false) }); }
   sendThreadReply(content: string) {
     const parent = this.activeThreadParent(); if (!parent || !content.trim()) return;
@@ -1427,6 +1439,22 @@ export class CommunicationPageComponent implements OnInit, OnDestroy {
     this.commsApi.sendMessage(payload).subscribe(saved => this.threadMessages.update(msgs => [...msgs, saved]));
   }
   translateMessage(msg: any) { if (msg.translatedContent) { msg.translatedContent = null; return; } this.commsApi.translateMessage(msg.content, 'English').subscribe(res => msg.translatedContent = res.translatedText); }
+  extractAction(msg: ChatMessage) {
+    if (!msg.id) return;
+    this.toast.show('Extracting action item…', 'info');
+    this.commsApi.extractTasks(msg.id, { createTask: true }).subscribe({
+      next: (res) => {
+        if (res?.createdTaskId) {
+          this.toast.show(`Task #${res.createdTaskId} created: ${res.suggestedTitle || 'action item'}`, 'success');
+        } else if (res?.actionDetected) {
+          this.toast.show(`Suggested: ${res.suggestedTitle || 'action item'} — no task created.`, 'info');
+        } else {
+          this.toast.show('No action detected in this message.', 'info');
+        }
+      },
+      error: () => this.toast.show('Extraction unavailable (AI service offline).', 'danger')
+    });
+  }
   showAuditLog() { this.commsApi.get<any[]>('/api/communication/chat/audit').subscribe(data => { this.auditEvents.set(data); this.auditActive.set(true); this.smartInboxActive.set(false); this.directSyncActive.set(false); this.groupSyncActive.set(false); this.pollCreatorActive.set(false); }); }
   addPollOption() { this.pollOptions.push(''); }
   removePollOption(i: number) { this.pollOptions.splice(i, 1); }

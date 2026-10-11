@@ -17,6 +17,16 @@ export const routes: Routes = [
         loadChildren: () => import('./features/dashboard/dashboard.routes').then((m) => m.DASHBOARD_ROUTES)
       },
       {
+        path: 'ops',
+        data: { requiredAnyScope: ['DASHBOARD_OPS_READ', 'ATTENDANCE_ORG_READ', 'LEAVE_ORG_APPROVE'] },
+        loadChildren: () => import('./features/ops/ops.routes').then((m) => m.OPS_ROUTES)
+      },
+      {
+        path: 'marketplace',
+        data: { requiredAnyScope: ['SCHEDULE_SELF_READ', 'SCHEDULE_TEAM_READ', 'SCHEDULE_ORG_READ'] },
+        loadChildren: () => import('./features/marketplace/marketplace.routes').then((m) => m.MARKETPLACE_ROUTES)
+      },
+      {
         path: 'notifications',
         data: { requiredAnyScope: ['DASHBOARD_SELF_READ', 'DASHBOARD_OPS_READ'] },
         loadChildren: () => import('./features/notifications/notifications.routes').then((m) => m.NOTIFICATIONS_ROUTES)
@@ -95,10 +105,9 @@ export const routes: Routes = [
         data: { requiredAnyScope: ['ANALYTICS_SELF_READ', 'ANALYTICS_TEAM_READ', 'ANALYTICS_ORG_READ', 'ANALYTICS_EXPORT'] },
         loadChildren: () => import('./features/reports/reports.routes').then((m) => m.REPORTS_ROUTES)
       },
-      {
-        path: 'helpdesk',
-        loadChildren: () => import('./features/helpdesk/helpdesk.routes').then((m) => m.HELPDESK_ROUTES)
-      },
+      // NOTE: /helpdesk route removed — no backend serves /api/helpdesk/**
+      // (gateway has no such route; all calls 404). Files remain on disk;
+      // re-add the route when a ticket service lands.
       {
         path: 'announcements',
         loadChildren: () => import('./features/announcements/announcements.routes').then((m) => m.ANNOUNCEMENTS_ROUTES)
@@ -116,13 +125,16 @@ export const routes: Routes = [
         path: 'tasks',
         data: { requiredAnyScope: ['TASKS_SELF_WRITE', 'TASKS_TEAM_WRITE', 'TASKS_ORG_WRITE'] },
         loadChildren: () => import('./features/tasks/tasks.routes').then((m) => m.TASKS_ROUTES)
+      },
+      {
+        path: 'integrations',
+        data: { requiredAnyScope: ['ORG_READ', 'ORG_DEPT_WRITE', 'ORG_LOCATION_WRITE'] },
+        loadChildren: () => import('./features/integrations/integrations.routes').then((m) => m.INTEGRATIONS_ROUTES)
       }
     ]
   },
-  {
-    path: 'sandbox',
-    loadChildren: () => import('./features/sandbox/sandbox.routes').then(m => m.SANDBOX_ROUTES)
-  },
+  // NOTE: /sandbox dev bypass removed (C-1). DevLoginComponent remains on disk
+  // for local UI testing only — re-enable locally via a guarded route, never commit.
   {
     path: '',
     pathMatch: 'full',

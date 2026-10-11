@@ -8,7 +8,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { AuthService } from '../../core/services/auth.service';
 import { SideSheetDrawerComponent } from '../../shared/components/side-sheet-drawer/side-sheet-drawer.component';
-import { catchError, of } from 'rxjs';
+import { PASSWORD_POLICY, passwordPolicyValidator, backendErrorMessage } from '../../shared/utils/password-policy';
 
 @Component({
   selector: 'app-profile-page',
@@ -23,57 +23,39 @@ import { catchError, of } from 'rxjs';
       <div class="profile-hero-card">
         <div class="profile-avatar-large">
           {{ getInitials() }}
-          <div class="avatar-edit-overlay" (click)="onUploadAvatar()">
-            <mat-icon>photo_camera</mat-icon>
-          </div>
         </div>
         <div class="profile-hero-info">
           <h2>{{ auth.user()?.name }}</h2>
-          <p id="profileHeroRole">ROLE_{{ auth.user()?.role }} · Operational Node · <span style="color:var(--success);">● ONLINE</span></p>
+          <p id="profileHeroRole">{{ auth.user()?.role }} · {{ auth.user()?.email }}</p>
           <div class="profile-hero-actions">
-            <button class="ui-btn ui-btn-primary" (click)="openEditDrawer()">Modify Identity</button>
-            <button class="ui-btn ui-btn-secondary" (click)="openPasswordDrawer()">Secure Password</button>
+            <button class="ui-btn ui-btn-primary" (click)="openEditDrawer()">Edit Profile</button>
+            <button class="ui-btn ui-btn-secondary" (click)="openPasswordDrawer()">Change Password</button>
           </div>
-        </div>
-      </div>
-
-      <div class="profile-stats-row mt-6">
-        <div class="ui-card profile-stat-card">
-          <span class="profile-stat-value">100%</span>
-          <span class="profile-stat-label">Reliability</span>
-        </div>
-        <div class="ui-card profile-stat-card">
-          <span class="profile-stat-value">NOMINAL</span>
-          <span class="profile-stat-label">Node Health</span>
-        </div>
-        <div class="ui-card profile-stat-card">
-          <span class="profile-stat-value">LVL_4</span>
-          <span class="profile-stat-label">Sync Depth</span>
         </div>
       </div>
 
       <div class="ui-card mt-6">
-        <div class="profile-section-title">Forensic Identification</div>
+        <div class="profile-section-title">Profile Details</div>
         <div class="profile-details-grid">
           <div class="profile-field-group">
-            <label>Master Identity</label>
+            <label>Name</label>
             <div class="profile-field-value">{{ auth.user()?.name }}</div>
           </div>
           <div class="profile-field-group">
-            <label>Primary Communication</label>
+            <label>Email</label>
             <div class="profile-field-value">{{ auth.user()?.email }}</div>
           </div>
           <div class="profile-field-group">
-            <label>Contact Protocol</label>
-            <div class="profile-field-value">{{ auth.user()?.phoneNumber || 'UNSET' }}</div>
+            <label>Phone</label>
+            <div class="profile-field-value">{{ auth.user()?.phoneNumber || '—' }}</div>
           </div>
           <div class="profile-field-group">
-            <label>Security Clearance</label>
-            <div class="profile-field-value text-mono" style="font-weight:700; color:var(--primary);">ROLE_{{ auth.user()?.role }}</div>
+            <label>Role</label>
+            <div class="profile-field-value text-mono" style="font-weight:700; color:var(--primary);">{{ auth.user()?.role }}</div>
           </div>
           <div class="profile-field-group">
-            <label>Tenant Hash</label>
-            <div class="profile-field-value text-mono">TID_{{ auth.user()?.companyId }}_AX</div>
+            <label>Company ID</label>
+            <div class="profile-field-value text-mono">{{ auth.user()?.companyId }}</div>
           </div>
         </div>
       </div>
@@ -82,9 +64,9 @@ import { catchError, of } from 'rxjs';
     <!-- EDIT PROFILE DRAWER -->
     <app-side-sheet-drawer
       [isOpen]="isEditDrawerOpen"
-      [title]="'Modify Identity'"
-      [subtitle]="'Updating operational metadata for core node.'"
-      [saveText]="'Commit Packet'"
+      [title]="'Edit Profile'"
+      [subtitle]="'Update your profile information.'"
+      [saveText]="'Save Changes'"
       [saveDisabled]="profileForm.invalid"
       (close)="isEditDrawerOpen = false"
       (save)="saveProfile()"
@@ -94,25 +76,25 @@ import { catchError, of } from 'rxjs';
             <div class="f-group"><label>First Name</label><input class="f-input" formControlName="firstName"></div>
             <div class="f-group"><label>Last Name</label><input class="f-input" formControlName="lastName"></div>
          </div>
-         <div class="f-group"><label>Contact Phone</label><input class="f-input" formControlName="phoneNumber"></div>
+         <div class="f-group"><label>Phone</label><input class="f-input" formControlName="phoneNumber"></div>
       </form>
     </app-side-sheet-drawer>
 
     <!-- PASSWORD DRAWER -->
     <app-side-sheet-drawer
       [isOpen]="isPasswordDrawerOpen"
-      [title]="'Secure Password Protocol'"
-      [subtitle]="'Rotating authentication credentials for session integrity.'"
-      [saveText]="'Rotate Key'"
+      [title]="'Change Password'"
+      [subtitle]="passwordHint"
+      [saveText]="'Update Password'"
       [saveDisabled]="passwordForm.invalid"
       (close)="isPasswordDrawerOpen = false"
       (save)="savePassword()"
     >
       <form [formGroup]="passwordForm" class="drawer-crud-form">
-         <div class="f-group"><label>Current Credentials</label><input class="f-input" type="password" formControlName="oldPassword"></div>
+         <div class="f-group"><label>Current Password</label><input class="f-input" type="password" formControlName="oldPassword" autocomplete="current-password"></div>
          <mat-divider style="margin:1rem 0;"></mat-divider>
-         <div class="f-group"><label>New Encryption Key</label><input class="f-input" type="password" formControlName="newPassword"></div>
-         <div class="f-group"><label>Verify Encryption Key</label><input class="f-input" type="password" formControlName="confirmPassword"></div>
+         <div class="f-group"><label>New Password</label><input class="f-input" type="password" formControlName="newPassword" autocomplete="new-password"></div>
+         <div class="f-group"><label>Confirm New Password</label><input class="f-input" type="password" formControlName="confirmPassword" autocomplete="new-password"></div>
       </form>
     </app-side-sheet-drawer>
   `,
@@ -121,15 +103,9 @@ import { catchError, of } from 'rxjs';
     .profile-viewport { max-width: 900px; margin: 0 auto; padding-bottom: 3rem; }
     .profile-hero-card { display: flex; align-items: center; gap: 3rem; padding: 3rem; background: var(--surface); border: 1px solid var(--border); border-radius: 24px; box-shadow: var(--shadow-md); margin-top: 1rem; }
     .profile-avatar-large { width: 140px; height: 140px; border-radius: 50%; background: linear-gradient(135deg, var(--primary), var(--accent)); color: #fff; display: grid; place-items: center; font-size: 3rem; font-weight: 900; position: relative; box-shadow: 0 10px 25px rgba(47, 111, 235, 0.3); }
-    .avatar-edit-overlay { position: absolute; bottom: 5px; right: 5px; width: 36px; height: 36px; background: var(--surface); border: 1px solid var(--border); border-radius: 50%; display: grid; place-items: center; cursor: pointer; color: var(--txt-secondary); box-shadow: var(--shadow-sm); }
     .profile-hero-info h2 { font-size: 2.25rem; font-weight: 900; letter-spacing: -0.04em; margin-bottom: 0.5rem; }
     .profile-hero-info p { color: var(--txt-muted); font-weight: 600; margin-bottom: 1.5rem; }
     .profile-hero-actions { display: flex; gap: 0.75rem; }
-
-    .profile-stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; }
-    .profile-stat-card { text-align: center; padding: 1.5rem; }
-    .profile-stat-value { display: block; font-size: 1.5rem; font-weight: 900; letter-spacing: -0.02em; }
-    .profile-stat-label { font-size: 0.7rem; font-weight: 800; color: var(--txt-muted); text-transform: uppercase; margin-top: 0.25rem; }
 
     .profile-section-title { font-size: 0.85rem; font-weight: 900; color: var(--primary); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 2rem; border-bottom: 1px solid var(--border); padding-bottom: 0.75rem; }
     .profile-details-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; }
@@ -165,9 +141,11 @@ export class ProfilePageComponent implements OnInit {
 
   passwordForm: FormGroup = this.fb.group({
     oldPassword: ['', [Validators.required]],
-    newPassword: ['', [Validators.required, Validators.minLength(6)]],
+    newPassword: ['', [Validators.required, passwordPolicyValidator()]],
     confirmPassword: ['', [Validators.required]]
   }, { validators: this.passwordMatchValidator });
+
+  protected readonly passwordHint = PASSWORD_POLICY.hint;
 
   ngOnInit(): void {
     const u = this.auth.user();
@@ -189,10 +167,10 @@ export class ProfilePageComponent implements OnInit {
     if (this.profileForm.invalid) return;
     this.auth.updateProfile(this.profileForm.value).subscribe({
       next: () => {
-        this.snack.open('Identity Packet Synchronized.', 'OK', { duration: 3000 });
+        this.snack.open('Profile updated.', 'OK', { duration: 3000 });
         this.isEditDrawerOpen = false;
       },
-      error: () => this.snack.open('Synchronization Failure.', 'OK', { duration: 4000 })
+      error: (err) => this.snack.open(backendErrorMessage(err, 'Could not update profile.'), 'Dismiss', { duration: 5000 })
     });
   }
 
@@ -201,20 +179,16 @@ export class ProfilePageComponent implements OnInit {
     const { oldPassword, newPassword } = this.passwordForm.value;
     this.auth.changePassword(oldPassword, newPassword).subscribe({
       next: () => {
-        this.snack.open('Credentials Rotated.', 'OK', { duration: 3000 });
+        this.snack.open('Password changed.', 'OK', { duration: 3000 });
         this.isPasswordDrawerOpen = false;
         this.passwordForm.reset();
       },
-      error: () => this.snack.open('Credential Rotation Failed.', 'OK', { duration: 4000 })
+      error: (err) => this.snack.open(backendErrorMessage(err, 'Could not change password.'), 'Dismiss', { duration: 6000 })
     });
   }
 
-  onUploadAvatar() {
-    this.snack.open('Avatar upload protocol pending implementation.', 'STANDBY', { duration: 3000 });
-  }
-
   protected getInitials() {
-    return this.auth.user()?.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() || 'OA';
+    return this.auth.user()?.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() || 'EW';
   }
 
   private passwordMatchValidator(g: FormGroup) {

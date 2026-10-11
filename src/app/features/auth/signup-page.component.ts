@@ -1,6 +1,7 @@
 import { Component, inject, signal, OnInit } from '@angular/core';
-import { FormBuilder, ReactiveFormsModule, Validators, AbstractControl, ValidationErrors } from '@angular/forms';
+import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink, ActivatedRoute } from '@angular/router';
+import { passwordPolicyValidator, passwordMatchValidator, backendErrorMessage, PASSWORD_POLICY } from '../../shared/utils/password-policy';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -78,6 +79,10 @@ import { AuthService } from '../../core/services/auth.service';
                 <mat-icon class="material-icons">lock</mat-icon>
                 <input type="password" class="f-input" formControlName="password" placeholder="Set secure password">
               </div>
+              <p style="font-size: 10px; color: var(--txt-muted); margin: 0; padding-left: 0.25rem;">{{ policyHint }}</p>
+              @if (form.get('password')?.hasError('passwordPolicy') && form.get('password')?.touched) {
+                <p style="font-size: 10px; color: var(--danger); margin: 0; padding-left: 0.25rem;">Password must meet complexity requirements.</p>
+              }
             </div>
 
             <div class="f-group">
@@ -118,12 +123,14 @@ export class SignupPageComponent implements OnInit {
   protected readonly loading = signal(false);
   protected readonly isEmailReadonly = signal(false);
 
+  protected readonly policyHint = PASSWORD_POLICY.hint;
+
   protected readonly form = this.fb.group({
     fullName: ['', [Validators.required]],
     email: ['', [Validators.required, Validators.email]],
-    password: ['', [Validators.required, Validators.minLength(6)]],
+    password: ['', [Validators.required, passwordPolicyValidator()]],
     confirmPassword: ['', [Validators.required]]
-  }, { validators: this.passwordMatchValidator });
+  }, { validators: passwordMatchValidator('password', 'confirmPassword') });
 
   ngOnInit(): void {
     this.route.queryParamMap.subscribe(params => {
@@ -136,16 +143,6 @@ export class SignupPageComponent implements OnInit {
     });
   }
 
-  private passwordMatchValidator(control: AbstractControl): ValidationErrors | null {
-    const password = control.get('password');
-    const confirm = control.get('confirmPassword');
-    if (password && confirm && password.value !== confirm.value) {
-      confirm.setErrors({ mismatch: true });
-      return { mismatch: true };
-    }
-    return null;
-  }
-
   protected submit(): void {
     if (this.form.invalid) {
       return;
@@ -156,12 +153,13 @@ export class SignupPageComponent implements OnInit {
     this.auth.signup(email ?? '', password ?? '', fullName ?? '').subscribe({
       next: () => {
         this.loading.set(false);
-        this.snack.open('Identity provisioned! You can now authenticate.', 'OK', { duration: 5000 });
+        this.snack.open('Account created. You can now sign in.', 'OK', { duration: 5000 });
         void this.router.navigateByUrl('/auth/login');
       },
-      error: () => {
+      error: (err) => {
         this.loading.set(false);
-        this.snack.open('Provision protocol failed. Connection interrupted.', 'Dismiss', { duration: 5000 });
+        // BE returns 403 when self-registration disabled — invite flow is canonical.
+        this.snack.open(backendErrorMessage(err, 'Registration failed.'), 'Dismiss', { duration: 6000 });
       }
     });
   }

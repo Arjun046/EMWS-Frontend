@@ -40,30 +40,41 @@ import { startWith, finalize } from 'rxjs';
     DecimalPipe
   ],
   template: `
-    <app-page-header 
-      title="Intelligence & Document Vault" 
-      subtitle="Secure gateway for corporate knowledge, personnel digital twins, and operational certifications." 
-      [actionLabel]="canWriteDocs() ? 'Upload Asset' : undefined"
+    <app-page-header
+      title="Documents"
+      subtitle="Company files, personal documents, and acknowledgment requests."
+      [actionLabel]="canWriteDocs() ? 'Upload' : undefined"
       icon="cloud_upload"
       (action)="onUpload()"
     />
 
     <section class="documents-shell">
+      @if (pendingAcks().length) {
+        <div class="ui-card" style="border-left:4px solid var(--warning); margin-bottom:1rem;">
+          <div class="ui-card-header"><h3>Awaiting my acknowledgment ({{ pendingAcks().length }})</h3></div>
+          @for (r of pendingAcks(); track r.id) {
+            <div style="display:flex;gap:0.75rem;align-items:center;padding:0.5rem 0;font-size:0.85rem;">
+              <span style="flex:1;">Document #{{ r.documentMetadataId }} — requested {{ r.createdAt | date:'short' }}</span>
+              <button mat-stroked-button color="primary" (click)="ack(r.id)">Acknowledge</button>
+            </div>
+          }
+        </div>
+      }
       <mat-tab-group class="enterprise-tabs">
         <!-- 1. PERSONAL VAULT -->
         <mat-tab>
           <ng-template mat-tab-label>
-             <mat-icon class="mr-2">fingerprint</mat-icon> My Digital Vault
+             <mat-icon class="mr-2">fingerprint</mat-icon> My Documents
           </ng-template>
-          
+
           <div class="tab-content mt-6">
             <div class="directory-actions mb-6">
               <mat-form-field appearance="outline" class="search-field no-subscript">
                 <mat-icon matPrefix>search</mat-icon>
-                <input matInput [formControl]="searchControl" placeholder="Filter my assets...">
+                <input matInput [formControl]="searchControl" placeholder="Search documents…">
               </mat-form-field>
               <div class="spacer"></div>
-              <button mat-stroked-button (click)="refresh()"><mat-icon>refresh</mat-icon> Sync Vault</button>
+              <button mat-stroked-button (click)="refresh()"><mat-icon>refresh</mat-icon> Refresh</button>
             </div>
 
             <div class="documents-grid">
@@ -84,10 +95,10 @@ import { startWith, finalize } from 'rxjs';
                       <mat-icon>{{ getIconForType(doc.fileType) }}</mat-icon>
                     </div>
                     <div class="doc-body">
-                      <strong class="doc-title">{{ doc.title }}</strong>
-                      <p class="doc-summary text-truncate">{{ doc.description }}</p>
+                      <strong class="doc-title">{{ doc.fileName }}</strong>
+                      <p class="doc-summary text-truncate">{{ doc.category }}</p>
                       <div class="doc-meta">
-                        <span class="file-size">{{ doc.fileSize / 1024 / 1024 | number:'1.1-1' }} MB</span>
+                        <span class="file-size">{{ doc.size / 1024 / 1024 | number:'1.1-1' }} MB</span>
                         <span class="dot">•</span>
                         <span class="file-type">{{ doc.fileType }}</span>
                       </div>
@@ -96,10 +107,29 @@ import { startWith, finalize } from 'rxjs';
                     <div class="doc-footer">
                        <span class="date">{{ doc.uploadDate | date:'mediumDate' }}</span>
                        <div class="actions">
-                          <button mat-icon-button color="primary" (click)="download(doc)" matTooltip="Secure Download"><mat-icon>download</mat-icon></button>
-                          <button mat-icon-button color="warn" *ngIf="canDeleteDoc(doc)" (click)="deleteDoc(doc)" matTooltip="Archive Asset"><mat-icon>delete_outline</mat-icon></button>
+                          <button mat-icon-button color="primary" (click)="download(doc)" matTooltip="Download" aria-label="Download"><mat-icon>download</mat-icon></button>
+                          <button mat-icon-button (click)="toggleVersions(doc.id)" matTooltip="Version history" aria-label="Version history"><mat-icon>history</mat-icon></button>
+                          <button mat-icon-button color="warn" *ngIf="canDeleteDoc(doc)" (click)="deleteDoc(doc)" matTooltip="Delete" aria-label="Delete"><mat-icon>delete_outline</mat-icon></button>
                        </div>
                     </div>
+                    @if (expandedDoc() === doc.id) {
+                      <div style="padding:0.75rem 1.25rem;font-size:0.8rem;background:#f8fafc;">
+                        @for (v of versions(); track v.id) {
+                          <div>v{{ v.versionNumber }} · {{ v.createdAt | date:'short' }}</div>
+                        }
+                        @if (!versions().length) { <span style="color:#94a3b8;">No versions found.</span> }
+                        <p style="color:#94a3b8;font-size:0.72rem;margin:0.5rem 0 0;">Re-upload the same filename to bump the version.</p>
+                        @if (canWriteDocs()) {
+                          <div style="display:flex;gap:0.5rem;margin-top:0.5rem;align-items:center;">
+                            <input #ackEmp class="f-input" type="number" placeholder="Employee ID" style="width:130px;height:34px;">
+                            <button mat-stroked-button (click)="requestAck(doc.id, +ackEmp.value)">Request ack</button>
+                          </div>
+                          @for (r of ackList(); track r.id) {
+                            <div>{{ r.requestedForEmployeeId }} · {{ r.status }}{{ r.ackedAt ? ' · ' + (r.ackedAt | date:'short') : '' }}</div>
+                          }
+                        }
+                      </div>
+                    }
                   </mat-card>
                 }
               }
@@ -107,16 +137,44 @@ import { startWith, finalize } from 'rxjs';
           </div>
         </mat-tab>
 
-        <!-- 2. CORPORATE KNOWLEDGE -->
-        <mat-tab *appHasScope="['DOCS_TEAM_READ', 'DOCS_WRITE']">
+        <!-- 2. COMPANY VAULT (BE /company, TEAM/ORG_READ) -->
+        <mat-tab *appHasScope="['DOCS_TEAM_READ', 'DOCS_ORG_READ', 'DOCS_WRITE']">
           <ng-template mat-tab-label>
-             <mat-icon class="mr-2">auto_stories</mat-icon> Knowledge Base
+             <mat-icon class="mr-2">auto_stories</mat-icon> Company Vault
           </ng-template>
           <div class="tab-content mt-6">
-             <div class="empty-state">
-                <mat-icon>lock</mat-icon>
-                <p>Company-wide knowledge management implementation in progress.</p>
-             </div>
+            @if (!companyDocs().length) {
+              <div class="empty-state"><mat-icon>folder_open</mat-icon><p>No company documents yet.</p></div>
+            }
+            <div class="documents-grid">
+              @for (doc of companyDocs(); track doc.id) {
+                <mat-card class="doc-card shadow-sm border-hover">
+                  <div class="doc-type-hero" [class]="doc.fileType.toLowerCase()">
+                    <mat-icon>{{ getIconForType(doc.fileType) }}</mat-icon>
+                  </div>
+                  <div class="doc-body">
+                    <strong class="doc-title">{{ doc.fileName }}</strong>
+                    <p class="doc-summary text-truncate">{{ doc.category }}</p>
+                  </div>
+                  <mat-divider></mat-divider>
+                  <div class="doc-footer">
+                    <span class="date">{{ doc.uploadDate | date:'mediumDate' }}</span>
+                    <div class="actions">
+                      <button mat-icon-button color="primary" (click)="download(doc)" matTooltip="Download" aria-label="Download"><mat-icon>download</mat-icon></button>
+                      <button mat-icon-button (click)="toggleVersions(doc.id)" matTooltip="Version history" aria-label="Version history"><mat-icon>history</mat-icon></button>
+                    </div>
+                  </div>
+                  @if (expandedDoc() === doc.id) {
+                    <div style="padding:0.75rem 1.25rem;font-size:0.8rem;">
+                      @for (v of versions(); track v.id) {
+                        <div>v{{ v.versionNumber }} · {{ v.createdAt | date:'short' }}</div>
+                      }
+                      @if (!versions().length) { <span style="color:#94a3b8;">No versions found.</span> }
+                    </div>
+                  }
+                </mat-card>
+              }
+            </div>
           </div>
         </mat-tab>
       </mat-tab-group>
@@ -169,24 +227,84 @@ export class DocumentsPageComponent implements OnInit {
   protected readonly searchControl = new FormControl('');
   protected readonly isLoading = signal(true);
   protected readonly documents = signal<DocumentMetadata[]>([]);
+  protected readonly companyDocs = signal<DocumentMetadata[]>([]);
+  protected readonly expandedDoc = signal<number | null>(null);
+  protected readonly versions = signal<{ id: number; versionNumber: number; createdAt: string }[]>([]);
+  protected readonly pendingAcks = signal<import('../../core/services/document.service').AckRequest[]>([]);
+  protected readonly ackList = signal<import('../../core/services/document.service').AckRequest[]>([]);
   private readonly searchQuery = toSignal(this.searchControl.valueChanges.pipe(startWith('')), { initialValue: '' });
 
   protected readonly filteredDocuments = computed(() => {
     const query = this.searchQuery()?.toLowerCase() || '';
     const all = this.documents();
     if (!query) return all;
-    return all.filter(d => d.title.toLowerCase().includes(query) || d.description?.toLowerCase().includes(query));
+    return all.filter(d => d.fileName.toLowerCase().includes(query) || d.category?.toLowerCase().includes(query));
   });
 
   ngOnInit() {
     this.refresh();
+    this.docApi.getMyAckRequests().subscribe({
+      next: (r) => this.pendingAcks.set((r ?? []).filter((x) => x.status === 'PENDING')),
+      error: () => this.pendingAcks.set([])
+    });
+  }
+
+  ack(requestId: number): void {
+    this.docApi.acknowledge(requestId).subscribe({
+      next: () => {
+        this.snack.open('Acknowledged.', 'OK', { duration: 3000 });
+        this.pendingAcks.set(this.pendingAcks().filter((r) => r.id !== requestId));
+      },
+      error: () => this.snack.open('Acknowledge failed.', 'Dismiss', { duration: 4000 })
+    });
+  }
+
+  requestAck(docId: number, employeeId: number): void {
+    if (!employeeId) return;
+    this.docApi.requestAck(docId, employeeId).subscribe({
+      next: () => {
+        this.snack.open(`Ack requested from #${employeeId}.`, 'OK', { duration: 3000 });
+        this.toggleVersions(docId, true);
+      },
+      error: () => this.snack.open('Request failed.', 'Dismiss', { duration: 4000 })
+    });
   }
 
   refresh() {
     this.isLoading.set(true);
     this.docApi.getMyDocuments()
       .pipe(finalize(() => this.isLoading.set(false)))
-      .subscribe(data => this.documents.set(data));
+      .subscribe({
+        next: (data) => this.documents.set(data ?? []),
+        error: () => {
+          this.documents.set([]);
+          this.snack.open('Could not load documents. Please try again.', 'Dismiss', { duration: 5000 });
+        }
+      });
+    if (this.auth.hasAnyScope(['DOCS_TEAM_READ', 'DOCS_ORG_READ'])) {
+      this.docApi.getCompanyDocuments().subscribe({
+        next: (d) => this.companyDocs.set(d ?? []),
+        error: () => this.companyDocs.set([])
+      });
+    }
+  }
+
+  toggleVersions(id: number, forceOpen = false): void {
+    if (this.expandedDoc() === id && !forceOpen) {
+      this.expandedDoc.set(null);
+      return;
+    }
+    this.expandedDoc.set(id);
+    this.versions.set([]);
+    this.ackList.set([]);
+    this.docApi.getVersions(id).subscribe({
+      next: (v) => this.versions.set(v ?? []),
+      error: () => this.versions.set([])
+    });
+    this.docApi.getDocAckRequests(id).subscribe({
+      next: (r) => this.ackList.set(r ?? []),
+      error: () => this.ackList.set([])
+    });
   }
 
   protected getIconForType(type: string): string {
@@ -212,7 +330,21 @@ export class DocumentsPageComponent implements OnInit {
       this.snack.open('You do not have permission to upload documents.', 'OK', { duration: 3000 });
       return;
     }
-    this.snack.open('Upload functionality available in the employee portal.', 'OK', { duration: 3000 });
+    // Real upload (BE POST /upload multipart; same filename bumps version).
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.onchange = () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      this.docApi.uploadDocument(file, 'GENERAL').subscribe({
+        next: () => {
+          this.snack.open(`Uploaded ${file.name} (new version if it existed).`, 'OK', { duration: 4000 });
+          this.refresh();
+        },
+        error: () => this.snack.open('Upload failed.', 'Dismiss', { duration: 4000 })
+      });
+    };
+    input.click();
   }
 
   protected download(doc: DocumentMetadata) {
@@ -221,7 +353,7 @@ export class DocumentsPageComponent implements OnInit {
         const url = window.URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        link.download = doc.title || 'document';
+        link.download = doc.fileName || 'document';
         link.click();
         window.URL.revokeObjectURL(url);
       },
@@ -234,8 +366,11 @@ export class DocumentsPageComponent implements OnInit {
       this.snack.open('You do not have permission to delete this document.', 'OK', { duration: 3000 });
       return;
     }
-    if (confirm(`Archive document "${doc.title}"?`)) {
-      this.docApi.deleteDocument(doc.id).subscribe(() => this.refresh());
+    if (confirm(`Delete document "${doc.fileName}"? This cannot be undone.`)) {
+      this.docApi.deleteDocument(doc.id).subscribe({
+        next: () => this.refresh(),
+        error: () => this.snack.open('Could not delete document. Please try again.', 'Dismiss', { duration: 5000 })
+      });
     }
   }
 }

@@ -38,6 +38,11 @@ testem.log
 /typings
 __screenshots__/
 
+# Local run/debug logs (diagnose locally; never commit)
+*.log
+/Screenshot *.png
+/figma_prototype_view.html
+
 # System files
 .DS_Store
 Thumbs.db

@@ -1,6 +1,7 @@
 import { HttpErrorResponse, HttpInterceptorFn } from '@angular/common/http';
 import { inject } from '@angular/core';
 import { Router } from '@angular/router';
+import { MatSnackBar } from '@angular/material/snack-bar';
 import { catchError, finalize, shareReplay, switchMap, throwError } from 'rxjs';
 import { AuthService } from '../services/auth.service';
 
@@ -9,6 +10,7 @@ let refreshRequest: ReturnType<AuthService['refreshToken']> | null = null;
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const auth = inject(AuthService);
   const router = inject(Router);
+  const snackBar = inject(MatSnackBar);
   const token = auth.token();
   const isRefreshRequest = req.url.includes('/api/auth/refresh');
   const isAuthRequest = req.url.includes('/api/auth/login') || req.url.includes('/api/auth/register');
@@ -39,6 +41,7 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
         }),
         catchError((refreshError) => {
           auth.logout();
+          snackBar.open('Session expired — please sign in again', 'Close', { duration: 4000 });
           router.navigate(['/auth/login']);
           return throwError(() => refreshError);
         })

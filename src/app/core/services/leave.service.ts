@@ -1,14 +1,17 @@
 import { Injectable } from '@angular/core';
 import { ApiService } from './api.service';
-import { Observable } from 'rxjs';
+import { Observable, expand, map, reduce, EMPTY } from 'rxjs';
 import { environment } from '../../../environments/environment';
+import { Page, PageQuery, isPage, toPageParams } from '../../shared/models/ui.models';
 
+/** Canonical BE LeaveType (leave-service). These exact names are validated server-side. */
 export enum LeaveType {
-  VACATION = 'VACATION',
+  ANNUAL = 'ANNUAL',
   SICK = 'SICK',
-  PERSONAL = 'PERSONAL',
-  BEREAVEMENT = 'BEREAVEMENT',
-  MATERNITY = 'MATERNITY'
+  CASUAL = 'CASUAL',
+  MATERNITY = 'MATERNITY',
+  PATERNITY = 'PATERNITY',
+  UNPAID = 'UNPAID'
 }
 
 export enum LeaveStatus {
@@ -50,23 +53,41 @@ export class LeaveService {
     return this.api.post<LeaveRequest>('/api/leaves', request, undefined, this.baseUrl);
   }
 
-  getMyRequests(): Observable<LeaveRequest[]> {
-    return this.api.get<LeaveRequest[]>('/api/leaves/me', [], this.baseUrl);
+  getMyRequests(query: PageQuery = { page: 0, size: 20 }): Observable<Page<LeaveRequest>> {
+    return this.api.get<Page<LeaveRequest>>(`/api/leaves/me?${toPageParams(query)}`, undefined, this.baseUrl);
   }
 
   getMyBalances(): Observable<LeaveBalance[]> {
     return this.api.get<LeaveBalance[]>('/api/leaves/me/balances', [], this.baseUrl);
   }
 
-  getCompanyRequests(status?: LeaveStatus): Observable<LeaveRequest[]> {
+  getCompanyRequests(status?: LeaveStatus, query: PageQuery = { page: 0, size: 20 }): Observable<Page<LeaveRequest>> {
     const params: string[] = [];
     if (status) params.push(`status=${status}`);
-    const query = params.length ? `?${params.join('&')}` : '';
-    return this.api.get<LeaveRequest[]>(`/api/leaves/company${query}`, [], this.baseUrl);
+    params.push(toPageParams(query));
+    return this.api.get<Page<LeaveRequest>>(`/api/leaves/company?${params.join('&')}`, undefined, this.baseUrl);
   }
 
-  getRequestsByStatus(status: LeaveStatus): Observable<LeaveRequest[]> {
-    return this.getCompanyRequests(status);
+  /** Queue/aggregation callers: follows all server pages so counts stay correct. */
+  getAllCompanyRequests(status?: LeaveStatus, size = 200): Observable<LeaveRequest[]> {
+    return this.getCompanyRequests(status, { page: 0, size }).pipe(
+      expand((page) => (page.last ? EMPTY : this.getCompanyRequests(status, { page: page.number + 1, size }))),
+      map((page) => (isPage<LeaveRequest>(page) ? page.content : [])),
+      reduce((all, content) => all.concat(content), [] as LeaveRequest[])
+    );
+  }
+
+  /** Own requests are low-volume: load all pages so client filters stay exact. */
+  getAllMyRequests(size = 200): Observable<LeaveRequest[]> {
+    return this.getMyRequests({ page: 0, size }).pipe(
+      expand((page) => (page.last ? EMPTY : this.getMyRequests({ page: page.number + 1, size }))),
+      map((page) => (isPage<LeaveRequest>(page) ? page.content : [])),
+      reduce((all, content) => all.concat(content), [] as LeaveRequest[])
+    );
+  }
+
+  getRequestsByStatus(status: LeaveStatus, query?: PageQuery): Observable<Page<LeaveRequest>> {
+    return this.getCompanyRequests(status, query);
   }
 
   updateStatus(id: number, status: LeaveStatus, comments?: string): Observable<LeaveRequest> {

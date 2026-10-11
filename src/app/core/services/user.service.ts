@@ -49,7 +49,38 @@ export class UserService {
   }
 
   searchUserByEmail(email: string): Observable<User> {
-    return this.api.get<User>(`/api/users/search?email=${email}`, undefined, this.baseUrl);
+    return this.api.get<User>(
+      `/api/users/search?email=${encodeURIComponent(email)}`,
+      undefined,
+      this.baseUrl
+    );
+  }
+
+  removeRole(id: number, roleName: string): Observable<User> {
+    return this.api.delete<User>(`/api/users/${id}/roles/${roleName}`, undefined, this.baseUrl);
+  }
+
+  // BE invite flow (required because POST /api/auth/register returns 403
+  // unless app.registration.enabled=true). Matches UserManagementController.
+  inviteUser(payload: { email: string; firstName?: string; lastName?: string; role: string }) {
+    return this.api.post<User>('/api/users/invite', payload, undefined, this.baseUrl);
+  }
+
+  pendingInvites(): Observable<User[]> {
+    return this.api.get<User[]>('/api/users/invites/pending', [], this.baseUrl);
+  }
+
+  resendInvite(id: number) {
+    return this.api.post<{ message: string }>(
+      `/api/users/${id}/invite/resend`,
+      {},
+      undefined,
+      this.baseUrl
+    );
+  }
+
+  cancelInvite(id: number) {
+    return this.api.delete<void>(`/api/users/${id}/invite`, undefined, this.baseUrl);
   }
 
   syncAuthWithEmployeeIds(): Observable<string> {

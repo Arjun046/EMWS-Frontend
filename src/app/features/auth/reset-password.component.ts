@@ -6,6 +6,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { AuthService } from '../../core/services/auth.service';
+import { passwordPolicyValidator, passwordMatchValidator, backendErrorMessage } from '../../shared/utils/password-policy';
 
 @Component({
   selector: 'app-reset-password',
@@ -91,9 +92,9 @@ export class ResetPasswordComponent implements OnInit {
   private token: string | null = null;
 
   protected readonly resetForm = this.fb.group({
-    password: ['', [Validators.required, Validators.minLength(8)]],
+    password: ['', [Validators.required, passwordPolicyValidator()]],
     confirmPassword: ['', [Validators.required]]
-  }, { validators: this.passwordMatchValidator });
+  }, { validators: passwordMatchValidator('password', 'confirmPassword') });
 
   ngOnInit(): void {
     this.token = this.route.snapshot.queryParamMap.get('token');
@@ -101,10 +102,6 @@ export class ResetPasswordComponent implements OnInit {
       this.snack.open('Invalid or missing reset token.', 'OK', { duration: 5000 });
       void this.router.navigate(['/auth/login']);
     }
-  }
-
-  private passwordMatchValidator(group: any) {
-    return group.get('password').value === group.get('confirmPassword').value ? null : { mismatch: true };
   }
 
   onSubmit(): void {
@@ -119,8 +116,7 @@ export class ResetPasswordComponent implements OnInit {
         },
         error: (err) => {
           this.isLoading.set(false);
-          const msg = err.error?.message || 'Failed to reset password. The link may have expired.';
-          this.snack.open(msg, 'OK', { duration: 5000 });
+          this.snack.open(backendErrorMessage(err, 'Failed to reset password. The link may have expired.'), 'OK', { duration: 6000 });
         }
       });
     }

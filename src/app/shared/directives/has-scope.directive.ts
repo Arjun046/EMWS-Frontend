@@ -56,7 +56,8 @@ export class HasScopeDirective implements OnInit, OnDestroy {
     if (!this.requiredScopes || this.requiredScopes.length === 0) {
       return true;
     }
-    // Check if user has ANY of the required scopes
-    return this.requiredScopes.some(scope => userScopes.includes(scope));
+    // Admin super-user bypass (matches AuthService.hasAnyScope + BE ROLE_ADMIN).
+    // Must not check raw includes() or admins stay hidden (P0 fix).
+    return this.authService.hasAnyScope(this.requiredScopes);
   }
 }
