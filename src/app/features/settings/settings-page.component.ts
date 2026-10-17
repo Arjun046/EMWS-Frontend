@@ -1,4 +1,4 @@
-import { Component, inject, signal, OnInit } from '@angular/core';
+import { Component, inject, signal, OnInit, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
@@ -7,9 +7,8 @@ import { MatDividerModule } from '@angular/material/divider';
 import { MatSnackBarModule, MatSnackBar } from '@angular/material/snack-bar';
 import { AuthService } from '../../core/services/auth.service';
 import { ThemeService } from '../../core/services/theme.service';
+import { UiPreferencesService, ACCENT_PRESETS } from '../../core/services/ui-preferences.service';
 import { backendErrorMessage } from '../../shared/utils/password-policy';
-
-const PREFS_KEY = 'ewms.ui.prefs';
 
 @Component({
   selector: 'app-settings-page',
@@ -46,13 +45,13 @@ const PREFS_KEY = 'ewms.ui.prefs';
                   <strong>Compact tables</strong>
                   <span>Denser rows in data tables.</span>
                 </div>
-                <div class="toggle-wrap" (click)="toggle('compact')">
-                   <div class="toggle-pill" [class.on]="settings().compact"></div>
+                <div class="toggle-wrap" (click)="prefs.setCompact(!prefs.compactTables())">
+                   <div class="toggle-pill" [class.on]="prefs.compactTables()"></div>
                 </div>
               </div>
 
               <div style="margin-top:2rem;">
-                 <button class="ui-btn ui-btn-primary" (click)="save()">Save Preferences</button>
+                 <button class="ui-btn ui-btn-primary" (click)="prefs.setCompact(!prefs.compactTables())">Toggle compact tables</button>
               </div>
             </div>
           }
@@ -69,6 +68,21 @@ const PREFS_KEY = 'ewms.ui.prefs';
                 </div>
                 <div class="toggle-wrap" (click)="theme.toggleTheme()">
                    <div class="toggle-pill" [class.on]="theme.isDarkMode()"></div>
+                </div>
+              </div>
+
+              <div class="settings-row">
+                <div class="settings-row-label">
+                  <strong>Accent color</strong>
+                  <span>Workspace highlight color applied to buttons, badges, and focus rings.</span>
+                </div>
+                <div class="accent-pills">
+                  @for (p of accentPresets; track p.key) {
+                    <button class="accent-pill" [class.active]="prefs.accentKey() === p.key"
+                            [style.--pill]="p.primary" (click)="prefs.setAccent(p.key)" [title]="p.label">
+                      <span class="pill-dot"></span>{{ p.label }}
+                    </button>
+                  }
                 </div>
               </div>
             </div>
@@ -157,13 +171,33 @@ const PREFS_KEY = 'ewms.ui.prefs';
     .ui-btn { padding: 0.75rem 1.5rem; border-radius: 12px; font-weight: 800; font-size: 0.85rem; cursor: pointer; border: none; display: inline-flex; align-items: center; gap: 0.5rem; transition: 0.2s; }
     .ui-btn-primary { background: var(--primary); color: #fff; }
     .ui-btn-secondary { background: var(--surface-2); color: var(--txt-secondary); border: 1px solid var(--border); }
+
+    .accent-pills { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.5rem; }
+    .accent-pill { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0.75rem; border-radius: 8px; border: 1px solid var(--border-2); background: var(--surface); color: var(--txt-main); cursor: pointer; font-size: 0.8rem; font-weight: 700; transition: 0.2s; }
+    .accent-pill:hover { border-color: var(--pill, var(--primary)); background: var(--surface-2); }
+    .accent-pill.active { border-color: var(--pill, var(--primary)); background: color-mix(in srgb, var(--pill, var(--primary)) 12%, white); color: var(--pill, var(--primary)); }
+    .accent-pill.active .pill-dot { background: var(--pill, var(--primary)); box-shadow: 0 0 0 3px color-mix(in srgb, var(--pill, var(--primary)) 35%, white); }
+    .pill-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--pill, var(--primary)); }
   `]
 })
 export class SettingsPageComponent implements OnInit {
   private readonly snack = inject(MatSnackBar);
   private readonly auth = inject(AuthService);
+  protected readonly prefs = inject(UiPreferencesService);
   protected readonly theme = inject(ThemeService);
+  protected readonly accentPresets = ACCENT_PRESETS;
   protected readonly activePanel = signal('prefs');
+
+  constructor() {
+    effect(() => {
+      // Reflect compact tables preference as a body class so tables can style themselves.
+      if (this.prefs.compactTables()) {
+        document.body.classList.add('compact-tables');
+      } else {
+        document.body.classList.remove('compact-tables');
+      }
+    });
+  }
 
   protected readonly sessions = signal<any[]>([]);
   protected readonly mfaEnabled = signal(false);
@@ -227,24 +261,5 @@ export class SettingsPageComponent implements OnInit {
       next: () => { this.snack.open('MFA disabled.', 'OK', { duration: 3000 }); this.mfaCode = ''; this.reloadSecurity(); },
       error: (err) => this.snack.open(backendErrorMessage(err, 'Disable failed.'), 'Dismiss', { duration: 5000 })
     });
-  }
-  
-  protected settings = signal(this.loadPrefs());
-
-  private loadPrefs(): { compact: boolean } {
-    try {
-      const raw = localStorage.getItem(PREFS_KEY);
-      if (raw) return { compact: !!(JSON.parse(raw) as { compact?: boolean }).compact };
-    } catch { /* corrupted prefs: fall through to defaults */ }
-    return { compact: false };
-  }
-
-  protected toggle(key: keyof ReturnType<typeof this.loadPrefs>) {
-    this.settings.update(s => ({ ...s, [key]: !s[key] }));
-  }
-
-  protected save() {
-    localStorage.setItem(PREFS_KEY, JSON.stringify(this.settings()));
-    this.snack.open('Preferences saved on this device.', 'OK', { duration: 3000 });
   }
 }

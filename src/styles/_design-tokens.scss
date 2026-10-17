@@ -1,0 +1,135 @@
+// EMWS design tokens — centralized source of truth for colors, typography,
+// spacing, borders, radii, shadows, breakpoints, and interaction states.
+// Consumed by src/styles.scss. Component styles should reference these
+// variables rather than hardcoding values.
+
+:root {
+  /* ── Light theme ────────────────────────────────────────────────────── */
+  --ews-bg: #f8fafc;
+  --ews-surface: #ffffff;
+  --ews-surface-2: #f1f5f9;
+  --ews-surface-3: #e2e8f0;
+  --ews-border: #e2e8f0;
+  --ews-border-2: #cbd5e1;
+
+  --ews-primary: #2f6feb;
+  --ews-primary-soft: #ebf1fd;
+  --ews-primary-hover: #1e5ad4;
+  --ews-accent: #8b5cf6;
+  --ews-accent-soft: #f5f3ff;
+
+  --ews-txt-main: #0f172a;
+  --ews-txt-secondary: #475569;
+  /* Muted text meets WCAG AA (4.5:1) on surface (#fff 5.45) and surface-2 (#f1f5f9 4.97). */
+  --ews-txt-muted: #5b6b7f;
+
+  --ews-success: #10b981;
+  --ews-success-soft: #ecfdf5;
+  --ews-warning: #f59e0b;
+  --ews-warning-soft: #fffbeb;
+  --ews-danger: #ef4444;
+  --ews-danger-soft: #fef2f2;
+
+  --ews-radius-xl: 20px;
+  --ews-radius-lg: 14px;
+  --ews-radius-md: 10px;
+  --ews-radius-sm: 8px;
+
+  --ews-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05);
+  --ews-shadow-md: 0 4px 6px -1px rgba(15, 23, 42, 0.08);
+  --ews-shadow-lg: 0 20px 25px -5px rgba(15, 23, 42, 0.1);
+  --ews-ease: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* ── Breakpoints (responsive) ───────────────────────────────────────── */
+  --ews-breakpoint-sm: 640px;
+  --ews-breakpoint-md: 768px;
+  --ews-breakpoint-lg: 1024px;
+  --ews-breakpoint-xl: 1280px;
+
+  /* ── Component heights / sizing ─────────────────────────────────────── */
+  --ews-height-input: 42px;
+  --ews-height-button: 40px;
+  --ews-height-header: 64px;
+  --ews-sidebar-width: 240px;
+
+  /* ── Focus / interaction ────────────────────────────────────────────── */
+  --ews-focus-outline: 2px solid var(--ews-primary);
+  --ews-focus-offset: 2px;
+  --ews-focus-radius: 4px;
+}
+
+body.global-dark-mode {
+  /* ── Dark theme ─────────────────────────────────────────────────────── */
+  --ews-bg: #090d16;
+  --ews-surface: #0f172a;
+  --ews-surface-2: #1e293b;
+  --ews-surface-3: #334155;
+  --ews-border: #1e293b;
+  --ews-border-2: #334155;
+
+  --ews-primary-soft: rgba(47, 111, 235, 0.15);
+  --ews-accent-soft: rgba(139, 92, 246, 0.15);
+
+  --ews-txt-main: #f8fafc;
+  --ews-txt-secondary: #94a3b8;
+  /* Muted text meets WCAG AA (4.5:1) on dark surfaces. */
+  --ews-txt-muted: #94a3b8;
+
+  --ews-success-soft: rgba(16, 185, 129, 0.12);
+  --ews-warning-soft: rgba(245, 158, 11, 0.12);
+  --ews-danger-soft: rgba(239, 68, 68, 0.12);
+}
+
+/* Backward-compatible aliases (prefixed --var-*) so existing inline styles
+   that reference --primary / --surface / etc. keep working during migration. */
+:root {
+  --primary: var(--ews-primary);
+  --primary-soft: var(--ews-primary-soft);
+  --primary-hover: var(--ews-primary-hover);
+  --accent: var(--ews-accent);
+  --accent-soft: var(--ews-accent-soft);
+
+  --bg: var(--ews-bg);
+  --surface: var(--ews-surface);
+  --surface-2: var(--ews-surface-2);
+  --surface-3: var(--ews-surface-3);
+  --border: var(--ews-border);
+  --border-2: var(--ews-border-2);
+
+  --txt-main: var(--ews-txt-main);
+  --txt-secondary: var(--ews-txt-secondary);
+  --txt-muted: var(--ews-txt-muted);
+
+  --success: var(--ews-success);
+  --success-soft: var(--ews-success-soft);
+  --warning: var(--ews-warning);
+  --warning-soft: var(--ews-warning-soft);
+  --danger: var(--ews-danger);
+  --danger-soft: var(--ews-danger-soft);
+
+  --radius-xl: var(--ews-radius-xl);
+  --radius-lg: var(--ews-radius-lg);
+  --radius-md: var(--ews-radius-md);
+  --radius-sm: var(--ews-radius-sm);
+
+  --shadow-sm: var(--ews-shadow-sm);
+  --shadow-md: var(--ews-shadow-md);
+  --shadow-lg: var(--ews-shadow-lg);
+  --ease: var(--ews-ease);
+}
+body.global-dark-mode {
+  --primary-soft: var(--ews-primary-soft);
+  --accent-soft: var(--ews-accent-soft);
+  --bg: var(--ews-bg);
+  --surface: var(--ews-surface);
+  --surface-2: var(--ews-surface-2);
+  --surface-3: var(--ews-surface-3);
+  --border: var(--ews-border);
+  --border-2: var(--ews-border-2);
+  --txt-main: var(--ews-txt-main);
+  --txt-secondary: var(--ews-txt-secondary);
+  --txt-muted: var(--ews-txt-muted);
+  --success-soft: var(--ews-success-soft);
+  --warning-soft: var(--ews-warning-soft);
+  --danger-soft: var(--ews-danger-soft);
+}

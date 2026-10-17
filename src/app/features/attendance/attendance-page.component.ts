@@ -67,7 +67,7 @@ import { catchError, of } from 'rxjs';
             </div>
             <div class="ui-card" style="padding: 1rem; background: var(--surface-2); margin-bottom: 0; border-radius:12px;">
                <span style="font-size: 0.65rem; font-weight: 800; color: var(--txt-muted); text-transform: uppercase; letter-spacing:0.05em;">On-time rate</span>
-               <div style="font-size: 1.5rem; font-weight: 900; color: var(--success);" id="attendanceGeoIntegrity">{{ geoVerifiedPercent() }}%</div>
+               <div style="font-size: 1.5rem; font-weight: 900; color: var(--success);" id="attendanceOnTimeRate">{{ onTimePercent() }}%</div>
             </div>
           </div>
         </div>
@@ -566,11 +566,11 @@ export class AttendancePageComponent implements OnInit {
     this.activeRecords().length
   );
 
-  protected geoVerifiedPercent = computed(() => {
+  protected onTimePercent = computed(() => {
     const total = this.dataSource.data.length;
     if (total === 0) return 100;
-    const verified = this.dataSource.data.filter(a => !a.isLate).length;
-    return Math.round((verified / total) * 100);
+    const onTime = this.dataSource.data.filter(a => !a.isLate).length;
+    return Math.round((onTime / total) * 100);
   });
 
   openViewDrawer(rec: Attendance) {

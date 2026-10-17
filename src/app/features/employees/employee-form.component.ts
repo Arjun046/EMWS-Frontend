@@ -138,34 +138,34 @@ import { toSignal } from '@angular/core/rxjs-interop';
       </mat-dialog-content>
 
       <footer class="m-footer">
-        <button class="ui-btn ui-btn-secondary" style="background:#fff; color:#000; border:none;" (click)="onCancel()">Abort Sync</button>
-        <button class="ui-btn ui-btn-primary" [style.background]="form.valid ? 'var(--primary)' : '#4a5568'" [disabled]="form.invalid" (click)="onSave()">
+        <button class="ui-btn ui-btn-secondary" (click)="onCancel()">Cancel</button>
+        <button class="ui-btn ui-btn-primary" [disabled]="form.invalid" (click)="onSave()">
           {{ data ? 'Commit Identity Packet' : 'Initialize Identity' }}
         </button>
       </footer>
     </div>
   `,
   styles: [`
-    .m-shell { display: flex; flex-direction: column; background: #0f172a; border-radius: 0; width: 800px; max-width: 100%; border: 1px solid #1e293b; color: #fff; }
-    .m-header { padding: 2rem 2.5rem; background: #1e293b; border-bottom: 1px solid #334155; display: flex; justify-content: space-between; align-items: flex-start; }
-    .m-title-stack h3 { font-size: 1.4rem; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 0.25rem; color: #fff; }
-    .m-title-stack p { font-size: 0.8rem; color: #94a3b8; font-weight: 600; margin: 0; }
+    .m-shell { display: flex; flex-direction: column; background: var(--surface); border-radius: var(--radius-lg); width: 800px; max-width: 100%; border: 1px solid var(--border); color: var(--txt-main); box-shadow: var(--shadow-lg); }
+    .m-header { padding: 2rem 2.5rem; background: var(--surface-2); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: flex-start; }
+    .m-title-stack h3 { font-size: 1.4rem; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 0.25rem; color: var(--txt-main); }
+    .m-title-stack p { font-size: 0.8rem; color: var(--txt-muted); font-weight: 600; margin: 0; }
     
-    .m-body { padding: 2.5rem; max-height: 70vh; background: #0f172a; }
-    .m-footer { padding: 1.25rem 2.5rem; border-top: 1px solid #1e293b; display: flex; justify-content: flex-end; gap: 1rem; background: #1e293b; }
+    .m-body { padding: 2.5rem; max-height: 70vh; background: var(--surface); overflow-y: auto; }
+    .m-footer { padding: 1.25rem 2.5rem; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 1rem; background: var(--surface-2); }
 
-    .f-section-title { font-size: 0.85rem; font-weight: 900; color: #94a3b8; text-transform: none; letter-spacing: 0.05em; margin: 2rem 0 1.25rem; }
+    .f-section-title { font-size: 0.85rem; font-weight: 900; color: var(--primary); text-transform: uppercase; letter-spacing: 0.05em; margin: 2rem 0 1.25rem; }
     .f-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
     .f-group { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1.5rem; }
-    .f-lab { font-size: 0.65rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.08em; }
-    .f-input { height: 48px; border-radius: 10px; border: none; padding: 0 1.25rem; font-family: inherit; font-size: 0.95rem; background: #05070a; color: #fff; width: 100%; outline: none; transition: all 0.2s; }
-    .f-input:focus { background: #0a0e14; box-shadow: 0 0 0 2px var(--primary); }
-    .f-input:disabled { opacity: 0.6; cursor: not-allowed; }
+    .f-lab { font-size: 0.65rem; font-weight: 800; color: var(--txt-secondary); text-transform: uppercase; letter-spacing: 0.08em; }
+    .f-input { height: 48px; border-radius: var(--radius-sm); border: 1.5px solid var(--border); padding: 0 1.25rem; font-family: inherit; font-size: 0.95rem; background: var(--surface); color: var(--txt-main); width: 100%; outline: none; transition: border-color 0.2s var(--ease); }
+    .f-input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); }
+    .f-input:disabled { opacity: 0.6; cursor: not-allowed; background: var(--surface-2); }
 
     .text-mono { font-family: 'JetBrains Mono', monospace; }
-    .ui-btn { padding: 0.75rem 1.5rem; border-radius: 8px; font-size: 0.85rem; font-weight: 800; cursor: pointer; border: none; transition: 0.2s; }
-    .ui-btn-primary { color: #fff; box-shadow: 0 4px 12px rgba(47, 111, 235, 0.2); }
-    .ui-btn-secondary { background: var(--surface-2); color: var(--txt-secondary); }
+    .ui-btn { padding: 0.75rem 1.5rem; border-radius: var(--radius-md); font-size: 0.85rem; font-weight: 800; cursor: pointer; border: none; transition: 0.2s; }
+    .ui-btn-primary { background: var(--primary); color: #fff; box-shadow: 0 4px 12px rgba(47, 111, 235, 0.2); }
+    .ui-btn-secondary { background: var(--surface-2); color: var(--txt-secondary); border: 1px solid var(--border); }
   `]
 })
 export class EmployeeFormComponent implements OnInit {

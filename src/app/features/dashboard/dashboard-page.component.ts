@@ -9,6 +9,7 @@ import { WidgetSocketService } from '../../core/services/widget-socket.service';
 import { AttendanceService, Attendance } from '../../core/services/attendance.service';
 import { AuthService } from '../../core/services/auth.service';
 import { AnnouncementService, Announcement } from '../../core/services/announcement.service';
+import { LeaveService, LeaveStatus } from '../../core/services/leave.service';
 import { TrendChartComponent } from '../../shared/components/trend-chart.component';
 
 @Component({
@@ -76,13 +77,13 @@ import { TrendChartComponent } from '../../shared/components/trend-chart.compone
           }
         } @else {
           <div style="height: 160px; width: 100%;">
-             <app-trend-chart [data]="telemetry()" color="var(--primary)" />
+             <app-trend-chart [data]="chartData()" color="var(--primary)" />
           </div>
           <div style="display:flex; gap:1rem; flex-wrap:wrap; font-size:0.75rem; color:var(--txt-muted); padding: 0 0.25rem;">
-            <span>Present: {{ telemetry()[0] }}</span>
-            <span>Absent: {{ telemetry()[1] }}</span>
-            <span>Late: {{ telemetry()[2] }}</span>
-            <span>On leave: {{ telemetry()[3] }}</span>
+            <span>Present: {{ telemetry()[0].value }}</span>
+            <span>Absent: {{ telemetry()[1].value }}</span>
+            <span>Late: {{ telemetry()[2].value }}</span>
+            <span>On leave: {{ telemetry()[3].value }}</span>
           </div>
         }
       </div>
@@ -106,6 +107,19 @@ import { TrendChartComponent } from '../../shared/components/trend-chart.compone
                  </span>
               </div>
               <div class="kpi-metric-value">{{ stat.value }}</div>
+            </div>
+          }
+
+          <!-- Pending approvals (managers / HR only) -->
+          @if (canSeeApprovals() && pendingApprovals() !== null) {
+            <div class="ui-card kpi-card">
+              <div class="kpi-meta-row">
+                 <span class="kpi-metric-title">Pending Approvals</span>
+                 <span class="ui-badge" [class.ui-badge-warning]="pendingApprovals()! > 0" [class.ui-badge-success]="pendingApprovals()! === 0">
+                   {{ pendingApprovalsLoading() ? 'Loading…' : (pendingApprovals()! > 0 ? 'Needs review' : 'Caught up') }}
+                 </span>
+              </div>
+              <div class="kpi-metric-value">{{ pendingApprovalsLoading() ? '—' : pendingApprovals()! }}</div>
             </div>
           }
         }
@@ -190,6 +204,7 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
   protected readonly dashboardApi = inject(DashboardService);
   protected readonly socket = inject(WidgetSocketService);
   protected readonly attendanceApi = inject(AttendanceService);
+  protected readonly leaveApi = inject(LeaveService);
   protected readonly announcementApi = inject(AnnouncementService);
   private readonly snack = inject(MatSnackBar);
 
@@ -199,22 +214,31 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
   protected readonly liveTime = signal(Date.now());
   protected readonly isLoading = signal(true);
   protected readonly biometricScanning = signal(false);
+  protected readonly pendingApprovals = signal<number | null>(null);
+  protected readonly pendingApprovalsLoading = signal(false);
   private timerHandle?: any;
 
-  /** Real-data chart series derived from live DashboardService stats
-   * (Present, Absent, Late, On Leave). No mock values. */
+  /** Telemetry series preserving unknown values ('—') instead of converting them to 0. */
   protected readonly telemetry = computed(() => {
     const stats = this.dashboardApi.stats();
-    const num = (label: string): number => {
+    const entry = (label: string) => {
       const found = stats.find((s) => s.label === label);
-      const n = Number(found?.value);
-      return Number.isFinite(n) ? n : 0;
+      const value = found?.value ?? '—';
+      return { label, value, unknown: value === '—' };
     };
-    return [num('Present Today'), num('Absent Today'), num('Late Arrivals'), num('On Leave')];
+    return [entry('Present Today'), entry('Absent Today'), entry('Late Arrivals'), entry('On Leave')];
   });
 
-  /** True when there is any activity to chart (template cannot use arrow fns). */
-  protected readonly hasTelemetry = computed(() => this.telemetry().some((v) => v !== 0));
+  /** Numeric chart data (unknown → 0, chart only rendered when hasTelemetry). */
+  protected readonly chartData = computed(() => this.telemetry().map((t) => (t.unknown ? 0 : Number(t.value))));
+
+  /** True when at least one stat carries real (non-unknown) data. */
+  protected readonly hasTelemetry = computed(() => this.telemetry().some((t) => !t.unknown));
+
+  /** True when the current user can view company-level pending approvals. */
+  protected readonly canSeeApprovals = computed(() =>
+    this.auth.hasAnyScope(['LEAVE_TEAM_APPROVE', 'LEAVE_ORG_APPROVE'])
+  );
 
   constructor() {
     effect(() => {
@@ -224,6 +248,9 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
         if (latest.topic.includes('attendance') || latest.topic.includes('scheduling')) {
           this.loadDashboardData();
         }
+        if (latest.topic.includes('leave')) {
+          this.loadPendingApprovals();
+        }
       }
     }, { allowSignalWrites: true });
   }
@@ -231,6 +258,7 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
   ngOnInit() {
     this.timerHandle = setInterval(() => this.liveTime.set(Date.now()), 1000);
     this.loadDashboardData();
+    this.loadPendingApprovals();
     this.socket.connect();
   }
 
@@ -256,6 +284,27 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
       this.currentStatus.set(data.statusData.status);
       this.currentAttendance = data.todayRecords.find((r: Attendance) => r.clockOut === null) || null;
       this.announcements.set(data.news);
+    });
+  }
+
+  /** Pending leave approvals count for users with approve scope. Unknown (null) otherwise. */
+  private loadPendingApprovals(): void {
+    if (!this.canSeeApprovals()) {
+      this.pendingApprovals.set(null);
+      return;
+    }
+    this.pendingApprovalsLoading.set(true);
+    this.leaveApi.getAllCompanyRequests(LeaveStatus.PENDING).pipe(
+      catchError(() => of([]))
+    ).subscribe({
+      next: (reqs) => {
+        this.pendingApprovals.set(reqs.length);
+        this.pendingApprovalsLoading.set(false);
+      },
+      error: () => {
+        this.pendingApprovals.set(null);
+        this.pendingApprovalsLoading.set(false);
+      }
     });
   }
 

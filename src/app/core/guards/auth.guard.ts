@@ -15,13 +15,13 @@ export const authGuard: CanActivateFn = (route) => {
   const requiredScope = route.data?.['requiredScope'] as string | undefined;
   const requiredAnyScope = route.data?.['requiredAnyScope'] as string[] | undefined;
   if (requiredScope && !auth.hasScope(requiredScope)) {
-    snackBar.open('Access denied', 'Close', { duration: 3000 });
-    return router.createUrlTree(['/dashboard']);
+    snackBar.open('Access denied — insufficient permission.', 'Close', { duration: 3000 });
+    return router.createUrlTree(['/auth/forbidden']);
   }
 
   if (requiredAnyScope?.length && !auth.hasAnyScope(requiredAnyScope)) {
-    snackBar.open('Access denied', 'Close', { duration: 3000 });
-    return router.createUrlTree(['/dashboard']);
+    snackBar.open('Access denied — insufficient permission.', 'Close', { duration: 3000 });
+    return router.createUrlTree(['/auth/forbidden']);
   }
 
   return true;

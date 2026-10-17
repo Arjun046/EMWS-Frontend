@@ -1,5 +1,6 @@
-import { Injectable, inject, signal } from '@angular/core';
+import { Injectable, inject, signal, effect } from '@angular/core';
 import { ApiService } from './api.service';
+import { UiPreferencesService } from './ui-preferences.service';
 import { tap } from 'rxjs';
 
 export interface CompanyTheme {
@@ -17,8 +18,9 @@ export interface CompanyTheme {
 })
 export class ThemeService {
   private readonly api = inject(ApiService);
+  private readonly prefs = inject(UiPreferencesService);
   private readonly THEME_KEY = 'ewms-theme';
-  
+
   isDarkMode = signal<boolean>(false);
   currentTheme = signal<CompanyTheme | null>(null);
 
@@ -31,6 +33,15 @@ export class ThemeService {
       this.isDarkMode.set(prefersDark);
     }
     this.applyTheme();
+
+    // Apply the saved accent color as CSS variables on every change.
+    effect(() => {
+      const key = this.prefs.accentKey();
+      const preset = this.prefs.presetFor(key);
+      if (preset) {
+        this.applyAccent(preset.primary, preset.accent);
+      }
+    });
   }
 
   toggleTheme() {
@@ -72,6 +83,16 @@ export class ThemeService {
     }
   }
 
+  /** Persist user-chosen accent colors as CSS variables so components can reference them. */
+  private applyAccent(primary: string, accent: string) {
+    const root = document.documentElement;
+    root.style.setProperty('--ews-accent-primary', primary);
+    root.style.setProperty('--ews-accent-accent', accent);
+    // Backward-compatible aliases so existing inline styles keep working.
+    root.style.setProperty('--primary', primary);
+    root.style.setProperty('--accent', accent);
+  }
+
   private applyBranding(theme: CompanyTheme) {
     const root = document.documentElement;
     root.style.setProperty('--primary', theme.primaryColor);
@@ -83,5 +104,7 @@ export class ThemeService {
     const root = document.documentElement;
     root.style.removeProperty('--primary');
     root.style.removeProperty('--accent');
+    root.style.removeProperty('--ews-accent-primary');
+    root.style.removeProperty('--ews-accent-accent');
   }
 }
