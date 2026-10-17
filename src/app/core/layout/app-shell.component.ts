@@ -180,9 +180,15 @@ interface NavigationItemExtended extends NavigationItem {
       </div>
     </div>
 
-    <!-- GLOBAL UI OVERLAYS -->
-    <app-ai-assistant />
-    <app-global-search />
+    <!-- GLOBAL UI OVERLAYS (deferred: excluded from the initial bundle) -->
+    @defer (on idle) {
+      <app-ai-assistant />
+    }
+    @defer (when search.isOpen()) {
+      <app-global-search />
+    } @placeholder {
+      <div></div>
+    }
 
     <!-- TOAST NOTIFICATIONS -->
     <div class="toast-notifications-container" aria-live="polite" aria-atomic="false">

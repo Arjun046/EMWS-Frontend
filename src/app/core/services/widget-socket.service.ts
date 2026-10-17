@@ -1,5 +1,5 @@
 import { Injectable, signal } from '@angular/core';
-import { Client, IMessage } from '@stomp/stompjs';
+import type { Client, IMessage } from '@stomp/stompjs';
 import { environment } from '../../../environments/environment';
 import { WidgetEvent } from '../../shared/models/ui.models';
 
@@ -15,24 +15,34 @@ const WIDGET_TOPICS = [
 @Injectable({ providedIn: 'root' })
 export class WidgetSocketService {
   private client: Client | null = null;
+  private readonly pendingTopics: string[] = [];
   private readonly eventsState = signal<WidgetEvent[]>([]);
   private readonly statusState = signal<'disconnected' | 'connecting' | 'connected'>('disconnected');
 
   readonly events = this.eventsState.asReadonly();
   readonly status = this.statusState.asReadonly();
 
-  connect(): void {
+  /**
+   * Lazily imports the STOMP client on first connect so the library rides a
+   * deferred chunk instead of the initial bundle.
+   */
+  async connect(): Promise<void> {
     if (this.client?.active || this.statusState() === 'connecting') {
       return;
     }
 
     this.statusState.set('connecting');
+    const { Client } = await import('@stomp/stompjs');
+    if (this.statusState() !== 'connecting') {
+      return;
+    }
     this.client = new Client({
       brokerURL: environment.widgetSocketUrl,
       reconnectDelay: 4000,
       onConnect: () => {
         this.statusState.set('connected');
         WIDGET_TOPICS.forEach((topic) => this.client?.subscribe(topic, (message) => this.handleMessage(topic, message)));
+        this.pendingTopics.splice(0).forEach((topic) => this.subscribe(topic));
       },
       onStompError: () => this.statusState.set('disconnected'),
       onWebSocketClose: () => this.statusState.set('disconnected')
@@ -44,6 +54,8 @@ export class WidgetSocketService {
   subscribe(topic: string): void {
     if (this.client?.connected) {
       this.client.subscribe(topic, (message) => this.handleMessage(topic, message));
+    } else if (!this.pendingTopics.includes(topic)) {
+      this.pendingTopics.push(topic);
     }
   }
 

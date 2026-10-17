@@ -1,5 +1,5 @@
 import { Injectable, signal } from '@angular/core';
-import { Client, IMessage } from '@stomp/stompjs';
+import type { Client, IMessage } from '@stomp/stompjs';
 import { environment } from '../../../environments/environment';
 import { ChatMessage } from '../../shared/models/ui.models';
 
@@ -21,7 +21,12 @@ export class ChatSocketService {
   readonly typing = this.typingState.asReadonly();
   readonly newGroupEvent = this.newGroupEventState.asReadonly();
 
-  connect(userId: number, companyId: number): void {
+  /**
+   * Lazily imports the STOMP client on first connect so the library rides a
+   * deferred chunk instead of the initial bundle. Fire-and-forget: existing
+   * callers ignore the promise; connection state flows through status().
+   */
+  async connect(userId: number, companyId: number): Promise<void> {
     if (this.currentUserId === userId && this.currentCompanyId === companyId && this.client?.active) {
       return;
     }
@@ -35,7 +40,12 @@ export class ChatSocketService {
     this.currentUserId = userId;
     this.currentCompanyId = companyId;
     this.statusState.set('connecting');
-    
+
+    const { Client } = await import('@stomp/stompjs');
+    if (this.statusState() !== 'connecting' || this.currentUserId !== userId) {
+      return;
+    }
+
     const brokerUrl = environment.chatSocketUrl.replace('http', 'ws').replace('https', 'wss');
 
     this.client = new Client({
@@ -91,6 +101,9 @@ export class ChatSocketService {
       this.currentGroupId = null;
       this.statusState.set('disconnected');
       console.log('[ChatSocket] Disconnected successfully');
+    } else {
+      // Also cancels a connect() whose lazy import is still in flight.
+      this.statusState.set('disconnected');
     }
   }
 
